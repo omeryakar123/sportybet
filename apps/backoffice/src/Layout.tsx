@@ -1,43 +1,99 @@
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { setToken } from "./api";
+import { api, setToken } from "./api";
 
-const NAV = [
-  { to: "/", label: "Dashboard", icon: "▦" },
-  { to: "/players", label: "Oyuncular", icon: "👥" },
-  { to: "/bets", label: "Spor Bahisleri", icon: "⚽" },
-  { to: "/sportsbook", label: "Sportsbook (Betco)", icon: "🔌" },
-  { to: "/bonuses", label: "Bonuslar", icon: "🎁" },
-  { to: "/promo-codes", label: "Promo Kodlar", icon: "🏷" },
-  { to: "/cms/banners", label: "CMS · Bannerlar", icon: "🖼" },
-  { to: "/cms/promotions", label: "CMS · Promosyonlar", icon: "📣" },
-  { to: "/cms/css", label: "CMS · CSS", icon: "</>" },
+type Role = "SUPERADMIN" | "ADMIN" | "FINANCE" | "RISK" | "SUPPORT" | "CMS";
+type Item = { to: string; label: string; roles?: Role[] };
+type Group = { label: string; icon: string; to?: string; roles?: Role[]; items?: Item[] };
+
+const ALL: Role[] = ["ADMIN", "FINANCE", "RISK", "SUPPORT", "CMS"];
+export const NAV: Group[] = [
+  { label: "Dashboard", icon: "▦", to: "/", roles: ["ADMIN", "FINANCE", "RISK", "SUPPORT"] },
+  { label: "Oyuncular", icon: "👥", to: "/players", roles: ["ADMIN", "FINANCE", "RISK", "SUPPORT"] },
+  { label: "Raporlar", icon: "📊", roles: ["ADMIN", "FINANCE", "RISK"], items: [
+    { to: "/reports/sportsbook", label: "Sportsbook Raporu" },
+    { to: "/reports/financial", label: "Finans Raporu" },
+    { to: "/reports/bonus", label: "Bonus Raporu" },
+    { to: "/reports/players", label: "Oyuncu Raporu" },
+  ] },
+  { label: "Finans", icon: "💳", roles: ["ADMIN", "FINANCE", "RISK"], items: [
+    { to: "/finance/deposits", label: "Yatırım Talepleri" },
+    { to: "/finance/withdrawals", label: "Çekim Talepleri" },
+    { to: "/finance/transactions", label: "Tüm İşlemler" },
+    { to: "/finance/payment-systems", label: "Ödeme Sistemleri", roles: ["ADMIN", "FINANCE"] },
+  ] },
+  { label: "Promosyon Araçları", icon: "🎁", roles: ["ADMIN", "RISK", "SUPPORT", "CMS", "FINANCE"], items: [
+    { to: "/bonuses", label: "Bonuslar", roles: ["ADMIN", "RISK", "SUPPORT", "FINANCE"] },
+    { to: "/bonus-requests", label: "Bonus Talepleri", roles: ["ADMIN", "RISK", "SUPPORT"] },
+    { to: "/promo-codes", label: "Promo Kodlar", roles: ["ADMIN", "CMS"] },
+  ] },
+  { label: "Sportsbook", icon: "⚽", roles: ["ADMIN", "RISK", "SUPPORT", "FINANCE"], items: [
+    { to: "/bets", label: "Spor Bahisleri" },
+    { to: "/sportsbook", label: "Betco Entegrasyonu", roles: ["ADMIN", "RISK", "FINANCE"] },
+  ] },
+  { label: "Kullanıcı Yönetimi", icon: "👤", roles: ["ADMIN"], items: [
+    { to: "/users", label: "Admin Kullanıcıları", roles: [] },
+    { to: "/audit-logs", label: "İşlem Geçmişi (Audit)" },
+  ] },
+  { label: "CMS", icon: "🧩", roles: ["ADMIN", "CMS"], items: [
+    { to: "/cms/banners", label: "Bannerlar" },
+    { to: "/cms/promotions", label: "Promosyonlar" },
+    { to: "/cms/pages", label: "Sayfalar" },
+    { to: "/cms/settings", label: "Site Ayarları (Logo, SEO, Menü)" },
+    { to: "/cms/css", label: "Web / Mobil CSS" },
+  ] },
 ];
 
+export const can = (role: Role | undefined, roles?: Role[]) => role === "SUPERADMIN" || !roles || (!!role && roles.includes(role));
+
 export default function Layout() {
-  const nav = useNavigate();
+  const nav = useNavigate(); const loc = useLocation();
+  const [me, setMe] = useState<any>(null);
   const [now, setNow] = useState(new Date());
+  const [collapsed, setCollapsed] = useState(false);
+  const [open, setOpen] = useState<Record<string, boolean>>({});
+  useEffect(() => { api("/admin/me").then(setMe).catch(() => { setToken(null); nav("/login"); }); }, []);
   useEffect(() => { const t = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(t); }, []);
+  useEffect(() => { // aktif grubu aç
+    const g = NAV.find((g) => g.items?.some((i) => loc.pathname.startsWith(i.to)));
+    if (g) setOpen((o) => ({ ...o, [g.label]: true }));
+  }, [loc.pathname]);
+  const role: Role | undefined = me?.role;
+  const link = (active: boolean) => `flex items-center gap-3 rounded px-3 py-2 ${active ? "bg-bo-blue text-white" : "text-bo-text hover:bg-bo-head"}`;
   return (
     <div className="flex min-h-screen">
-      <aside className="w-[200px] shrink-0 border-r border-bo-line bg-white">
-        <div className="flex h-11 items-center px-4 font-bold text-bo-blue">SportyBet BO</div>
-        <nav className="flex flex-col">
-          {NAV.map((n) => (
-            <NavLink key={n.to} to={n.to} end={n.to === "/"}
-              className={({ isActive }) => `flex items-center gap-3 px-4 py-2.5 ${isActive ? "bg-bo-blue text-white" : "text-bo-text hover:bg-bo-head"}`}>
-              <span className="w-5 text-center">{n.icon}</span>{n.label}
-            </NavLink>
+      <aside className={`${collapsed ? "w-14" : "w-[230px]"} sticky top-0 h-screen shrink-0 overflow-y-auto border-r border-bo-line bg-white transition-all`}>
+        <div className="flex h-11 items-center gap-2 px-3">
+          <button onClick={() => setCollapsed(!collapsed)} className="text-xl text-bo-blue">☰</button>
+          {!collapsed && <span className="font-bold text-bo-blue">SportyBet BO</span>}
+        </div>
+        <nav className="flex flex-col gap-0.5 p-1.5">
+          {NAV.filter((g) => can(role, g.roles ?? ALL)).map((g) => g.to ? (
+            <NavLink key={g.label} to={g.to} end className={({ isActive }) => link(isActive)} title={g.label}><span className="w-5 text-center">{g.icon}</span>{!collapsed && g.label}</NavLink>
+          ) : (
+            <div key={g.label}>
+              <button onClick={() => setOpen((o) => ({ ...o, [g.label]: !o[g.label] }))} className={`${link(false)} w-full`} title={g.label}>
+                <span className="w-5 text-center">{g.icon}</span>{!collapsed && <><span className="flex-1 text-left">{g.label}</span><span className="text-xs text-bo-muted">{open[g.label] ? "▾" : "›"}</span></>}
+              </button>
+              {open[g.label] && !collapsed && (
+                <div className="ml-6 flex flex-col border-l border-bo-line pl-2">
+                  {g.items!.filter((i) => can(role, i.roles ?? g.roles)).map((i) => (
+                    <NavLink key={i.to} to={i.to} className={({ isActive }) => `rounded px-2 py-1.5 text-[13px] ${isActive ? "text-bo-blue font-medium" : "text-bo-text hover:text-bo-blue"}`}>{i.label}</NavLink>
+                  ))}
+                </div>
+              )}
+            </div>
           ))}
         </nav>
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-11 items-center justify-end gap-6 border-b border-bo-line bg-white px-5 text-xs text-bo-blue">
+        <header className="sticky top-0 z-30 flex h-11 items-center justify-end gap-6 border-b border-bo-line bg-white px-5 text-xs text-bo-blue">
           <span>sportybet</span>
           <span>🕑 {now.toLocaleTimeString("tr-TR")}</span>
-          <button onClick={() => { setToken(null); nav("/login"); }} className="text-bo-muted hover:text-bo-red">ADMIN · Çıkış</button>
+          <NavLink to="/profile" className="hover:underline">👤 {me?.username} <span className="text-bo-muted">({me?.role})</span></NavLink>
+          <button onClick={() => { setToken(null); nav("/login"); }} className="text-bo-muted hover:text-bo-red">Çıkış</button>
         </header>
-        <main className="min-w-0 flex-1 p-4"><Outlet /></main>
+        <main className="min-w-0 flex-1 p-4"><Outlet context={{ me }} /></main>
       </div>
     </div>
   );

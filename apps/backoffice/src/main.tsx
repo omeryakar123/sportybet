@@ -9,10 +9,14 @@ import Dashboard from "./pages/Dashboard";
 import Players from "./pages/Players";
 import PlayerDetail from "./pages/PlayerDetail";
 import Bonuses from "./pages/Bonuses";
+import BonusRequests from "./pages/BonusRequests";
 import PromoCodes from "./pages/PromoCodes";
 import SportsBets from "./pages/SportsBets";
 import Sportsbook from "./pages/Sportsbook";
-import { CmsBanners, CmsPromotions, CmsCss } from "./pages/Cms";
+import { PaymentRequests, Transactions, PaymentSystems } from "./pages/Finance";
+import { SportsbookReport, FinancialReport, BonusReport } from "./pages/Reports";
+import { Users, AuditLogs, Profile } from "./pages/Users";
+import { CmsBanners, CmsPromotions, CmsCss, CmsPages, CmsSettings } from "./pages/Cms";
 
 const Private = ({ children }: { children: React.ReactNode }) => (getToken() ? <>{children}</> : <Navigate to="/login" replace />);
 
@@ -24,13 +28,28 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         <Route index element={<Dashboard />} />
         <Route path="players" element={<Players />} />
         <Route path="players/:id" element={<PlayerDetail />} />
+        <Route path="reports/sportsbook" element={<SportsbookReport />} />
+        <Route path="reports/financial" element={<FinancialReport />} />
+        <Route path="reports/bonus" element={<BonusReport />} />
+        <Route path="reports/players" element={<Players title="Oyuncu Raporu" reportMode />} />
+        <Route path="finance/deposits" element={<PaymentRequests key="d" type="DEPOSIT" />} />
+        <Route path="finance/withdrawals" element={<PaymentRequests key="w" type="WITHDRAWAL" />} />
+        <Route path="finance/transactions" element={<Transactions />} />
+        <Route path="finance/payment-systems" element={<PaymentSystems />} />
+        <Route path="bonuses" element={<Bonuses />} />
+        <Route path="bonus-requests" element={<BonusRequests />} />
+        <Route path="promo-codes" element={<PromoCodes />} />
         <Route path="bets" element={<SportsBets />} />
         <Route path="sportsbook" element={<Sportsbook />} />
-        <Route path="bonuses" element={<Bonuses />} />
-        <Route path="promo-codes" element={<PromoCodes />} />
+        <Route path="users" element={<Users />} />
+        <Route path="audit-logs" element={<AuditLogs />} />
+        <Route path="profile" element={<Profile />} />
         <Route path="cms/banners" element={<CmsBanners />} />
         <Route path="cms/promotions" element={<CmsPromotions />} />
+        <Route path="cms/pages" element={<CmsPages />} />
+        <Route path="cms/settings" element={<CmsSettings />} />
         <Route path="cms/css" element={<CmsCss />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
   </BrowserRouter>,

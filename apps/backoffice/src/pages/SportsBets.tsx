@@ -1,25 +1,36 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
-import { Panel, money } from "../ui";
-import { BetsTable } from "./PlayerDetail";
+import { Panel, Field, DataTable, DateRange, presetRange, money, Err, useForm } from "../ui";
+import { betCols, Selections } from "./PlayerDetail";
 
 export default function SportsBets() {
-  const [state, setState] = useState(""); const [live, setLive] = useState(""); const [coupon, setCoupon] = useState(""); const [playerId, setPlayerId] = useState(""); const [bonusOnly, setBonusOnly] = useState(false);
-  const [bets, setBets] = useState<any[]>([]);
-  const load = () => api(`/admin/bets?${new URLSearchParams(Object.fromEntries(Object.entries({ state, isLive: live, coupon, playerId, bonusOnly: bonusOnly ? "true" : "" }).filter(([, v]) => v)))}`).then(setBets).catch(() => {});
-  const total = (k: string) => bets.reduce((a, b) => a + Number(b[k] ?? 0), 0);
-  useEffect(() => { load(); }, []);
+  const [range, setRange] = useState(presetRange("today"));
+  const { f, bind, check } = useForm({ state: "", isLive: "", coupon: "", playerId: "", type: "", minStake: "", bonusOnly: false as any });
+  const [bets, setBets] = useState<any[]>([]); const [e, setE] = useState("");
+  const load = () => api(`/admin/bets?${new URLSearchParams(Object.fromEntries(Object.entries({ ...f, bonusOnly: f.bonusOnly ? "true" : "", from: range.from, to: range.to, take: "1000" }).filter(([, v]) => v)))}`).then(setBets).catch((x) => setE(x.message));
+  useEffect(() => { load(); }, [range]);
+  const tot = (k: string) => bets.filter((b) => b.state !== "CANCELLED").reduce((a, b) => a + Number(b[k] ?? 0), 0);
+  const settled = bets.filter((b) => ["WON", "LOST", "RETURNED", "CASHED_OUT"].includes(b.state));
+  const ggr = settled.reduce((a, b) => a + Number(b.stake) - Number(b.winAmount), 0);
   return (
     <>
-      <Panel title="Filtre"><div className="flex gap-3">
-        <select className="inp max-w-48" value={state} onChange={(e) => setState(e.target.value)}><option value="">Tüm Durumlar</option>{["PENDING", "ACTIVE", "WON", "LOST", "RETURNED", "CASHED_OUT", "CANCELLED"].map((s) => <option key={s}>{s}</option>)}</select>
-        <select className="inp max-w-48" value={live} onChange={(e) => setLive(e.target.value)}><option value="">Canlı + Maç Öncesi</option><option value="true">Canlı</option><option value="false">Maç Öncesi</option></select>
-        <input className="inp max-w-48" placeholder="Kupon No" value={coupon} onChange={(e) => setCoupon(e.target.value)} />
-        <input className="inp max-w-36" placeholder="Oyuncu ID" value={playerId} onChange={(e) => setPlayerId(e.target.value)} />
-        <label className="flex items-center gap-2 whitespace-nowrap"><input type="checkbox" checked={bonusOnly} onChange={(e) => setBonusOnly(e.target.checked)} />Bonuslu</label>
-        <button className="btn-blue" onClick={load}>Uygula</button>
-      </div></Panel>
-      <Panel title="Tüm Spor Bahisleri" right={<span className="text-bo-text">Kupon: {bets.length} · Yatırılan: {money(total("stake"))} · Ödenen: {money(total("winAmount"))} · GGR: {money(total("stake") - total("winAmount"))}</span>}><BetsTable bets={bets} showPlayer /></Panel>
+      <Panel title="Filtre">
+        <div className="mb-3"><DateRange value={range} onChange={setRange} /></div>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
+          <Field label="Durum"><select className="inp" {...bind("state")}><option value="">Tümü</option><option value="ACTIVE">Açık</option><option value="WON">Kazandı</option><option value="LOST">Kaybetti</option><option value="RETURNED">İade</option><option value="CASHED_OUT">Cashout</option><option value="CANCELLED">İptal</option></select></Field>
+          <Field label="Canlı"><select className="inp" {...bind("isLive")}><option value="">Hepsi</option><option value="true">Canlı</option><option value="false">Maç Öncesi</option></select></Field>
+          <Field label="Tip"><select className="inp" {...bind("type")}><option value="">Hepsi</option><option value="SINGLE">Tekli</option><option value="MULTIPLE">Kombine</option></select></Field>
+          <Field label="Kupon No"><input className="inp" {...bind("coupon")} /></Field>
+          <Field label="Oyuncu ID"><input className="inp" {...bind("playerId")} /></Field>
+          <Field label="Min. Yatırılan"><input type="number" className="inp" {...bind("minStake")} /></Field>
+          <label className="flex items-end gap-2 pb-2"><input type="checkbox" {...check("bonusOnly")} />Sadece bonuslu</label>
+        </div>
+        <div className="mt-3 flex justify-end"><button className="btn-blue w-28" onClick={load}>Uygula</button></div>
+      </Panel>
+      <Panel title="Spor Bahisleri" right={<span className="text-bo-text">Kupon: {bets.length} · Yatırılan: {money(tot("stake"))} · Ödenen: {money(tot("winAmount"))} · GGR (sonuçlanan): <b className={ggr < 0 ? "text-bo-red" : "text-bo-green"}>{money(ggr)}</b></span>}>
+        <Err e={e} />
+        <DataTable rows={bets} cols={betCols(true)} csvName="spor_bahisleri" expand={(b) => <Selections b={b} />} />
+      </Panel>
     </>
   );
 }
