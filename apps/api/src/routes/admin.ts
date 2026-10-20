@@ -56,7 +56,7 @@ const toNum = (v: unknown) => (v === "" || v === undefined || v === null ? undef
 const dateQ = z.object({ from: z.string().optional(), to: z.string().optional() });
 
 export async function adminRoutes(app: FastifyInstance) {
-  app.setErrorHandler((err, _req, reply) => {
+  app.setErrorHandler((err: any, _req, reply) => {
     if (err instanceof z.ZodError) return reply.code(400).send({ error: "VALIDATION_ERROR", detail: err.flatten() });
     if (err instanceof BizError) return reply.code(400).send({ error: err.message });
     if (err instanceof Prisma.PrismaClientKnownRequestError) {

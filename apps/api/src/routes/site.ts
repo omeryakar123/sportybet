@@ -13,7 +13,7 @@ import { redeemPromo } from "../services/bonus.js";
 type PlayerJwt = { playerId: number; kind: "player" };
 
 export async function siteRoutes(app: FastifyInstance) {
-  app.setErrorHandler((err, _req, reply) => {
+  app.setErrorHandler((err: any, _req, reply) => {
     if (err instanceof z.ZodError) return reply.code(400).send({ error: "VALIDATION_ERROR", detail: err.flatten() });
     if (err instanceof BizError || /^[A-Z_]+$/.test(err.message)) return reply.code(400).send({ error: err.message });
     app.log.error(err);
