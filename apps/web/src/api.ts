@@ -1,4 +1,5 @@
-export const API_URL = (import.meta as any).env?.VITE_API_URL || "http://localhost:4000";
+const guess = () => { try { const h = location.host; return location.protocol + "//" + (h.includes("localhost") ? "localhost:4000" : "api-" + h.replace(/^(www\.|bo-)/, "")); } catch { return "http://localhost:4000"; } };
+export const API_URL = (import.meta as any).env?.VITE_API_URL || guess();
 const TOKEN_KEY = "sb_web_token";
 export const getToken = () => { try { return localStorage.getItem(TOKEN_KEY); } catch { return null; } };
 export const setToken = (t: string | null) => { try { t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY); } catch {} };

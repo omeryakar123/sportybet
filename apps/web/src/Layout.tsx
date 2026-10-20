@@ -1,0 +1,318 @@
+import { useEffect, useRef, useState } from "react";
+import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { api, setToken } from "./api";
+import { Btn, ErrBox, Field, I, inp, money, pct, useStore } from "./lib";
+
+function Logo({ className = "h-9" }: { className?: string }) {
+  const { settings } = useStore();
+  if (settings.logoUrl) return <img src={settings.logoUrl} alt={settings.siteName ?? "SportyBet"} className={`${className} w-auto max-w-[220px] object-contain object-left`} draggable={false} />;
+  return (
+    <span className={`${className} flex items-center text-[22px] leading-none font-extrabold tracking-tight`}>
+      <span className="text-fg">{(settings.siteName ?? "SportyBet").replace(/bet/i, "")}</span><span className="text-primary">Bet</span>
+    </span>
+  );
+}
+
+// ---------------- Sidebar ----------------
+const SPORT_ITEMS = [
+  { to: "/spor?page=live", icon: "live", label: "Canlı Bahis" },
+  { to: "/spor", icon: "calendar", label: "Maç Öncesi" },
+  { to: "/spor?sport=Soccer", icon: "ball", label: "Futbol" },
+  { to: "/spor?sport=Basketball", icon: "ball", label: "Basketbol" },
+  { to: "/spor?sport=Tennis", icon: "ball", label: "Tenis" },
+  { to: "/hesap/kuponlarim", icon: "ticket", label: "Kuponlarım" },
+];
+
+function SideLink({ to, icon, label, count, badge, exact }: { to: string; icon: string; label: string; count?: number; badge?: string; exact?: boolean }) {
+  const { setSidebarOpen } = useStore();
+  return (
+    <NavLink to={to} end={exact} onClick={() => setSidebarOpen(false)}
+      className={({ isActive }) => `flex h-10 items-center gap-3 rounded-lg px-3 text-sm font-semibold transition-colors ${isActive ? "bg-card text-fg" : "text-muted hover:bg-card hover:text-fg"}`}>
+      <I n={icon} className="size-[18px] shrink-0" />
+      <span className="flex-1 truncate">{label}</span>
+      {badge && <span className="rounded-sm bg-primary px-1.5 py-0.5 text-[10px] font-extrabold tracking-wide text-primary-fg uppercase">{badge}</span>}
+      {count !== undefined && count > 0 && <span className="rounded-sm bg-elevated px-1.5 py-0.5 text-[11px] font-bold text-soft">{count}</span>}
+    </NavLink>
+  );
+}
+const SideHead = ({ t }: { t: string }) => <div className="mt-5 mb-1.5 px-3 text-[11px] font-extrabold tracking-wider text-dim uppercase">{t}</div>;
+
+function SidebarBody() {
+  const { predCats, settings } = useStore();
+  const total = predCats.reduce((a, c) => a + (c.activeCount ?? 0), 0);
+  return (
+    <nav className="flex-1 overflow-y-auto px-3 pt-3 pb-8">
+      <SideLink to="/" icon="home" label="Ana Sayfa" exact />
+      <SideHead t="Spor" />
+      {SPORT_ITEMS.map((s) => <SideLink key={s.label} {...s} exact={s.to === "/spor"} />)}
+      <SideHead t="Tahminler" />
+      <SideLink to="/tahminler" icon="grid" label="Tüm Tahminler" count={total} exact />
+      <SideLink to="/liderlik" icon="trophy" label="Liderlik Tablosu" />
+      {predCats.filter((c) => c.activeCount > 0).map((c) => (
+        <SideLink key={c.id} to={`/tahminler?kategori=${c.slug}`} icon={c.icon && !c.icon.startsWith("http") ? "hash" : "hash"} label={c.name} count={c.activeCount} />
+      ))}
+      <SideHead t="Ayrıcalıkları Keşfet" />
+      <SideLink to="/vip" icon="crown" label="VIP Kulübü" badge="Yakında" />
+      <SideLink to="/promosyonlar" icon="gift" label="Promosyonlar" badge="Yeni" />
+      <SideHead t="Diğer" />
+      <a href={settings.supportEmail ? `mailto:${settings.supportEmail}` : "#"} className="flex h-10 items-center gap-3 rounded-lg px-3 text-sm font-semibold text-muted transition-colors hover:bg-card hover:text-fg">
+        <I n="headset" className="size-[18px]" /><span>Canlı Destek</span>
+      </a>
+      {settings.telegram || true ? (
+        <>
+          <SideHead t="Sosyal" />
+          <a href={settings.telegram || "#"} target="_blank" rel="noreferrer" className="flex h-10 items-center gap-3 rounded-lg px-3 text-sm font-semibold text-muted transition-colors hover:bg-card hover:text-fg">
+            <I n="send" className="size-[18px]" /><span className="flex-1">Telegram</span>
+            <span className="rounded-sm bg-elevated px-1.5 py-0.5 text-[10px] font-extrabold tracking-wide text-primary uppercase">Popüler</span>
+          </a>
+        </>
+      ) : null}
+    </nav>
+  );
+}
+
+function Sidebar() {
+  const { sidebarOpen, setSidebarOpen } = useStore();
+  return (
+    <>
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-[var(--sidebar-w)] flex-col border-r border-line/60 bg-rail lg:flex">
+        <div className="flex h-[var(--header-h)] shrink-0 items-center gap-3 border-b border-line/60 bg-header pl-5">
+          <Link to="/" aria-label="Ana sayfa"><Logo /></Link>
+        </div>
+        <SidebarBody />
+      </aside>
+      {sidebarOpen && (
+        <div className="fixed inset-0 z-50 lg:hidden" onClick={() => setSidebarOpen(false)}>
+          <div className="absolute inset-0 bg-black/60" />
+          <aside className="animate-sports-fade absolute inset-y-0 left-0 flex w-[min(303px,80vw)] flex-col border-r border-line/60 bg-rail" onClick={(e) => e.stopPropagation()}>
+            <div className="flex h-[var(--header-h)] shrink-0 items-center justify-between border-b border-line/60 bg-header px-4">
+              <Logo />
+              <button onClick={() => setSidebarOpen(false)} className="grid size-9 place-items-center rounded-lg text-muted hover:text-fg"><I n="x" className="size-5" /></button>
+            </div>
+            <SidebarBody />
+          </aside>
+        </div>
+      )}
+    </>
+  );
+}
+
+// ---------------- Header ----------------
+function WalletChip() {
+  const { me, balance, setWallet, refreshMe } = useStore();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => { const h = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); }; document.addEventListener("mousedown", h); return () => document.removeEventListener("mousedown", h); }, []);
+  const active = me?.activeWallet === "BONUS" ? "BONUS" : "MAIN";
+  return (
+    <div ref={ref} className="relative">
+      <button onClick={() => { setOpen(!open); refreshMe(); }} className="flex h-[42px] cursor-pointer items-center gap-2 rounded-lg bg-elevated px-3 text-sm font-bold transition-colors hover:bg-elevated-hover">
+        <I n="wallet" className="size-[18px] text-primary" />
+        <span>{money(balance(active as any))}</span>
+        {active === "BONUS" && <span className="rounded-sm bg-primary/20 px-1 text-[10px] font-extrabold text-primary uppercase">Bonus</span>}
+        <I n="down" className="size-3.5 text-subtle" />
+      </button>
+      {open && (
+        <div className="animate-slip-item absolute right-0 top-[calc(100%+8px)] z-50 w-[300px] rounded-xl border border-line bg-panel p-3 shadow-[0_18px_50px_rgba(0,0,0,.5)]">
+          <div className="mb-2 text-[11px] font-extrabold tracking-wider text-dim uppercase">Oynadığın cüzdan</div>
+          {(["MAIN", "BONUS"] as const).map((w) => (
+            <button key={w} onClick={async () => { await setWallet(w); }} className={`mb-1.5 flex w-full items-center justify-between rounded-lg border px-3 py-2.5 text-left transition-colors ${active === w ? "border-primary/60 bg-primary/10" : "border-line bg-card hover:bg-surface-hover"}`}>
+              <span>
+                <span className="block text-sm font-bold">{w === "MAIN" ? "Ana Para" : "Bonus"}</span>
+                <span className="block text-xs text-subtle">{w === "MAIN" ? "Yatırımların ve çekilebilir bakiyen" : "Çevrim tamamlanınca ana paraya geçer"}</span>
+              </span>
+              <span className={`text-sm font-extrabold ${active === w ? "text-primary" : "text-fg"}`}>{money(balance(w))}</span>
+            </button>
+          ))}
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <Link to="/para-yatir" onClick={() => setOpen(false)} className="grid h-10 place-items-center rounded-lg bg-primary text-sm font-bold text-primary-fg hover:bg-primary-hover">Para Yatır</Link>
+            <Link to="/para-cek" onClick={() => setOpen(false)} className="grid h-10 place-items-center rounded-lg bg-elevated text-sm font-bold hover:bg-elevated-hover">Para Çek</Link>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function UserMenu() {
+  const { me, logout } = useStore();
+  const nav = useNavigate();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => { const h = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); }; document.addEventListener("mousedown", h); return () => document.removeEventListener("mousedown", h); }, []);
+  const ITEMS = [["/hesap", "Hesap"], ["/hesap/tahminlerim", "Tahminlerim"], ["/hesap/islemler", "İşlemler"], ["/hesap/kuponlarim", "Kuponlarım"], ["/hesap/bonuslarim", "Bonuslarım"], ["/hesap/guvenlik", "Güvenlik"]];
+  return (
+    <div ref={ref} className="relative">
+      <button onClick={() => setOpen(!open)} className="flex h-[42px] cursor-pointer items-center gap-2 rounded-lg bg-elevated pr-3 pl-1.5 text-sm font-bold transition-colors hover:bg-elevated-hover">
+        <span className="grid size-[30px] place-items-center rounded-md bg-primary text-sm font-extrabold text-primary-fg uppercase">{me.username[0]}</span>
+        <span className="hidden max-w-[110px] truncate sm:block">{me.username}</span>
+        <I n="down" className="size-3.5 text-subtle" />
+      </button>
+      {open && (
+        <div className="animate-slip-item absolute right-0 top-[calc(100%+8px)] z-50 w-56 rounded-xl border border-line bg-panel py-1.5 shadow-[0_18px_50px_rgba(0,0,0,.5)]">
+          {ITEMS.map(([to, l]) => <Link key={to} to={to} onClick={() => setOpen(false)} className="block px-4 py-2.5 text-sm font-semibold text-muted hover:bg-card hover:text-fg">{l}</Link>)}
+          <div className="mx-3 my-1 h-px bg-line" />
+          <button onClick={() => { logout(); setOpen(false); nav("/"); }} className="block w-full px-4 py-2.5 text-left text-sm font-semibold text-loss hover:bg-card">Çıkış Yap</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const NavPill = ({ to, icon, label }: { to: string; icon: string; label: string }) => (
+  <NavLink to={to} className={({ isActive }) => `inline-flex h-[42px] shrink-0 items-center justify-center gap-2 rounded-lg px-5 text-sm font-bold whitespace-nowrap transition-colors ${isActive ? "bg-elevated-hover text-primary" : "bg-elevated text-fg hover:bg-elevated-hover"}`}>
+    <I n={icon} className="size-4" /><span className="hidden md:inline">{label}</span>
+  </NavLink>
+);
+
+function Header() {
+  const { me, setAuthOpen, setSidebarOpen } = useStore();
+  const nav = useNavigate();
+  return (
+    <header className="sticky top-0 z-30 h-[var(--header-h)] border-b border-line/60 bg-header">
+      <div className="mx-auto flex h-full max-w-[1286px] items-center gap-2 px-4">
+        <button onClick={() => setSidebarOpen(true)} className="mr-1 grid size-9 place-items-center rounded-lg text-muted hover:text-fg lg:hidden"><I n="menu" className="size-6" /></button>
+        <Link to="/" className="mr-2 lg:hidden"><Logo className="h-7" /></Link>
+        <nav className="hidden items-center gap-2 min-[480px]:flex">
+          <NavPill to="/spor" icon="ball" label="Spor" />
+          <NavPill to="/tahminler" icon="vote" label="Tahminler" />
+          <NavPill to="/liderlik" icon="trophy" label="Liderlik" />
+        </nav>
+        <div className="ml-auto flex items-center gap-2">
+          <button onClick={() => nav("/tahminler?ara=1")} aria-label="Ara" className="hidden size-[42px] place-items-center rounded-lg bg-elevated text-muted transition-colors hover:bg-elevated-hover hover:text-fg sm:grid"><I n="search" className="size-[18px]" /></button>
+          <Link to="/promosyonlar" aria-label="Promosyonlar" className="hidden size-[42px] place-items-center rounded-lg bg-elevated text-muted transition-colors hover:bg-elevated-hover hover:text-fg sm:grid"><I n="gift" className="size-[18px]" /></Link>
+          {me ? (
+            <><WalletChip /><UserMenu /></>
+          ) : (
+            <>
+              <button onClick={() => setAuthOpen(true)} className="inline-flex h-[42px] items-center rounded-lg bg-elevated px-5 text-sm font-bold hover:bg-elevated-hover">Giriş Yap</button>
+              <button onClick={() => setAuthOpen("register")} className="inline-flex h-[42px] items-center rounded-lg bg-primary px-5 text-sm font-bold text-primary-fg hover:bg-primary-hover">Kayıt Ol</button>
+            </>
+          )}
+        </div>
+      </div>
+    </header>
+  );
+}
+
+// ---------------- Footer ----------------
+function Footer() {
+  const { settings, menus, predCats } = useStore();
+  const cols: { title: string; links: { label: string; url: string }[] }[] = [
+    { title: "Spor", links: [{ label: "Canlı bahis", url: "/spor?page=live" }, { label: "Maç öncesi", url: "/spor" }, { label: "Kuponlarım", url: "/hesap/kuponlarim" }] },
+    { title: "Tahminler", links: [{ label: "Tüm tahminler", url: "/tahminler" }, ...predCats.slice(0, 4).map((c) => ({ label: c.name, url: `/tahminler?kategori=${c.slug}` })), { label: "Liderlik tablosu", url: "/liderlik" }] },
+    ...(menus.footer ?? []),
+    { title: "Destek", links: [{ label: "Promosyonlar", url: "/promosyonlar" }, { label: "VIP Kulübü", url: "/vip" }] },
+  ];
+  return (
+    <footer className="mt-14 border-t border-line/60 bg-panel-deep">
+      <div className="mx-auto grid max-w-[1286px] gap-10 px-4 py-12 md:grid-cols-[1.2fr_2fr]">
+        <div>
+          <Logo className="h-10" />
+          <p className="mt-4 max-w-[300px] text-sm leading-relaxed text-subtle">Canlı bahisten tahmin pazarlarına; maçı oyna, gündemi tahmin et, doğru bildikçe kazan.</p>
+          <div className="mt-5 flex gap-2">
+            {settings.telegram && <a href={settings.telegram} target="_blank" rel="noreferrer" className="grid size-10 place-items-center rounded-lg bg-card text-muted hover:bg-surface-hover hover:text-fg"><I n="send" className="size-4" /></a>}
+            <a href={settings.supportEmail ? `mailto:${settings.supportEmail}` : "#"} className="grid size-10 place-items-center rounded-lg bg-card text-muted hover:bg-surface-hover hover:text-fg"><I n="chat" className="size-4" /></a>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-8 sm:grid-cols-4">
+          {cols.map((c) => (
+            <div key={c.title}>
+              <div className="mb-3 text-[12px] font-extrabold tracking-wider text-soft uppercase">{c.title}</div>
+              <ul className="space-y-2.5">
+                {(c.links ?? []).map((l: any) => (
+                  <li key={l.label}>{l.url?.startsWith("/") ? <Link to={l.url} className="text-sm font-medium text-subtle hover:text-fg">{l.label}</Link> : <a href={l.url} className="text-sm font-medium text-subtle hover:text-fg">{l.label}</a>}</li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="border-t border-line/60">
+        <div className="mx-auto flex max-w-[1286px] flex-wrap items-center gap-4 px-4 py-5 text-xs font-medium text-dim">
+          <span>{settings.licenseText ?? `${settings.siteName ?? "SportyBet"}, lisanslı olarak faaliyet gösteren bir firmadır.`}</span>
+          <span className="ml-auto grid size-7 place-items-center rounded-full border border-loss text-[10px] font-extrabold text-loss">18+</span>
+          <span>© {new Date().getFullYear()} {settings.siteName ?? "SportyBet"}. Tüm hakları saklıdır.</span>
+        </div>
+      </div>
+    </footer>
+  );
+}
+
+// ---------------- Mobil alt menü ----------------
+function BottomNav() {
+  const items = [["/", "home", "Ana Sayfa"], ["/spor", "ball", "Spor"], ["/tahminler", "vote", "Tahminler"], ["/hesap/kuponlarim", "ticket", "Kuponlarım"], ["/hesap", "user", "Hesap"]];
+  return (
+    <nav className="fixed inset-x-0 bottom-0 z-40 grid h-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom))] grid-cols-5 border-t border-line/60 bg-header pb-[env(safe-area-inset-bottom)] lg:hidden">
+      {items.map(([to, icon, label]) => (
+        <NavLink key={to} to={to} end={to === "/" || to === "/hesap"} className={({ isActive }) => `flex flex-col items-center justify-center gap-1 text-[10px] font-bold ${isActive ? "text-primary" : "text-subtle"}`}>
+          <I n={icon} className="size-5" />{label}
+        </NavLink>
+      ))}
+    </nav>
+  );
+}
+
+// ---------------- Giriş / Kayıt ----------------
+function AuthModal() {
+  const { authOpen, setAuthOpen, refreshMe } = useStore();
+  const [mode, setMode] = useState<"login" | "register">("login");
+  const [f, setF] = useState({ username: "", password: "", email: "", phone: "" });
+  const [err, setErr] = useState(""); const [busy, setBusy] = useState(false);
+  useEffect(() => { if (authOpen) { setMode(authOpen === "register" ? "register" : "login"); setErr(""); } }, [authOpen]);
+  if (!authOpen) return null;
+  async function submit(e: React.FormEvent) {
+    e.preventDefault(); setErr(""); setBusy(true);
+    try {
+      const body = mode === "login" ? { username: f.username, password: f.password } : { username: f.username, password: f.password, email: f.email || undefined, phone: f.phone || undefined };
+      const r = await api(`/api/auth/${mode}`, { method: "POST", json: body });
+      setToken(r.token); await refreshMe(); setAuthOpen(false);
+    } catch (x: any) { setErr(x.message); }
+    setBusy(false);
+  }
+  return (
+    <div className="fixed inset-0 z-[60] grid place-items-center bg-black/70 p-4 backdrop-blur-sm" onMouseDown={(e) => e.target === e.currentTarget && setAuthOpen(false)}>
+      <div className="animate-slip-reveal w-full max-w-[410px] rounded-2xl border border-line bg-panel p-6 shadow-[0_30px_80px_rgba(0,0,0,.6)]">
+        <div className="mb-5 flex items-center justify-between">
+          <Logo className="h-8" />
+          <button onClick={() => setAuthOpen(false)} className="grid size-9 place-items-center rounded-lg text-muted hover:bg-card hover:text-fg"><I n="x" className="size-5" /></button>
+        </div>
+        <div className="mb-5 grid grid-cols-2 rounded-lg bg-field p-1">
+          {(["login", "register"] as const).map((m) => (
+            <button key={m} type="button" onClick={() => setMode(m)} className={`h-10 rounded-md text-sm font-bold transition-colors ${mode === m ? "bg-elevated text-fg" : "text-subtle hover:text-fg"}`}>{m === "login" ? "Giriş Yap" : "Kayıt Ol"}</button>
+          ))}
+        </div>
+        <form onSubmit={submit} className="space-y-3">
+          <Field label="Kullanıcı adı"><input className={inp} value={f.username} onChange={(e) => setF({ ...f, username: e.target.value })} autoFocus /></Field>
+          {mode === "register" && <>
+            <Field label="E-posta (isteğe bağlı)"><input className={inp} type="email" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} /></Field>
+            <Field label="Telefon (isteğe bağlı)"><input className={inp} value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} /></Field>
+          </>}
+          <Field label="Şifre"><input className={inp} type="password" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} /></Field>
+          <ErrBox e={err} />
+          <Btn className="w-full" disabled={busy || !f.username || f.password.length < 6}>{mode === "login" ? "Giriş Yap" : "Hesap Oluştur"}</Btn>
+          {mode === "register" && <p className="text-center text-xs text-dim">Kayıt olarak 18 yaşından büyük olduğunu ve kullanıcı sözleşmesini kabul ettiğini onaylarsın.</p>}
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ---------------- Düzen ----------------
+export default function Layout() {
+  const loc = useLocation();
+  useEffect(() => { window.scrollTo(0, 0); }, [loc.pathname]);
+  const bare = loc.pathname === "/spor"; // iframe sayfası tam genişlik
+  return (
+    <div className="min-h-dvh lg:pl-[var(--sidebar-w)]">
+      <Sidebar />
+      <Header />
+      <main className={bare ? "" : "mx-auto max-w-[1286px] px-4 pt-[22px] pb-24 lg:pb-10"}>
+        <Outlet />
+      </main>
+      {!bare && <Footer />}
+      <BottomNav />
+      <AuthModal />
+    </div>
+  );
+}

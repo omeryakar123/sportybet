@@ -1,4 +1,24 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-body { @apply bg-page text-fg antialiased; font-family: Inter, system-ui, sans-serif; }
+
+:root { --header-h: 64px; --sidebar-w: 260px; --bottom-nav-h: 60px; }
+html { scrollbar-color: #404048 #17171a; }
+body { @apply bg-page font-sans text-fg antialiased; }
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: #323239; border-radius: 6px; border: 2px solid #17171a; }
+::-webkit-scrollbar-track { background: #17171a; }
+
+/* CMS promosyon/sayfa içeriği (koyu zemin üstünde) */
+.cms-content { @apply text-[15px] leading-relaxed text-muted; }
+.cms-content h1, .cms-content h2, .cms-content h3 { @apply mt-6 mb-3 font-extrabold text-fg; }
+.cms-content h1 { @apply text-2xl; } .cms-content h2 { @apply text-xl; } .cms-content h3 { @apply text-lg; }
+.cms-content p { @apply my-3; }
+.cms-content a { @apply text-primary underline; }
+.cms-content ul, .cms-content ol { @apply my-3 list-disc pl-6; }
+.cms-content ol { list-style: decimal; }
+.cms-content img { @apply my-4 rounded-lg; }
+.cms-content strong, .cms-content b { @apply text-fg; }
+.cms-content code { @apply rounded bg-elevated px-1 text-[13px]; }

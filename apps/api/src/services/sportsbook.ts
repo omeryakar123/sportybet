@@ -50,6 +50,7 @@ export const sportsbook = {
   bet: (id: string) => signed("GET", `/api/v1/bets/${encodeURIComponent(id)}`),
   transactions: (q: Record<string, unknown>) => signed("GET", "/api/v1/transactions" + qs(q)),
   billing: (q: Record<string, unknown> = {}) => signed("GET", "/api/v1/billing" + qs(q)),
+  liveGamesWidget: (p: Record<string, unknown>) => signed("POST", "/api/v1/widget/live-games/launch", p),
   ledger: (q: Record<string, unknown> = {}) => signed("GET", "/api/v1/billing/ledger" + qs(q)),
 };
 

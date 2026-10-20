@@ -158,7 +158,14 @@ Backoffice: Tahmin Piyasaları (KPI, filtre, Al/Sat/★ hızlı aç-kapa, Aç/Ki
 ## 4d. Demo veri
 Backoffice → Kullanıcı Yönetimi → Sistem / Demo Veri (SUPERADMIN) veya env `DEMO_SEED=1`. Demo oyuncular btag `DEMO`, şifre `demo123456`. **Canlıdan önce "Demo Veriyi Sil".**
 
-## 5. Site
+## 5. Site (frontend) — TASARIM UYGULANDI
+
+Kullanıcının verdiği referans (docs/references/site-html/anasayfa-full.html + site-css/tailwind-utilities.css) temel alındı; token'lar birebir `apps/web/tailwind.config.js` içinde (koyu tema #17171a, turuncu primary #ffbe7b, Manrope). Marka: SportyBet (CMS'ten logo/site adı değiştirilebilir).
+
+Sayfalar: Ana sayfa (hero, Spor/Tahminler kartları, arama, CMS hero banner slider, "Tahminlere Göz At" kaydırmalı kartlar, Betco canlı maç widget'ı) · /spor (Betco iframe + üstte Ana/Bonus cüzdan seçici, cüzdan değişince oturum yeniden açılır) · /tahminler (tanıtım şeridi, kategori sekmeleri, arama/sıralama/kaydedilenler, kart grid) · /tahminler/:slug (sonuç seçimi, sağda yapışkan Tahmin Kuponu: tutar + hızlı butonlar + cüzdan seçici + olası kazanç; bozdurma teklifi; kurallar; grup alt piyasaları) · /liderlik · /promosyonlar(+detay, promo kod kutusu) · /page/:slug · /vip (yakında) · /para-yatir (yöntem kartları, yatırım bonusu seçimi, talep listesi) · /para-cek (dinamik alanlar, bloke uyarısı, NEW iptali) · /hesap (profil, tahminlerim+bozdur, işlemler, kuponlarım, bonuslarım+talep+kod, güvenlik). Mobil: alt gezinme + hamburger sidebar.
+
+Eski "## 5. Site" notları:
+## 5. Site (eski)
 
 - Şu an: sidebar (sporlar), header (Ana para + Bonus bakiyesi), giriş/kayıt, CMS banner slotları, maç listesi, promosyonlar.
 - Tasarım token'ları referans HTML'den çıkarıldı (`apps/web/tailwind.config.js`). Primary yeşil `#00ae61`.
@@ -225,3 +232,4 @@ cd apps/web && npm i && npm run dev          # http://localhost:5173
 - **2026-10-20** — İlk canlı deploy. Coolify deploy: `POST /api/v1/deploy?uuid=jyiwgs7yf6tdcocutfidsfki`. Backoffice admin kullanıcısı `admin` (şifre Coolify env `ADMIN_PASSWORD`).
 - **2026-10-20** — Backoffice tamamlandı (BC referansıyla tüm menü). Kararlar: tek aktif bonus; çekim talepte bloke; manuel yatırım/çekim raporlara PaymentRequest ile girer; test oyuncuları raporlardan hariç; roller URL önekine göre (PERMS).
 - **2026-10-20** — Tahmin piyasaları eklendi (motor + API + backoffice). Cüzdanlar ayrıldı: oyuncu aktif cüzdan seçer. Backoffice görünümü BC'ye yaklaştırıldı. Demo veri araçları.
+- **2026-10-20** — Site frontend'i kullanıcı tasarımıyla (nolurKi referansı) yeniden yazıldı; SportyBet markası. VITE_API_URL boşsa `api-<host>` tahmini. Betco live-games widget ucu eklendi (`GET /api/sportsbook/widgets/live-games`).

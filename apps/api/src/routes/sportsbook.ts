@@ -63,4 +63,15 @@ export async function launchRoutes(app: FastifyInstance) {
     return { launch_token: r.data.launch_token, expires_at: r.data.expires_at, base_url: SB_BASE };
   });
   app.get("/sportsbook/config", async () => ({ base_url: SB_BASE }));
+  // Ana sayfadaki canlı maç listesi widget'ı (herkese açık; başarısız olursa site bölümü gizler)
+  app.get("/sportsbook/widgets/live-games", async (req, reply) => {
+    if (!sportsbookConfigured()) return reply.code(503).send({ error: "SPORTSBOOK_NOT_CONFIGURED" });
+    try {
+      const r: any = await sportsbook.liveGamesWidget({ language: "tur", settings: { sportsLimit: 3, gamesLimit: 6, numberOfExpandedSports: 3 } });
+      const d = r.data ?? r;
+      return { url: d.iframe_url ?? d.widget_url ?? d.url ?? null };
+    } catch (e: any) {
+      return reply.code(502).send({ error: e.message });
+    }
+  });
 }
