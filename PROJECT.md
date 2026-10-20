@@ -149,11 +149,14 @@ cd apps/web && npm i && npm run dev          # http://localhost:5173
 - [x] Masaüstünde `sportybet` klasörü
 - [x] Monorepo iskeleti (api / backoffice / web), veri modeli, cüzdan + bonus servisleri
 - [x] Backoffice ilk sayfalar, site ilk iskelet, docker-compose
-- [x] GitHub repo `omeryakar123/sportybet` oluşturuldu (kullanıcı) — **push bekliyor**: Claude GitHub App bu repoya kurulmalı
-- [x] Coolify: uygulama Docker Compose'a çevrildi, env değişkenleri girildi — **domain ataması ilk push'tan sonra**
+- [x] GitHub repo `omeryakar123/sportybet` — kod push'landı
+- [x] Coolify: Docker Compose, env, domainler (HTTPS) atandı, deploy başarılı — api/web/backoffice/db çalışıyor
 - [x] Betco seamless wallet + webhook + launch + backoffice Sportsbook ekranı yazıldı
-- [ ] Betco `api_key` + `api_secret` (partner oluşturulunca verilir) → Coolify env
-- [ ] Betco tarafında partner'a wallet_base_url / webhook_url / allowed_domains girilmesi
+- [x] Betco api_key/secret Coolify'da; `/api/v1/me` ve `/billing` 200. Partner slug `oy`, allowed_domains + webhook_url doğru
+- [x] Cüzdan testleri canlıda geçti (checklist 1,5,6,7,13,14,15 + imza reddi); launch→consume→iframe sitede açıldı
+- [ ] GitHub → Coolify otomatik deploy webhook'u (kullanıcı GitHub repo ayarlarından ekleyecek); şimdilik deploy Coolify API ile tetikleniyor
+- [ ] Gerçek bahisle test: webhook bet_placed/bet_settled (checklist 9–12, 16–19)
+- [ ] Test oyuncusu `test_wallet` (id 1, 2075 ₺ test bakiyesi) canlıya geçmeden silinmeli/kapatılmalı
 - [ ] Site tasarımı 1:1 — bekliyor: Tailwind kodları + ekran görüntüleri
 - [ ] Uçtan uca test (doküman "Test checklist" 1–19)
 - [ ] İlk derleme testi (bulut ortamında npm kapalıydı; Coolify build'inde veya lokalde yapılacak)
@@ -163,3 +166,4 @@ cd apps/web && npm i && npm run dev          # http://localhost:5173
 - **2026-10-20** — Proje başlatıldı. Stack: Fastify + Prisma + Postgres, iki ayrı React/Vite uygulaması (backoffice, web). Deploy: GitHub → Coolify (Docker Compose). İki cüzdan modeli (MAIN/BONUS) ve çevrim tamamlanınca bonus→ana para aktarımı kararlaştırıldı. Backoffice BetConstruct referansıyla, site nolurKi referansıyla tasarlanacak. Her site görselinin CMS karşılığı olacak.
 - **2026-10-20** — Notlar: bulut ortamında npm registry ve GitHub API engelli; mevcut GitHub token geçersiz; Coolify bilgisi yok. Sportsbook API anahtarı mesajda iletilmedi.
 - **2026-10-20** — Spor sağlayıcısı: Betco Sportsbook (probetlab), iframe + seamless wallet. Kararlar: /balance = ANA+BONUS; debit önce ANA sonra BONUS; credit stake oranıyla geri; çevrim bonuslu kupon won/lost + kural uyumu ile. Kullanıcı: "şimdilik backoffice + spor, site tasarımı sonra". Coolify'daki mevcut uygulama (railpack) Docker Compose'a çevrildi.
+- **2026-10-20** — İlk canlı deploy. Coolify deploy: `POST /api/v1/deploy?uuid=jyiwgs7yf6tdcocutfidsfki`. Backoffice admin kullanıcısı `admin` (şifre Coolify env `ADMIN_PASSWORD`).
