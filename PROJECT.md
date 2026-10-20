@@ -84,27 +84,53 @@ Her oyuncunun **2 cüzdanı** var (`Wallet` tablosu, `type` alanı):
 | allowed_domains | `sportybet.131.123.39.95.sslip.io` |
 | wallet_secret | kullanıcı verdi → Coolify env `SPORTSBOOK_WALLET_SECRET` |
 
-## 4. Backoffice Modülleri (referans: BetConstruct ekran görüntüleri)
+## 4. Backoffice Modülleri (BetConstruct referansı)
 
-| Modül | Durum | Not |
-|---|---|---|
-| Giriş (admin JWT) | ✅ iskelet | İlk açılışta `ADMIN_USERNAME/ADMIN_PASSWORD` ile süper admin oluşur |
-| Dashboard | ✅ iskelet | 24s KPI'lar |
-| Oyuncular listesi | ✅ iskelet | arama, iki cüzdan bakiyesi |
-| Oyuncu detay → Genel | ✅ iskelet | kişisel / hesap / promosyon bilgileri, engelleme toggle'ları |
-| Oyuncu detay → Finansal | ✅ iskelet | 2 cüzdan bakiyesi, işlemler, manuel yatırım/çekim/düzeltme |
-| Oyuncu detay → Spor Bahisleri | ✅ iskelet | kupon + seçimler (BC tablosu gibi) |
-| Oyuncu detay → Bonuslar | ✅ iskelet | **oyuncuya bonus verme**, çevrim ilerlemesi |
-| Tüm spor bahisleri | ✅ | durum / canlı / kupon / oyuncu / bonuslu filtresi, GGR toplamı |
-| Sportsbook (Betco) | ✅ | durum, GGR bakiye, ledger, mutabakat, cüzdan & webhook logları |
-| Bonuslar (tanım) | ✅ iskelet | 2 adımlı: Kurulum + Spor Kuralları (BC "Add Free Bet Bonus" gibi) |
-| Promo kodlar | ✅ iskelet | BC "Add Or Edit Promo Code" alanları |
-| CMS → Bannerlar | ✅ iskelet | grup = sitedeki slot |
-| CMS → Promosyonlar | ✅ iskelet | HTML içerik + önizleme |
-| CMS → Web/Mobil CSS | ✅ iskelet | siteye canlı enjekte edilir |
-| Raporlar, KYC, Ödeme sistemleri, Risk, Roller | ⏳ sonra | |
+Menü yapısı (`apps/backoffice/src/Layout.tsx`), her öğe role göre görünür:
 
-Referans görseller: `docs/references/backoffice/`
+| Grup | Ekranlar |
+|---|---|
+| Dashboard | Bugün/Dün/Hafta/Ay filtreleri; 12 KPI kartı (yatırım, çekim, giriş, kayıt, oyuncu bakiyesi, kâr, bonus bakiyesi, düzeltmeler); Sportsbook özeti (maç öncesi / canlı / toplam: ciro, kazanç, açık bahis, GGR, kârlılık, bahis sayısı, ort. bahis, oyuncu); Bonus özeti; En çok oynanan 5 spor |
+| Oyuncular | Filtreler (arama, ID, durum, kategori, KYC, test, btag, kayıt tarihi, min bakiye), sunucu sayfalama, CSV, oyuncu oluşturma |
+| Oyuncu detay | **Genel**: kişisel/iletişim/promosyon/hesap bilgileri + 20 Player KPI + notlar · **Finansal**: 2 cüzdan, yatırım/çekim talepleri, işlemler (tip/cüzdan filtresi), manuel işlem (yatırım, çekim, düzeltme ±) · **Raporlar**: spor bahisleri (seçimler açılır), bonuslar (ver / iptal, çevrim %), girişler · **Ayarlar**: durum, kategori, KYC, spor/casino engeli, bonustan hariç, test, şifre sıfırlama |
+| Raporlar | Sportsbook (günlük ciro/GGR/marj), Finans (günlük + ödeme sistemi kırılımı), Bonus (verilen bonuslar, dönüşüm oranı), Oyuncu raporu |
+| Finans | Yatırım talepleri, Çekim talepleri (Onayla → Öde / Reddet, 30 sn otomatik yenileme, yeni talepte ses), Tüm işlemler, Ödeme sistemleri |
+| Promosyon | Bonuslar (2 adım: Kurulum + Spor Kuralları; verilen/dönüşen istatistiği), Bonus talepleri (onay/red), Promo kodlar (kullananlar listesi) |
+| Sportsbook | Spor bahisleri (tarih, durum, canlı, tip, kupon, oyuncu, min stake, bonuslu), Betco entegrasyonu |
+| Kullanıcı Yönetimi | Admin kullanıcıları + roller (sadece SUPERADMIN), Audit log |
+| CMS | Bannerlar (10 slot), Promosyonlar, Sayfalar (/page/slug), Site ayarları (logo, SEO, sosyal, menüler JSON), Web/Mobil CSS |
+
+### Roller (`apps/api/src/routes/admin.ts → PERMS`)
+SUPERADMIN her şey · ADMIN kullanıcı yönetimi hariç · FINANCE ödemeler/raporlar/manuel bakiye · RISK oyuncu kısıtlama, bonus, bahis · SUPPORT görüntüleme + not · CMS içerik + promo kod. Her yazma işlemi `AuditLog`'a düşer.
+
+### Ödeme akışı
+- **Çekim**: oyuncu talep → tutar ANA cüzdandan hemen **bloke** → NEW → (Onayla) PENDING → (Öde) PAID. Red/iptal → iade. Aktif bonusu "çekime izin ver" kapalıysa çekim yapılamaz; açık çekim varken ikincisi açılamaz.
+- **Yatırım**: oyuncu talep (yatırım bonusu seçebilir) → admin/PSP "Öde" → ANA cüzdana yatar → seçilen yatırım bonusu `yatırım × %` (maks sınırıyla) otomatik verilir.
+- Manuel yatırım/çekim de `PaymentRequest` (PAID) kaydı açar → raporlara girer. Düzeltme ± ayrı tiptir.
+- Gerçek PSP entegrasyonu (FulgurPay vb.) sonra: PSP callback'i `processPayment(..., "pay")` çağıracak.
+
+### Bonus kuralları
+- Oyuncunun aynı anda **tek aktif bonusu** olur (bonus cüzdanı tek havuz).
+- Kaynaklar: admin verir · yatırım bonusu · promo kod (anında) · oyuncu talebi (admin onaylar).
+
+### Test oyuncusu
+`isTest = true` olan oyuncular dashboard ve raporlara girmez. `test_wallet` (id 1) test oyuncusu olarak işaretli.
+
+## 4b. Site API'si (frontend bunu kullanacak) — `apps/api/src/routes/site.ts`
+
+| Uç | Açıklama |
+|---|---|
+| `POST /api/auth/register`, `/api/auth/login` | JWT döner (10 hatalı denemede kilit) |
+| `GET /api/me`, `PATCH /api/me`, `POST /api/me/password` | profil |
+| `GET /api/me/transactions` `bets` `bonuses` `payments` | geçmişler (bonuslarda `progress` %) |
+| `GET /api/payment-systems?type=DEPOSIT\|WITHDRAWAL` | yöntemler + istenecek alanlar |
+| `POST /api/payments/deposit` `{paymentSystem, amount, bonusId?}` | yatırım talebi |
+| `POST /api/payments/withdraw` `{paymentSystem, amount, info}` | çekim talebi |
+| `POST /api/payments/:id/cancel` | NEW çekimi iptal |
+| `GET /api/bonuses/available`, `POST /api/bonuses/:id/request` | bonus listesi / talep |
+| `POST /api/promo/redeem` `{code}` | promo kod |
+| `GET /api/sportsbook/launch` | Betco iframe launch token |
+| `GET /api/cms/banners?group=&platform=`, `/api/cms/promotions[/:slug]`, `/api/cms/pages/:slug`, `/api/cms/settings/:key` | CMS içerikleri (`site_general`, `seo`, `social`, `menus`, `web_css`, `mobile_css`) |
 
 ## 5. Site
 
@@ -155,7 +181,11 @@ cd apps/web && npm i && npm run dev          # http://localhost:5173
 - [x] Betco api_key/secret Coolify'da; `/api/v1/me` ve `/billing` 200. Partner slug `oy`, allowed_domains + webhook_url doğru
 - [x] Cüzdan testleri canlıda geçti (checklist 1,5,6,7,13,14,15 + imza reddi); launch→consume→iframe sitede açıldı
 - [ ] GitHub → Coolify otomatik deploy webhook'u (kullanıcı GitHub repo ayarlarından ekleyecek); şimdilik deploy Coolify API ile tetikleniyor
+- [x] Backoffice tam modül seti (bkz. bölüm 4) canlıda
+- [x] Ödeme akışı canlıda test edildi: çekim bloke/red-iade, açık çekim engeli, yatırım + %50 yatırım bonusu, aktif bonusla çekim engeli, bonus iptali
 - [ ] Gerçek bahisle test: webhook bet_placed/bet_settled (checklist 9–12, 16–19)
+- [ ] Gerçek PSP entegrasyonu (callback → processPayment)
+- [ ] Site frontend (sıradaki adım)
 - [ ] Test oyuncusu `test_wallet` (id 1, 2075 ₺ test bakiyesi) canlıya geçmeden silinmeli/kapatılmalı
 - [ ] Site tasarımı 1:1 — bekliyor: Tailwind kodları + ekran görüntüleri
 - [ ] Uçtan uca test (doküman "Test checklist" 1–19)
@@ -167,3 +197,4 @@ cd apps/web && npm i && npm run dev          # http://localhost:5173
 - **2026-10-20** — Notlar: bulut ortamında npm registry ve GitHub API engelli; mevcut GitHub token geçersiz; Coolify bilgisi yok. Sportsbook API anahtarı mesajda iletilmedi.
 - **2026-10-20** — Spor sağlayıcısı: Betco Sportsbook (probetlab), iframe + seamless wallet. Kararlar: /balance = ANA+BONUS; debit önce ANA sonra BONUS; credit stake oranıyla geri; çevrim bonuslu kupon won/lost + kural uyumu ile. Kullanıcı: "şimdilik backoffice + spor, site tasarımı sonra". Coolify'daki mevcut uygulama (railpack) Docker Compose'a çevrildi.
 - **2026-10-20** — İlk canlı deploy. Coolify deploy: `POST /api/v1/deploy?uuid=jyiwgs7yf6tdcocutfidsfki`. Backoffice admin kullanıcısı `admin` (şifre Coolify env `ADMIN_PASSWORD`).
+- **2026-10-20** — Backoffice tamamlandı (BC referansıyla tüm menü). Kararlar: tek aktif bonus; çekim talepte bloke; manuel yatırım/çekim raporlara PaymentRequest ile girer; test oyuncuları raporlardan hariç; roller URL önekine göre (PERMS).
