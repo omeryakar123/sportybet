@@ -1,0 +1,9 @@
+{
+  "folders": [
+    { "name": "root", "path": "." },
+    { "name": "api", "path": "apps/api" },
+    { "name": "backoffice", "path": "apps/backoffice" },
+    { "name": "web (site)", "path": "apps/web" }
+  ],
+  "settings": { "files.exclude": { "**/node_modules": true, "**/dist": true } }
+}

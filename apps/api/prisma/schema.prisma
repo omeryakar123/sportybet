@@ -1,0 +1,328 @@
+// SportyBet — veri modeli
+// Cüzdan mantığı: her oyuncunun 2 cüzdanı var
+//   MAIN  = Ana para (yatırımlar buraya, çekilebilir)
+//   BONUS = Bonus cüzdanı (çevrim tamamlanınca bakiye MAIN'e aktarılır)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum WalletType {
+  MAIN
+  BONUS
+}
+
+enum TxType {
+  DEPOSIT
+  WITHDRAWAL
+  BET_STAKE
+  BET_WIN
+  BET_REFUND
+  BONUS_GRANT
+  BONUS_CONVERT // bonus cüzdanından ana paraya aktarım
+  BONUS_EXPIRE
+  BONUS_CANCEL
+  ADJUSTMENT // admin manuel düzeltme
+}
+
+enum BetState {
+  PENDING
+  WON
+  LOST
+  RETURNED
+  CASHED_OUT
+}
+
+enum BetType {
+  SINGLE
+  MULTIPLE
+  SYSTEM
+}
+
+enum BonusType {
+  DEPOSIT
+  MANUAL
+  FREEBET
+  FREESPIN
+  CASINO_FREEBET
+  WAGERING // kayıp bonusu vb. çevrimli bonus
+}
+
+enum PlayerBonusState {
+  ACTIVE
+  COMPLETED // çevrim tamamlandı -> ana paraya aktarıldı
+  EXPIRED
+  CANCELED
+  LOST // bonus bakiyesi sıfırlandı
+}
+
+enum AdminRole {
+  SUPERADMIN
+  ADMIN
+  FINANCE
+  RISK
+  SUPPORT
+  CMS
+}
+
+model Admin {
+  id           Int       @id @default(autoincrement())
+  username     String    @unique
+  passwordHash String
+  role         AdminRole @default(ADMIN)
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  auditLogs    AuditLog[]
+}
+
+model Player {
+  id             Int       @id @default(autoincrement())
+  username       String    @unique
+  email          String?   @unique
+  phone          String?
+  passwordHash   String
+  firstName      String?
+  lastName       String?
+  birthDate      DateTime?
+  currency       String    @default("TRY")
+  language       String    @default("tr")
+  status         String    @default("OPEN") // OPEN, BLOCKED, CLOSED, SELF_EXCLUDED
+  category       String    @default("LOW_RISK")
+  isVerified     Boolean   @default(false)
+  isSportBlocked Boolean   @default(false)
+  isCasinoBlocked Boolean  @default(false)
+  excludedFromBonuses Boolean @default(false)
+  loyaltyLevel   String?
+  loyaltyPoints  Decimal   @default(0) @db.Decimal(18, 2)
+  btag           String?
+  promoCode      String?
+  regSource      String    @default("Web")
+  lastLoginAt    DateTime?
+  lastLoginIp    String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  wallets       Wallet[]
+  transactions  Transaction[]
+  bets          Bet[]
+  bonuses       PlayerBonus[]
+  notes         PlayerNote[]
+  logins        LoginLog[]
+}
+
+model Wallet {
+  id        Int        @id @default(autoincrement())
+  playerId  Int
+  type      WalletType
+  currency  String     @default("TRY")
+  balance   Decimal    @default(0) @db.Decimal(18, 2)
+  updatedAt DateTime   @updatedAt
+  player    Player     @relation(fields: [playerId], references: [id])
+  transactions Transaction[]
+
+  @@unique([playerId, type, currency])
+}
+
+model Transaction {
+  id            BigInt   @id @default(autoincrement())
+  playerId      Int
+  walletId      Int
+  type          TxType
+  amount        Decimal  @db.Decimal(18, 2) // + giriş, - çıkış
+  balanceAfter  Decimal  @db.Decimal(18, 2)
+  paymentSystem String?
+  reference     String?  // betId, bonusId, psp tx id
+  note          String?
+  adminId       Int?
+  createdAt     DateTime @default(now())
+  player        Player   @relation(fields: [playerId], references: [id])
+  wallet        Wallet   @relation(fields: [walletId], references: [id])
+
+  @@index([playerId, createdAt])
+}
+
+model Bet {
+  id           BigInt   @id @default(autoincrement())
+  playerId     Int
+  type         BetType
+  stake        Decimal  @db.Decimal(18, 2)
+  stakeFromMain  Decimal @default(0) @db.Decimal(18, 2)
+  stakeFromBonus Decimal @default(0) @db.Decimal(18, 2)
+  totalOdds    Decimal  @db.Decimal(12, 3)
+  potentialWin Decimal  @db.Decimal(18, 2)
+  winAmount    Decimal  @default(0) @db.Decimal(18, 2)
+  state        BetState @default(PENDING)
+  isLive       Boolean  @default(false)
+  playerBonusId Int?
+  source       String   @default("Web")
+  ip           String?
+  createdAt    DateTime @default(now())
+  settledAt    DateTime?
+  player       Player   @relation(fields: [playerId], references: [id])
+  selections   BetSelection[]
+
+  @@index([playerId, createdAt])
+  @@index([state])
+}
+
+model BetSelection {
+  id            BigInt   @id @default(autoincrement())
+  betId         BigInt
+  providerEventId String
+  sport         String
+  region        String?
+  competition   String?
+  matchName     String
+  matchStart    DateTime
+  market        String
+  selection     String
+  odds          Decimal  @db.Decimal(12, 3)
+  state         BetState @default(PENDING)
+  isLive        Boolean  @default(false)
+  info          String?  // skor / dakika bilgisi
+  bet           Bet      @relation(fields: [betId], references: [id])
+}
+
+// Bonus tanımı (Backoffice > Bonuses > Add New Bonus)
+model Bonus {
+  id              Int       @id @default(autoincrement())
+  name            String
+  type            BonusType
+  product         String    @default("SPORT") // SPORT, CASINO
+  description     String?
+  note            String?
+  isActive        Boolean   @default(true)
+  startsAt        DateTime?
+  endsAt          DateTime?
+  expirationType  String    @default("FROM_PAYOUT_DATE")
+  expirationDays  Int       @default(7)
+  allowWithdrawal Boolean   @default(false)
+  availableOnRequest Boolean @default(false)
+  // Çevrim kuralları
+  wageringMultiplier Decimal @default(1) @db.Decimal(8, 2) // bonus x N kadar bahis
+  // Para birimi bazlı ayarlar
+  minAmount       Decimal?  @db.Decimal(18, 2)
+  maxAmount       Decimal?  @db.Decimal(18, 2)
+  maxPayout       Decimal?  @db.Decimal(18, 2)
+  maxPayoutPct    Decimal?  @db.Decimal(8, 2)
+  percent         Decimal?  @db.Decimal(8, 2) // yatırım bonusu % oranı
+  // Spor kuralları (Sport sekmesi)
+  rules           Json?     // {sports:[], competitions:[], matches:[], markets:[], regions:[], betType, eventType, minSelections, minSelectionOdds, minTotalOdds}
+  createdAt       DateTime  @default(now())
+  playerBonuses   PlayerBonus[]
+  promoCodes      PromoCode[]
+}
+
+model PlayerBonus {
+  id             Int       @id @default(autoincrement())
+  playerId       Int
+  bonusId        Int
+  state          PlayerBonusState @default(ACTIVE)
+  amount         Decimal   @db.Decimal(18, 2)
+  wagerRequired  Decimal   @db.Decimal(18, 2)
+  wagerDone      Decimal   @default(0) @db.Decimal(18, 2)
+  convertedAmount Decimal  @default(0) @db.Decimal(18, 2)
+  grantedByAdminId Int?
+  expiresAt      DateTime?
+  resultAt       DateTime?
+  createdAt      DateTime  @default(now())
+  player         Player    @relation(fields: [playerId], references: [id])
+  bonus          Bonus     @relation(fields: [bonusId], references: [id])
+
+  @@index([playerId, state])
+}
+
+model PromoCode {
+  id          Int      @id @default(autoincrement())
+  code        String   @unique
+  bonusId     Int
+  amount      Decimal  @db.Decimal(18, 2)
+  currency    String   @default("TRY")
+  maxCount    Int
+  usedCount   Int      @default(0)
+  isActive    Boolean  @default(true)
+  startsAt    DateTime?
+  endsAt      DateTime?
+  conditions  Json?    // fromRegistration, fromDeposit, emailVerified, phoneVerified, minDepositCount...
+  bonus       Bonus    @relation(fields: [bonusId], references: [id])
+}
+
+model PlayerNote {
+  id        Int      @id @default(autoincrement())
+  playerId  Int
+  adminId   Int
+  text      String
+  createdAt DateTime @default(now())
+  player    Player   @relation(fields: [playerId], references: [id])
+}
+
+model LoginLog {
+  id        Int      @id @default(autoincrement())
+  playerId  Int
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+  player    Player   @relation(fields: [playerId], references: [id])
+}
+
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  adminId   Int
+  action    String
+  target    String?
+  payload   Json?
+  createdAt DateTime @default(now())
+  admin     Admin    @relation(fields: [adminId], references: [id])
+}
+
+// ---------- CMS (sitedeki her görselin panelde karşılığı) ----------
+model CmsBanner {
+  id         Int      @id @default(autoincrement())
+  group      String   // ör. homepage-main-left
+  title      String
+  imageUrl   String
+  linkUrl    String?
+  platform   String   @default("web") // web, mobile
+  language   String   @default("tr")
+  isPublished Boolean @default(true)
+  sortOrder  Int      @default(0)
+  startsAt   DateTime?
+  endsAt     DateTime?
+  updatedAt  DateTime @updatedAt
+}
+
+model CmsPromotion {
+  id         Int      @id @default(autoincrement())
+  title      String
+  slug       String   @unique
+  category   String   @default("TUMU")
+  imageUrl   String?
+  contentHtml String
+  platform   String   @default("web,mobile")
+  showFor    String   @default("ALL") // ALL, GUEST, LOGGED_IN
+  language   String   @default("tr")
+  isPublished Boolean @default(true)
+  sortOrder  Int      @default(0)
+  startsAt   DateTime?
+  endsAt     DateTime?
+  updatedAt  DateTime @updatedAt
+}
+
+model CmsPage {
+  id         Int      @id @default(autoincrement())
+  slug       String   @unique
+  title      String
+  contentHtml String
+  isPublished Boolean @default(true)
+  updatedAt  DateTime @updatedAt
+}
+
+model CmsSetting {
+  key   String @id // web_css, mobile_css, logo_url, menus, seo...
+  value Json
+}

@@ -1,0 +1,17 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body { @apply bg-bo-bg text-bo-text text-[13px] font-sans; }
+.panel { @apply bg-bo-panel rounded border border-bo-line; }
+.panel-title { @apply px-3 py-2 text-bo-blue border-b border-bo-line; }
+.inp { @apply h-8 w-full rounded-sm border border-bo-line bg-white px-2 text-[13px] outline-none focus:border-bo-blue; }
+.lbl { @apply mb-1 block text-[13px] text-bo-text; }
+.btn { @apply h-8 rounded-sm px-4 text-[13px] text-white disabled:opacity-50; }
+.btn-blue { @apply btn bg-bo-blue hover:brightness-95; }
+.btn-green { @apply btn bg-bo-green hover:brightness-95; }
+.btn-ghost { @apply h-8 rounded-sm border border-bo-blue/40 bg-bo-blue/10 px-4 text-bo-blue; }
+.tbl { @apply w-full border-collapse text-[13px]; }
+.tbl th { @apply bg-bo-head px-3 py-2 text-left font-normal text-bo-text whitespace-nowrap; }
+.tbl td { @apply border-t border-bo-line px-3 py-2 whitespace-nowrap; }
+.tbl tbody tr:nth-child(even) td { @apply bg-[#f8fafc]; }
