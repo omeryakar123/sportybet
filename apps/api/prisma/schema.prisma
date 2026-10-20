@@ -28,6 +28,22 @@ enum TxType {
   BONUS_EXPIRE
   BONUS_CANCEL
   ADJUSTMENT // admin manuel düzeltme
+  WITHDRAWAL_REFUND // reddedilen/iptal edilen çekim iadesi
+  CORRECTION_UP
+  CORRECTION_DOWN
+}
+
+enum PaymentType {
+  DEPOSIT
+  WITHDRAWAL
+}
+
+enum PaymentState {
+  NEW
+  PENDING   // onaylandı, ödeme bekliyor
+  PAID
+  REJECTED
+  CANCELLED // oyuncu iptal etti
 }
 
 enum BetState {
@@ -75,9 +91,11 @@ enum AdminRole {
 model Admin {
   id           Int       @id @default(autoincrement())
   username     String    @unique
+  fullName     String?
   passwordHash String
   role         AdminRole @default(ADMIN)
   isActive     Boolean   @default(true)
+  lastLoginAt  DateTime?
   createdAt    DateTime  @default(now())
   auditLogs    AuditLog[]
 }
@@ -104,6 +122,12 @@ model Player {
   btag           String?
   promoCode      String?
   regSource      String    @default("Web")
+  isTest         Boolean   @default(false)
+  city           String?
+  address        String?
+  gender         String?
+  affiliateId    String?
+  wrongLoginAttempts Int   @default(0)
   lastLoginAt    DateTime?
   lastLoginIp    String?
   createdAt      DateTime  @default(now())
@@ -115,6 +139,9 @@ model Player {
   bonuses       PlayerBonus[]
   notes         PlayerNote[]
   logins        LoginLog[]
+  payments      PaymentRequest[]
+  bonusRequests BonusRequest[]
+  promoRedemptions PromoRedemption[]
 }
 
 model Wallet {
@@ -259,6 +286,7 @@ model Bonus {
   createdAt       DateTime  @default(now())
   playerBonuses   PlayerBonus[]
   promoCodes      PromoCode[]
+  bonusRequests   BonusRequest[]
 }
 
 model PlayerBonus {
@@ -292,7 +320,81 @@ model PromoCode {
   startsAt    DateTime?
   endsAt      DateTime?
   conditions  Json?    // fromRegistration, fromDeposit, emailVerified, phoneVerified, minDepositCount...
+  description String?
+  createdAt   DateTime @default(now())
   bonus       Bonus    @relation(fields: [bonusId], references: [id])
+  redemptions PromoRedemption[]
+}
+
+model PromoRedemption {
+  id          Int       @id @default(autoincrement())
+  promoCodeId Int
+  playerId    Int
+  playerBonusId Int?
+  createdAt   DateTime  @default(now())
+  promoCode   PromoCode @relation(fields: [promoCodeId], references: [id])
+  player      Player    @relation(fields: [playerId], references: [id])
+
+  @@unique([promoCodeId, playerId])
+}
+
+// Oyuncunun siteden talep ettiği bonus (Bonus "Talep ile alınabilir" ise) — admin onaylar
+model BonusRequest {
+  id          Int      @id @default(autoincrement())
+  playerId    Int
+  bonusId     Int
+  state       String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  amount      Decimal? @db.Decimal(18, 2)
+  note        String?
+  playerBonusId Int?
+  processedByAdminId Int?
+  processedAt DateTime?
+  createdAt   DateTime @default(now())
+  player      Player   @relation(fields: [playerId], references: [id])
+  bonus       Bonus    @relation(fields: [bonusId], references: [id])
+
+  @@index([state])
+}
+
+// ---------- Ödemeler ----------
+model PaymentSystem {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  displayName String
+  kind        String   @default("BOTH") // DEPOSIT, WITHDRAWAL, BOTH
+  logoUrl     String?
+  minAmount   Decimal  @default(0) @db.Decimal(18, 2)
+  maxAmount   Decimal? @db.Decimal(18, 2)
+  fields      Json?    // çekimde istenecek alanlar: [{key:"iban",label:"IBAN"}]
+  instructions String?
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+}
+
+model PaymentRequest {
+  id            BigInt       @id @default(autoincrement())
+  playerId      Int
+  type          PaymentType
+  amount        Decimal      @db.Decimal(18, 2)
+  currency      String       @default("TRY")
+  state         PaymentState @default(NEW)
+  paymentSystem String
+  info          Json?        // IBAN, cüzdan adresi, ad soyad...
+  notes         String?
+  bonusId       Int?         // yatırımla seçilen yatırım bonusu
+  rejectReason  String?
+  allowAdminId  Int?
+  rejectAdminId Int?
+  paidAdminId   Int?
+  externalId    String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  processedAt   DateTime?
+  player        Player       @relation(fields: [playerId], references: [id])
+
+  @@index([type, state, createdAt])
+  @@index([playerId])
 }
 
 model PlayerNote {

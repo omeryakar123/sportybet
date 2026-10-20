@@ -1,141 +1,389 @@
-import type { FastifyInstance, FastifyRequest } from "fastify";
+import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
-import { TxType, WalletType } from "@prisma/client";
+import { Prisma, TxType, WalletType, PaymentType, PaymentState, AdminRole } from "@prisma/client";
 import { db } from "../index.js";
-import { grantBonus } from "../services/bonus.js";
-import { move } from "../services/wallet.js";
+import { grantBonus, cancelBonus } from "../services/bonus.js";
+import { move, ensureWallets } from "../services/wallet.js";
 import { sportsbook, sportsbookConfigured } from "../services/sportsbook.js";
+import { processPayment, BizError } from "../services/payments.js";
+import { dashboard, playerKpis, range, sportsbookDaily, financialReport } from "../services/reports.js";
 
-type AdminJwt = { adminId: number; role: string; kind: "admin" };
+type AdminJwt = { adminId: number; role: AdminRole; kind: "admin" };
+
+/**
+ * Rol yetkileri — URL önekine göre. SUPERADMIN her şey.
+ * Okuma (GET) ve yazma ayrı tutulur: SUPPORT oyuncuları görebilir ama değiştiremez.
+ */
+const PERMS: Record<string, { read: AdminRole[]; write: AdminRole[] }> = {
+  "/admin/users": { read: ["SUPERADMIN"], write: ["SUPERADMIN"] },
+  "/admin/audit-logs": { read: ["SUPERADMIN", "ADMIN"], write: [] },
+  "/admin/payment-requests": { read: ["ADMIN", "FINANCE", "RISK"], write: ["ADMIN", "FINANCE"] },
+  "/admin/payment-systems": { read: ["ADMIN", "FINANCE"], write: ["ADMIN", "FINANCE"] },
+  "/admin/transactions": { read: ["ADMIN", "FINANCE", "RISK"], write: [] },
+  "/admin/reports": { read: ["ADMIN", "FINANCE", "RISK"], write: [] },
+  "/admin/dashboard": { read: ["ADMIN", "FINANCE", "RISK", "SUPPORT"], write: [] },
+  "/admin/players": { read: ["ADMIN", "FINANCE", "RISK", "SUPPORT"], write: ["ADMIN", "RISK"] },
+  "/admin/bets": { read: ["ADMIN", "RISK", "SUPPORT", "FINANCE"], write: [] },
+  "/admin/sportsbook": { read: ["ADMIN", "RISK", "FINANCE"], write: [] },
+  "/admin/wallet-requests": { read: ["ADMIN", "RISK", "FINANCE"], write: [] },
+  "/admin/webhook-events": { read: ["ADMIN", "RISK"], write: [] },
+  "/admin/bonuses": { read: ["ADMIN", "RISK", "SUPPORT", "FINANCE"], write: ["ADMIN"] },
+  "/admin/bonus-requests": { read: ["ADMIN", "RISK", "SUPPORT"], write: ["ADMIN", "RISK"] },
+  "/admin/player-bonuses": { read: ["ADMIN", "RISK", "SUPPORT", "FINANCE"], write: ["ADMIN", "RISK"] },
+  "/admin/promo-codes": { read: ["ADMIN", "CMS"], write: ["ADMIN"] },
+  "/admin/cms": { read: ["ADMIN", "CMS"], write: ["ADMIN", "CMS"] },
+};
+// Oyuncu alt kaynakları: finans işlemleri ve bonus verme daha sıkı
+const PLAYER_WRITE_EXTRA: [RegExp, AdminRole[]][] = [
+  [/^\/admin\/players\/\d+\/adjust/, ["ADMIN", "FINANCE"]],
+  [/^\/admin\/players\/\d+\/bonuses/, ["ADMIN", "RISK"]],
+  [/^\/admin\/players\/\d+\/notes/, ["ADMIN", "RISK", "SUPPORT", "FINANCE"]],
+];
+
+function allowed(role: AdminRole, method: string, url: string) {
+  if (role === "SUPERADMIN") return true;
+  const path = url.split("?")[0];
+  if (path === "/admin/me" || path === "/admin/me/password") return true;
+  const write = method !== "GET";
+  if (write) for (const [re, roles] of PLAYER_WRITE_EXTRA) if (re.test(path)) return roles.includes(role);
+  const key = Object.keys(PERMS).find((k) => path === k || path.startsWith(k + "/"));
+  if (!key) return role === "ADMIN";
+  return (write ? PERMS[key].write : PERMS[key].read).includes(role);
+}
+
+const toNum = (v: unknown) => (v === "" || v === undefined || v === null ? undefined : Number(v));
+const dateQ = z.object({ from: z.string().optional(), to: z.string().optional() });
 
 export async function adminRoutes(app: FastifyInstance) {
+  app.setErrorHandler((err, _req, reply) => {
+    if (err instanceof z.ZodError) return reply.code(400).send({ error: "VALIDATION_ERROR", detail: err.flatten() });
+    if (err instanceof BizError) return reply.code(400).send({ error: err.message });
+    if (err instanceof Prisma.PrismaClientKnownRequestError) {
+      if (err.code === "P2025") return reply.code(404).send({ error: "NOT_FOUND" });
+      if (err.code === "P2002") return reply.code(409).send({ error: "ALREADY_EXISTS" });
+    }
+    const known = /^[A-Z_]+$/.test(err.message);
+    if (known) return reply.code(400).send({ error: err.message });
+    app.log.error(err);
+    return reply.code(500).send({ error: "INTERNAL_ERROR" });
+  });
+
   app.post("/login", async (req, reply) => {
     const { username, password } = z.object({ username: z.string(), password: z.string() }).parse(req.body);
     const admin = await db.admin.findUnique({ where: { username } });
     if (!admin || !admin.isActive || !(await bcrypt.compare(password, admin.passwordHash)))
       return reply.code(401).send({ error: "INVALID_CREDENTIALS" });
+    await db.admin.update({ where: { id: admin.id }, data: { lastLoginAt: new Date() } });
     const token = app.jwt.sign({ adminId: admin.id, role: admin.role, kind: "admin" } satisfies AdminJwt, { expiresIn: "12h" });
-    return { token, admin: { id: admin.id, username: admin.username, role: admin.role } };
+    return { token, admin: { id: admin.id, username: admin.username, fullName: admin.fullName, role: admin.role } };
   });
 
-  // Bundan sonraki tüm rotalar admin token ister
   app.addHook("onRequest", async (req, reply) => {
-    if (req.url.endsWith("/login")) return;
+    if (req.url.split("?")[0].endsWith("/login")) return;
     try {
       await req.jwtVerify();
-      if ((req.user as AdminJwt).kind !== "admin") throw new Error();
+      const u = req.user as AdminJwt;
+      if (u.kind !== "admin") throw new Error();
+      const a = await db.admin.findUnique({ where: { id: u.adminId } });
+      if (!a || !a.isActive) throw new Error();
+      (req as any).admin = a;
     } catch {
       return reply.code(401).send({ error: "UNAUTHORIZED" });
     }
+    const a = (req as any).admin;
+    if (!allowed(a.role, req.method, req.url)) return reply.code(403).send({ error: "FORBIDDEN" });
   });
-  const adminId = (req: FastifyRequest) => (req.user as AdminJwt).adminId;
+
+  const adminId = (req: FastifyRequest) => ((req as any).admin as { id: number }).id;
+  const audit = (req: FastifyRequest, action: string, target: string, payload?: unknown) =>
+    db.auditLog.create({ data: { adminId: adminId(req), action, target, payload: (payload ?? {}) as any } });
+  const idParam = (req: FastifyRequest) => Number((req.params as any).id);
+
+  // ---------- Kendi hesabım ----------
+  app.get("/me", async (req) => {
+    const a = (req as any).admin;
+    return { id: a.id, username: a.username, fullName: a.fullName, role: a.role };
+  });
+  app.post("/me/password", async (req, reply) => {
+    const b = z.object({ current: z.string(), next: z.string().min(8) }).parse(req.body);
+    const a = (req as any).admin;
+    if (!(await bcrypt.compare(b.current, a.passwordHash))) return reply.code(400).send({ error: "WRONG_PASSWORD" });
+    await db.admin.update({ where: { id: a.id }, data: { passwordHash: await bcrypt.hash(b.next, 10) } });
+    return { ok: true };
+  });
+
+  // ---------- Kullanıcı yönetimi ----------
+  app.get("/users", async () => db.admin.findMany({ select: { id: true, username: true, fullName: true, role: true, isActive: true, lastLoginAt: true, createdAt: true }, orderBy: { id: "asc" } }));
+  app.post("/users", async (req) => {
+    const b = z.object({ username: z.string().min(3), fullName: z.string().optional(), password: z.string().min(8), role: z.nativeEnum(AdminRole) }).parse(req.body);
+    const u = await db.admin.create({ data: { username: b.username, fullName: b.fullName, role: b.role, passwordHash: await bcrypt.hash(b.password, 10) } });
+    await audit(req, "ADMIN_CREATE", `admin:${u.id}`, { username: b.username, role: b.role });
+    return { id: u.id };
+  });
+  app.patch("/users/:id", async (req) => {
+    const b = z.object({ fullName: z.string().optional(), role: z.nativeEnum(AdminRole).optional(), isActive: z.boolean().optional(), password: z.string().min(8).optional() }).parse(req.body);
+    const { password, ...rest } = b;
+    const u = await db.admin.update({ where: { id: idParam(req) }, data: { ...rest, ...(password ? { passwordHash: await bcrypt.hash(password, 10) } : {}) } });
+    await audit(req, "ADMIN_UPDATE", `admin:${u.id}`, { ...rest, passwordChanged: Boolean(password) });
+    return { id: u.id };
+  });
+  app.get("/audit-logs", async (req) => {
+    const q = z.object({ action: z.string().optional(), adminId: z.coerce.number().optional(), target: z.string().optional(), take: z.coerce.number().default(300) }).parse(req.query);
+    return db.auditLog.findMany({
+      where: { ...(q.action ? { action: q.action } : {}), ...(q.adminId ? { adminId: q.adminId } : {}), ...(q.target ? { target: { contains: q.target } } : {}) },
+      include: { admin: { select: { username: true } } }, orderBy: { id: "desc" }, take: q.take,
+    });
+  });
 
   // ---------- Dashboard ----------
-  app.get("/dashboard", async () => {
-    const since = new Date(Date.now() - 86400_000);
-    const [players, newPlayers, bets, deposits] = await Promise.all([
-      db.player.count(),
-      db.player.count({ where: { createdAt: { gte: since } } }),
-      db.bet.aggregate({ where: { createdAt: { gte: since } }, _sum: { stake: true, winAmount: true }, _count: true }),
-      db.transaction.aggregate({ where: { type: TxType.DEPOSIT, createdAt: { gte: since } }, _sum: { amount: true }, _count: true }),
-    ]);
-    return { players, newPlayers, bets, deposits };
+  app.get("/dashboard", async (req) => {
+    const { from, to } = range(dateQ.parse(req.query));
+    return dashboard(db, from, to);
   });
 
   // ---------- Oyuncular ----------
   app.get("/players", async (req) => {
-    const q = z.object({ search: z.string().optional(), page: z.coerce.number().default(1), size: z.coerce.number().default(25) }).parse(req.query);
-    const where = q.search
-      ? { OR: [{ username: { contains: q.search, mode: "insensitive" as const } }, { email: { contains: q.search, mode: "insensitive" as const } }, ...(Number(q.search) ? [{ id: Number(q.search) }] : [])] }
-      : {};
+    const q = z.object({
+      search: z.string().optional(), id: z.coerce.number().optional(), status: z.string().optional(), category: z.string().optional(),
+      verified: z.string().optional(), isTest: z.string().optional(), btag: z.string().optional(), from: z.string().optional(), to: z.string().optional(),
+      minBalance: z.coerce.number().optional(), page: z.coerce.number().default(1), size: z.coerce.number().max(500).default(20),
+      sort: z.string().default("id"), dir: z.enum(["asc", "desc"]).default("desc"),
+    }).parse(req.query);
+    const where: Prisma.PlayerWhereInput = {
+      ...(q.id ? { id: q.id } : {}),
+      ...(q.search ? { OR: [
+        { username: { contains: q.search, mode: "insensitive" } }, { email: { contains: q.search, mode: "insensitive" } },
+        { firstName: { contains: q.search, mode: "insensitive" } }, { lastName: { contains: q.search, mode: "insensitive" } },
+        { phone: { contains: q.search } }, ...(Number(q.search) ? [{ id: Number(q.search) }] : []),
+      ] } : {}),
+      ...(q.status ? { status: q.status } : {}), ...(q.category ? { category: q.category } : {}),
+      ...(q.verified ? { isVerified: q.verified === "true" } : {}), ...(q.isTest ? { isTest: q.isTest === "true" } : {}),
+      ...(q.btag ? { btag: q.btag } : {}),
+      ...(q.from || q.to ? { createdAt: { ...(q.from ? { gte: new Date(q.from) } : {}), ...(q.to ? { lt: new Date(q.to) } : {}) } } : {}),
+      ...(q.minBalance !== undefined ? { wallets: { some: { type: WalletType.MAIN, balance: { gte: q.minBalance } } } } : {}),
+    };
+    const sortable = ["id", "username", "createdAt", "lastLoginAt", "firstName", "lastName"];
     const [items, total] = await Promise.all([
-      db.player.findMany({ where, include: { wallets: true }, orderBy: { id: "desc" }, skip: (q.page - 1) * q.size, take: q.size }),
+      db.player.findMany({ where, include: { wallets: true }, orderBy: { [sortable.includes(q.sort) ? q.sort : "id"]: q.dir }, skip: (q.page - 1) * q.size, take: q.size }),
       db.player.count({ where }),
     ]);
-    return { items, total };
+    return { items: items.map(({ passwordHash, ...p }) => p), total };
+  });
+
+  app.post("/players", async (req) => {
+    const b = z.object({ username: z.string().min(3), password: z.string().min(6), email: z.string().email().optional(), phone: z.string().optional(), firstName: z.string().optional(), lastName: z.string().optional(), isTest: z.boolean().default(false) }).parse(req.body);
+    const { password, ...rest } = b;
+    const p = await db.player.create({ data: { ...rest, passwordHash: await bcrypt.hash(password, 10), regSource: "Backoffice" } });
+    await ensureWallets(db, p.id);
+    await audit(req, "PLAYER_CREATE", `player:${p.id}`, rest);
+    return { id: p.id };
   });
 
   app.get("/players/:id", async (req) => {
-    const id = Number((req.params as any).id);
-    return db.player.findUniqueOrThrow({ where: { id }, include: { wallets: true, notes: { orderBy: { id: "desc" } } } });
+    const p = await db.player.findUniqueOrThrow({ where: { id: idParam(req) }, include: { wallets: true, notes: { orderBy: { id: "desc" } } } });
+    const { passwordHash, ...safe } = p;
+    return safe;
   });
 
+  app.get("/players/:id/kpis", async (req) => playerKpis(db, idParam(req)));
+
   app.patch("/players/:id", async (req) => {
-    const id = Number((req.params as any).id);
+    const id = idParam(req);
     const data = z.object({
-      status: z.string().optional(), category: z.string().optional(), isVerified: z.boolean().optional(),
-      isSportBlocked: z.boolean().optional(), isCasinoBlocked: z.boolean().optional(), excludedFromBonuses: z.boolean().optional(),
-      email: z.string().optional(), phone: z.string().optional(), firstName: z.string().optional(), lastName: z.string().optional(),
+      status: z.enum(["OPEN", "BLOCKED", "CLOSED", "SELF_EXCLUDED"]).optional(), category: z.string().optional(), isVerified: z.boolean().optional(),
+      isSportBlocked: z.boolean().optional(), isCasinoBlocked: z.boolean().optional(), excludedFromBonuses: z.boolean().optional(), isTest: z.boolean().optional(),
+      email: z.string().nullable().optional(), phone: z.string().nullable().optional(), firstName: z.string().nullable().optional(), lastName: z.string().nullable().optional(),
+      city: z.string().nullable().optional(), address: z.string().nullable().optional(), gender: z.string().nullable().optional(),
+      birthDate: z.string().nullable().optional(), btag: z.string().nullable().optional(), loyaltyLevel: z.string().nullable().optional(), language: z.string().optional(),
     }).parse(req.body);
-    const p = await db.player.update({ where: { id }, data });
-    await db.auditLog.create({ data: { adminId: adminId(req), action: "PLAYER_UPDATE", target: `player:${id}`, payload: data } });
-    return p;
+    const p = await db.player.update({ where: { id }, data: { ...data, ...(data.birthDate !== undefined ? { birthDate: data.birthDate ? new Date(data.birthDate) : null } : {}) } });
+    await audit(req, "PLAYER_UPDATE", `player:${id}`, data);
+    return { id: p.id };
+  });
+
+  app.post("/players/:id/password", async (req) => {
+    const { password } = z.object({ password: z.string().min(6) }).parse(req.body);
+    await db.player.update({ where: { id: idParam(req) }, data: { passwordHash: await bcrypt.hash(password, 10), wrongLoginAttempts: 0 } });
+    await audit(req, "PLAYER_PASSWORD_RESET", `player:${idParam(req)}`);
+    return { ok: true };
   });
 
   app.get("/players/:id/transactions", async (req) => {
-    const id = Number((req.params as any).id);
-    return db.transaction.findMany({ where: { playerId: id }, include: { wallet: true }, orderBy: { id: "desc" }, take: 200 });
+    const q = z.object({ type: z.string().optional(), wallet: z.string().optional(), from: z.string().optional(), to: z.string().optional() }).parse(req.query);
+    return db.transaction.findMany({
+      where: {
+        playerId: idParam(req), ...(q.type ? { type: { in: q.type.split(",") as TxType[] } } : {}), ...(q.wallet ? { wallet: { type: q.wallet as WalletType } } : {}),
+        ...(q.from || q.to ? { createdAt: { ...(q.from ? { gte: new Date(q.from) } : {}), ...(q.to ? { lt: new Date(q.to) } : {}) } } : {}),
+      },
+      include: { wallet: true }, orderBy: { id: "desc" }, take: 500,
+    });
   });
+  app.get("/players/:id/bets", async (req) => db.bet.findMany({ where: { playerId: idParam(req) }, include: { selections: true }, orderBy: { id: "desc" }, take: 300 }));
+  app.get("/players/:id/bonuses", async (req) => db.playerBonus.findMany({ where: { playerId: idParam(req) }, include: { bonus: true }, orderBy: { id: "desc" } }));
+  app.get("/players/:id/payments", async (req) => db.paymentRequest.findMany({ where: { playerId: idParam(req) }, orderBy: { id: "desc" }, take: 300 }));
+  app.get("/players/:id/logins", async (req) => db.loginLog.findMany({ where: { playerId: idParam(req) }, orderBy: { id: "desc" }, take: 200 }));
 
-  app.get("/players/:id/bets", async (req) => {
-    const id = Number((req.params as any).id);
-    return db.bet.findMany({ where: { playerId: id }, include: { selections: true }, orderBy: { id: "desc" }, take: 200 });
-  });
-
-  app.get("/players/:id/bonuses", async (req) => {
-    const id = Number((req.params as any).id);
-    return db.playerBonus.findMany({ where: { playerId: id }, include: { bonus: true }, orderBy: { id: "desc" } });
-  });
-
-  // Oyuncuya bonus ver (Player > Bonuses > Add)
   app.post("/players/:id/bonuses", async (req) => {
-    const playerId = Number((req.params as any).id);
+    const playerId = idParam(req);
     const body = z.object({ bonusId: z.number(), amount: z.number().positive() }).parse(req.body);
     const pb = await grantBonus(db, { playerId, ...body, adminId: adminId(req) });
-    await db.auditLog.create({ data: { adminId: adminId(req), action: "BONUS_GRANT", target: `player:${playerId}`, payload: body } });
+    await audit(req, "BONUS_GRANT", `player:${playerId}`, body);
     return pb;
   });
 
-  // Manuel bakiye düzeltme / manuel yatırım
+  // Manuel bakiye işlemi: yatırım / çekim / düzeltme (artı-eksi)
   app.post("/players/:id/adjust", async (req) => {
-    const playerId = Number((req.params as any).id);
+    const playerId = idParam(req);
     const b = z.object({
       wallet: z.nativeEnum(WalletType).default(WalletType.MAIN),
-      type: z.enum(["DEPOSIT", "WITHDRAWAL", "ADJUSTMENT"]),
-      amount: z.number(),
+      type: z.enum(["DEPOSIT", "WITHDRAWAL", "CORRECTION_UP", "CORRECTION_DOWN"]),
+      amount: z.number().positive(),
       paymentSystem: z.string().optional(),
       note: z.string().optional(),
     }).parse(req.body);
-    const amount = b.type === "WITHDRAWAL" ? -Math.abs(b.amount) : b.amount;
-    const tx = await db.$transaction((t) => move(t, { playerId, wallet: b.wallet, type: b.type as TxType, amount, paymentSystem: b.paymentSystem, note: b.note, adminId: adminId(req) }));
-    await db.auditLog.create({ data: { adminId: adminId(req), action: "BALANCE_ADJUST", target: `player:${playerId}`, payload: b } });
-    return { ...tx, id: tx.id.toString() };
+    const out = await db.$transaction(async (t) => {
+      const neg = b.type === "WITHDRAWAL" || b.type === "CORRECTION_DOWN";
+      // Manuel yatırım/çekim raporlara girsin diye PAID ödeme kaydı da açılır
+      let ref: string | undefined;
+      if (b.type === "DEPOSIT" || b.type === "WITHDRAWAL") {
+        const pr = await t.paymentRequest.create({ data: { playerId, type: b.type as PaymentType, amount: b.amount, state: PaymentState.PAID, paymentSystem: b.paymentSystem || "Manual", notes: b.note, allowAdminId: adminId(req), paidAdminId: adminId(req), processedAt: new Date() } });
+        ref = `pay:${pr.id}`;
+      }
+      return move(t, { playerId, wallet: b.wallet, type: b.type as TxType, amount: neg ? -b.amount : b.amount, paymentSystem: b.paymentSystem, note: b.note, adminId: adminId(req), reference: ref });
+    });
+    await audit(req, "BALANCE_ADJUST", `player:${playerId}`, b);
+    return { id: out.id.toString(), balanceAfter: out.balanceAfter };
   });
 
   app.post("/players/:id/notes", async (req) => {
-    const playerId = Number((req.params as any).id);
     const { text } = z.object({ text: z.string().min(1) }).parse(req.body);
-    return db.playerNote.create({ data: { playerId, text, adminId: adminId(req) } });
+    return db.playerNote.create({ data: { playerId: idParam(req), text, adminId: adminId(req) } });
   });
 
-  // ---------- Spor bahisleri (tüm oyuncular) ----------
+  // ---------- Finans: yatırım / çekim talepleri ----------
+  app.get("/payment-requests", async (req) => {
+    const q = z.object({
+      type: z.nativeEnum(PaymentType), state: z.string().optional(), playerId: z.coerce.number().optional(), id: z.string().optional(),
+      username: z.string().optional(), paymentSystem: z.string().optional(), minAmount: z.coerce.number().optional(), maxAmount: z.coerce.number().optional(),
+      from: z.string().optional(), to: z.string().optional(), page: z.coerce.number().default(1), size: z.coerce.number().max(500).default(50),
+    }).parse(req.query);
+    const where: Prisma.PaymentRequestWhereInput = {
+      type: q.type,
+      ...(q.state ? { state: { in: q.state.split(",") as PaymentState[] } } : {}),
+      ...(q.playerId ? { playerId: q.playerId } : {}), ...(q.id && /^\d+$/.test(q.id) ? { id: BigInt(q.id) } : {}),
+      ...(q.username ? { player: { username: { contains: q.username, mode: "insensitive" } } } : {}),
+      ...(q.paymentSystem ? { paymentSystem: q.paymentSystem } : {}),
+      ...(q.minAmount !== undefined || q.maxAmount !== undefined ? { amount: { ...(q.minAmount !== undefined ? { gte: q.minAmount } : {}), ...(q.maxAmount !== undefined ? { lte: q.maxAmount } : {}) } } : {}),
+      ...(q.from || q.to ? { createdAt: { ...(q.from ? { gte: new Date(q.from) } : {}), ...(q.to ? { lt: new Date(q.to) } : {}) } } : {}),
+    };
+    const [items, total, sum] = await Promise.all([
+      db.paymentRequest.findMany({ where, include: { player: { select: { id: true, username: true, firstName: true, lastName: true, isVerified: true, category: true } } }, orderBy: { id: "desc" }, skip: (q.page - 1) * q.size, take: q.size }),
+      db.paymentRequest.count({ where }),
+      db.paymentRequest.aggregate({ where, _sum: { amount: true } }),
+    ]);
+    const admins = await db.admin.findMany({ select: { id: true, username: true } });
+    const name = (id: number | null) => (id ? admins.find((a) => a.id === id)?.username ?? String(id) : null);
+    return { items: items.map((i) => ({ ...i, allowUser: name(i.allowAdminId), rejectUser: name(i.rejectAdminId), paidUser: name(i.paidAdminId) })), total, sum: Number(sum._sum.amount ?? 0) };
+  });
+  app.post("/payment-requests/:id/:action", async (req) => {
+    const { id, action } = req.params as { id: string; action: string };
+    const a = z.enum(["allow", "pay", "reject"]).parse(action);
+    const { reason, notes } = z.object({ reason: z.string().optional(), notes: z.string().optional() }).parse(req.body ?? {});
+    if (notes !== undefined) await db.paymentRequest.update({ where: { id: BigInt(id) }, data: { notes } });
+    const r = await processPayment(db, BigInt(id), a, { adminId: adminId(req), reason });
+    await audit(req, `PAYMENT_${a.toUpperCase()}`, `payment:${id}`, { reason });
+    return r;
+  });
+  app.patch("/payment-requests/:id", async (req) => {
+    const { notes } = z.object({ notes: z.string() }).parse(req.body);
+    return db.paymentRequest.update({ where: { id: BigInt((req.params as any).id) }, data: { notes } });
+  });
+
+  // ---------- Ödeme sistemleri ----------
+  app.get("/payment-systems", async () => db.paymentSystem.findMany({ orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }));
+  const psBody = z.object({
+    name: z.string().min(2), displayName: z.string(), kind: z.enum(["DEPOSIT", "WITHDRAWAL", "BOTH"]), logoUrl: z.string().nullable().optional(),
+    minAmount: z.coerce.number().default(0), maxAmount: z.preprocess(toNum, z.number().optional()), fields: z.any().optional(), instructions: z.string().nullable().optional(),
+    isActive: z.boolean().default(true), sortOrder: z.coerce.number().default(0),
+  });
+  app.post("/payment-systems", async (req) => db.paymentSystem.create({ data: psBody.parse(req.body) }));
+  app.patch("/payment-systems/:id", async (req) => db.paymentSystem.update({ where: { id: idParam(req) }, data: psBody.partial().parse(req.body) }));
+
+  // ---------- Tüm işlemler ----------
+  app.get("/transactions", async (req) => {
+    const q = z.object({ type: z.string().optional(), playerId: z.coerce.number().optional(), wallet: z.string().optional(), from: z.string().optional(), to: z.string().optional(), take: z.coerce.number().max(1000).default(300) }).parse(req.query);
+    return db.transaction.findMany({
+      where: {
+        ...(q.type ? { type: { in: q.type.split(",") as TxType[] } } : {}), ...(q.playerId ? { playerId: q.playerId } : {}), ...(q.wallet ? { wallet: { type: q.wallet as WalletType } } : {}),
+        ...(q.from || q.to ? { createdAt: { ...(q.from ? { gte: new Date(q.from) } : {}), ...(q.to ? { lt: new Date(q.to) } : {}) } } : {}),
+      },
+      include: { wallet: { select: { type: true } }, player: { select: { username: true } } }, orderBy: { id: "desc" }, take: q.take,
+    });
+  });
+
+  // ---------- Raporlar ----------
+  app.get("/reports/sportsbook", async (req) => { const { from, to } = range(dateQ.parse(req.query)); return sportsbookDaily(db, from, to); });
+  app.get("/reports/financial", async (req) => { const { from, to } = range(dateQ.parse(req.query)); return financialReport(db, from, to); });
+  app.get("/player-bonuses", async (req) => {
+    const q = z.object({ state: z.string().optional(), bonusId: z.coerce.number().optional(), type: z.string().optional(), playerId: z.coerce.number().optional(), from: z.string().optional(), to: z.string().optional(), take: z.coerce.number().max(1000).default(300) }).parse(req.query);
+    return db.playerBonus.findMany({
+      where: {
+        ...(q.state ? { state: q.state as any } : {}), ...(q.bonusId ? { bonusId: q.bonusId } : {}), ...(q.type ? { bonus: { type: q.type as any } } : {}),
+        ...(q.playerId ? { playerId: q.playerId } : {}),
+        ...(q.from || q.to ? { createdAt: { ...(q.from ? { gte: new Date(q.from) } : {}), ...(q.to ? { lt: new Date(q.to) } : {}) } } : {}),
+      },
+      include: { bonus: { select: { name: true, type: true } }, player: { select: { username: true } } }, orderBy: { id: "desc" }, take: q.take,
+    });
+  });
+  app.post("/player-bonuses/:id/cancel", async (req) => {
+    const r = await cancelBonus(db, idParam(req), adminId(req));
+    await audit(req, "BONUS_CANCEL", `playerBonus:${idParam(req)}`);
+    return r;
+  });
+
+  // ---------- Bonus talepleri ----------
+  app.get("/bonus-requests", async (req) => {
+    const q = z.object({ state: z.string().optional() }).parse(req.query);
+    return db.bonusRequest.findMany({ where: q.state ? { state: q.state } : {}, include: { bonus: { select: { name: true, type: true, minAmount: true, maxAmount: true } }, player: { select: { username: true } } }, orderBy: { id: "desc" }, take: 300 });
+  });
+  app.post("/bonus-requests/:id/:action", async (req) => {
+    const { action } = req.params as { action: string };
+    const b = z.object({ amount: z.number().positive().optional(), note: z.string().optional() }).parse(req.body ?? {});
+    const r = await db.bonusRequest.findUniqueOrThrow({ where: { id: idParam(req) } });
+    if (r.state !== "PENDING") throw new BizError("ALREADY_PROCESSED");
+    if (action === "approve") {
+      if (!b.amount) throw new BizError("AMOUNT_REQUIRED");
+      const pb = await grantBonus(db, { playerId: r.playerId, bonusId: r.bonusId, amount: b.amount, adminId: adminId(req) });
+      await db.bonusRequest.update({ where: { id: r.id }, data: { state: "APPROVED", amount: b.amount, note: b.note, playerBonusId: pb.id, processedByAdminId: adminId(req), processedAt: new Date() } });
+    } else if (action === "reject") {
+      await db.bonusRequest.update({ where: { id: r.id }, data: { state: "REJECTED", note: b.note, processedByAdminId: adminId(req), processedAt: new Date() } });
+    } else throw new BizError("INVALID_ACTION");
+    await audit(req, `BONUS_REQUEST_${action.toUpperCase()}`, `bonusRequest:${r.id}`, b);
+    return { ok: true };
+  });
+
+  // ---------- Spor bahisleri ----------
   app.get("/bets", async (req) => {
-    const q = z.object({ state: z.string().optional(), isLive: z.string().optional(), coupon: z.string().optional(), playerId: z.coerce.number().optional(), bonusOnly: z.string().optional(), take: z.coerce.number().default(100) }).parse(req.query);
+    const q = z.object({
+      state: z.string().optional(), isLive: z.string().optional(), coupon: z.string().optional(), playerId: z.coerce.number().optional(), bonusOnly: z.string().optional(),
+      type: z.string().optional(), minStake: z.coerce.number().optional(), from: z.string().optional(), to: z.string().optional(), take: z.coerce.number().max(1000).default(200),
+    }).parse(req.query);
     return db.bet.findMany({
       where: {
-        ...(q.state ? { state: q.state as any } : {}), ...(q.isLive ? { isLive: q.isLive === "true" } : {}),
+        ...(q.state ? { state: { in: q.state.split(",") as any } } : {}), ...(q.isLive ? { isLive: q.isLive === "true" } : {}),
         ...(q.coupon ? { couponId: q.coupon } : {}), ...(q.playerId ? { playerId: q.playerId } : {}),
-        ...(q.bonusOnly === "true" ? { stakeFromBonus: { gt: 0 } } : {}),
+        ...(q.bonusOnly === "true" ? { stakeFromBonus: { gt: 0 } } : {}), ...(q.type ? { type: q.type as any } : {}),
+        ...(q.minStake !== undefined ? { stake: { gte: q.minStake } } : {}),
+        ...(q.from || q.to ? { createdAt: { ...(q.from ? { gte: new Date(q.from) } : {}), ...(q.to ? { lt: new Date(q.to) } : {}) } } : {}),
       },
       include: { selections: true, player: { select: { id: true, username: true } } },
-      orderBy: { id: "desc" },
-      take: q.take,
+      orderBy: { id: "desc" }, take: q.take,
     });
   });
 
   // ---------- Sportsbook (Betco) ----------
-  const sb = (fn: () => Promise<any>) => async (_req: FastifyRequest, reply: any) => {
+  const sb = (fn: () => Promise<any>) => async (_req: FastifyRequest, reply: FastifyReply) => {
     try { return await fn(); } catch (e: any) { return reply.code(502).send({ error: e.message, detail: e.detail }); }
   };
   app.get("/sportsbook/status", async () => {
@@ -151,7 +399,6 @@ export async function adminRoutes(app: FastifyInstance) {
   app.get("/sportsbook/transactions", (req, reply) => sb(() => sportsbook.transactions(req.query as any))(req, reply));
   app.get("/sportsbook/bets", (req, reply) => sb(() => sportsbook.bets(req.query as any))(req, reply));
   app.get("/sportsbook/bets/:id", (req, reply) => sb(() => sportsbook.bet((req.params as any).id))(req, reply));
-  // Bizim taraftaki cüzdan çağrı logu + webhook logu
   app.get("/wallet-requests", async (req) => {
     const q = z.object({ kind: z.string().optional(), status: z.string().optional(), playerId: z.coerce.number().optional(), take: z.coerce.number().default(200) }).parse(req.query);
     return db.walletRequest.findMany({
@@ -162,26 +409,55 @@ export async function adminRoutes(app: FastifyInstance) {
   app.get("/webhook-events", async () => db.webhookEvent.findMany({ orderBy: { createdAt: "desc" }, take: 200 }));
 
   // ---------- Bonus tanımları ----------
-  app.get("/bonuses", async () => db.bonus.findMany({ orderBy: { id: "desc" } }));
-  app.post("/bonuses", async (req) => db.bonus.create({ data: req.body as any }));
-  app.patch("/bonuses/:id", async (req) => db.bonus.update({ where: { id: Number((req.params as any).id) }, data: req.body as any }));
+  const bonusBody = z.object({
+    name: z.string().min(1), type: z.enum(["DEPOSIT", "MANUAL", "FREEBET", "FREESPIN", "CASINO_FREEBET", "WAGERING"]), product: z.string().default("SPORT"),
+    description: z.string().nullable().optional(), note: z.string().nullable().optional(), isActive: z.boolean().default(true),
+    startsAt: z.preprocess((v) => (v ? new Date(v as string) : null), z.date().nullable()).optional(),
+    endsAt: z.preprocess((v) => (v ? new Date(v as string) : null), z.date().nullable()).optional(),
+    expirationType: z.string().default("FROM_PAYOUT_DATE"), expirationDays: z.coerce.number().int().min(1).default(7),
+    allowWithdrawal: z.boolean().default(false), availableOnRequest: z.boolean().default(false),
+    wageringMultiplier: z.coerce.number().min(0).default(1),
+    minAmount: z.preprocess(toNum, z.number().optional()).nullable(), maxAmount: z.preprocess(toNum, z.number().optional()).nullable(),
+    maxPayout: z.preprocess(toNum, z.number().optional()).nullable(), maxPayoutPct: z.preprocess(toNum, z.number().optional()).nullable(),
+    percent: z.preprocess(toNum, z.number().optional()).nullable(), rules: z.any().optional(),
+  });
+  const nullify = (o: Record<string, unknown>) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, v === undefined && ["minAmount", "maxAmount", "maxPayout", "maxPayoutPct", "percent"].includes(k) ? null : v]));
+  app.get("/bonuses", async () => {
+    const list = await db.bonus.findMany({ orderBy: { id: "desc" } });
+    const stats = await db.playerBonus.groupBy({ by: ["bonusId"], _count: true, _sum: { amount: true, convertedAmount: true } });
+    return list.map((b) => { const s = stats.find((x) => x.bonusId === b.id); return { ...b, awardedCount: s?._count ?? 0, awardedSum: Number(s?._sum.amount ?? 0), convertedSum: Number(s?._sum.convertedAmount ?? 0) }; });
+  });
+  app.post("/bonuses", async (req) => { const b = await db.bonus.create({ data: nullify(bonusBody.parse(req.body)) as any }); await audit(req, "BONUS_CREATE", `bonus:${b.id}`); return b; });
+  app.patch("/bonuses/:id", async (req) => { const b = await db.bonus.update({ where: { id: idParam(req) }, data: nullify(bonusBody.partial().parse(req.body)) as any }); await audit(req, "BONUS_UPDATE", `bonus:${b.id}`); return b; });
 
   // ---------- Promo kodlar ----------
-  app.get("/promo-codes", async () => db.promoCode.findMany({ include: { bonus: true }, orderBy: { id: "desc" } }));
-  app.post("/promo-codes", async (req) => db.promoCode.create({ data: req.body as any }));
-  app.patch("/promo-codes/:id", async (req) => db.promoCode.update({ where: { id: Number((req.params as any).id) }, data: req.body as any }));
+  const promoBody = z.object({
+    code: z.string().min(2), bonusId: z.coerce.number(), amount: z.coerce.number().positive(), currency: z.string().default("TRY"),
+    maxCount: z.coerce.number().int().min(1), isActive: z.boolean().default(true), description: z.string().nullable().optional(),
+    startsAt: z.preprocess((v) => (v ? new Date(v as string) : null), z.date().nullable()).optional(),
+    endsAt: z.preprocess((v) => (v ? new Date(v as string) : null), z.date().nullable()).optional(),
+    conditions: z.any().optional(),
+  });
+  app.get("/promo-codes", async () => db.promoCode.findMany({ include: { bonus: { select: { name: true, type: true } } }, orderBy: { id: "desc" } }));
+  app.post("/promo-codes", async (req) => db.promoCode.create({ data: promoBody.parse(req.body) }));
+  app.patch("/promo-codes/:id", async (req) => db.promoCode.update({ where: { id: idParam(req) }, data: promoBody.partial().parse(req.body) }));
+  app.get("/promo-codes/:id/redemptions", async (req) => db.promoRedemption.findMany({ where: { promoCodeId: idParam(req) }, include: { player: { select: { username: true } } }, orderBy: { id: "desc" } }));
 
   // ---------- CMS ----------
   for (const [path, model] of [["banners", db.cmsBanner], ["promotions", db.cmsPromotion], ["pages", db.cmsPage]] as const) {
     const m = model as any;
+    const clean = (b: any) => { const { id, updatedAt, ...rest } = b ?? {}; for (const k of ["startsAt", "endsAt"]) if (k in rest) rest[k] = rest[k] ? new Date(rest[k]) : null; if ("sortOrder" in rest) rest.sortOrder = Number(rest.sortOrder) || 0; return rest; };
     app.get(`/cms/${path}`, async () => m.findMany({ orderBy: [{ id: "desc" }] }));
-    app.post(`/cms/${path}`, async (req) => m.create({ data: req.body }));
-    app.patch(`/cms/${path}/:id`, async (req) => m.update({ where: { id: Number((req.params as any).id) }, data: req.body }));
-    app.delete(`/cms/${path}/:id`, async (req) => m.delete({ where: { id: Number((req.params as any).id) } }));
+    app.post(`/cms/${path}`, async (req) => { const r = await m.create({ data: clean(req.body) }); await audit(req, `CMS_${path.toUpperCase()}_CREATE`, `${path}:${r.id}`); return r; });
+    app.patch(`/cms/${path}/:id`, async (req) => { const r = await m.update({ where: { id: idParam(req) }, data: clean(req.body) }); await audit(req, `CMS_${path.toUpperCase()}_UPDATE`, `${path}:${r.id}`); return r; });
+    app.delete(`/cms/${path}/:id`, async (req) => { await m.delete({ where: { id: idParam(req) } }); await audit(req, `CMS_${path.toUpperCase()}_DELETE`, `${path}:${idParam(req)}`); return { ok: true }; });
   }
   app.get("/cms/settings/:key", async (req) => db.cmsSetting.findUnique({ where: { key: (req.params as any).key } }));
   app.put("/cms/settings/:key", async (req) => {
     const key = (req.params as any).key;
-    return db.cmsSetting.upsert({ where: { key }, update: { value: req.body as any }, create: { key, value: req.body as any } });
+    if (!/^[a-z0-9_]+$/.test(key) || key.startsWith("sportsbook_")) throw new BizError("INVALID_KEY");
+    const r = await db.cmsSetting.upsert({ where: { key }, update: { value: req.body as any }, create: { key, value: req.body as any } });
+    await audit(req, "CMS_SETTING_UPDATE", `setting:${key}`);
+    return r;
   });
 }

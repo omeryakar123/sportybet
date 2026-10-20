@@ -6,6 +6,7 @@ import { PrismaClient } from "@prisma/client";
 import { adminRoutes } from "./routes/admin.js";
 import { publicRoutes } from "./routes/public.js";
 import { platformRoutes, launchRoutes } from "./routes/sportsbook.js";
+import { siteRoutes } from "./routes/site.js";
 import { expireBonuses } from "./services/bonus.js";
 
 // BigInt alanları JSON'a string olarak çıksın
@@ -26,6 +27,7 @@ await app.register(publicRoutes, { prefix: "/api" });
 await app.register(adminRoutes, { prefix: "/admin" });
 await app.register(platformRoutes); // /wallet/* ve /webhooks/sportsbook (Betco)
 await app.register(launchRoutes, { prefix: "/api" });
+await app.register(siteRoutes, { prefix: "/api" }); // oyuncu hesabı, ödemeler, bonuslar
 
 // İlk açılışta süper admin oluştur
 async function seedAdmin() {
@@ -40,6 +42,13 @@ async function seedAdmin() {
 }
 
 await seedAdmin();
+// Hiç ödeme sistemi yoksa örnekleri oluştur (backoffice'ten düzenlenir)
+if ((await db.paymentSystem.count()) === 0) {
+  await db.paymentSystem.createMany({ data: [
+    { name: "BankTransfer", displayName: "Havale / EFT", kind: "BOTH", minAmount: 100, fields: [{ key: "fullName", label: "Ad Soyad" }, { key: "iban", label: "IBAN" }] },
+    { name: "CryptoUSDT", displayName: "USDT (TRC20)", kind: "BOTH", minAmount: 100, fields: [{ key: "address", label: "TRC20 Cüzdan Adresi" }] },
+  ] });
+}
 setInterval(() => expireBonuses(db).catch((e) => app.log.error(e)), 5 * 60_000);
 
 await app.listen({ port: Number(process.env.PORT ?? 4000), host: "0.0.0.0" });

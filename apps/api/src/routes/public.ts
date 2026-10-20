@@ -19,10 +19,16 @@ export async function publicRoutes(app: FastifyInstance) {
   app.post("/auth/login", async (req, reply) => {
     const b = z.object({ username: z.string(), password: z.string() }).parse(req.body);
     const p = await db.player.findUnique({ where: { username: b.username } });
-    if (!p || !(await bcrypt.compare(b.password, p.passwordHash))) return reply.code(401).send({ error: "INVALID_CREDENTIALS" });
+    if (!p) return reply.code(401).send({ error: "INVALID_CREDENTIALS" });
+    if (p.wrongLoginAttempts >= 10) return reply.code(403).send({ error: "TOO_MANY_ATTEMPTS" });
+    if (!(await bcrypt.compare(b.password, p.passwordHash))) {
+      await db.player.update({ where: { id: p.id }, data: { wrongLoginAttempts: { increment: 1 } } });
+      return reply.code(401).send({ error: "INVALID_CREDENTIALS" });
+    }
     if (p.status !== "OPEN") return reply.code(403).send({ error: "ACCOUNT_" + p.status });
-    await db.player.update({ where: { id: p.id }, data: { lastLoginAt: new Date(), lastLoginIp: req.ip } });
-    await db.loginLog.create({ data: { playerId: p.id, ip: req.ip, userAgent: req.headers["user-agent"] } });
+    const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.ip;
+    await db.player.update({ where: { id: p.id }, data: { lastLoginAt: new Date(), lastLoginIp: ip, wrongLoginAttempts: 0 } });
+    await db.loginLog.create({ data: { playerId: p.id, ip, userAgent: req.headers["user-agent"] } });
     return { token: app.jwt.sign({ playerId: p.id, kind: "player" } satisfies PlayerJwt, { expiresIn: "7d" }) };
   });
 
