@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import ReactDOM from "react-dom/client";
-import { BrowserRouter, Link, NavLink, Route, Routes, useParams } from "react-router-dom";
+import { BrowserRouter, Link, NavLink, Route, Routes, useLocation, useParams } from "react-router-dom";
 import "./index.css";
 import { api, getToken, setToken } from "./api";
 
@@ -29,18 +29,13 @@ function BannerSlot({ group }: { group: string }) {
 }
 
 function Sidebar() {
-  const [sports, setSports] = useState<any[]>([]);
-  useEffect(() => { api("/api/sports").then(setSports).catch(() => {}); }, []);
   const item = "flex items-center justify-between rounded-lg px-3 py-2 text-sm text-soft hover:bg-card";
   return (
     <aside className="fixed inset-y-0 left-0 z-40 hidden w-sidebar-w flex-col border-r border-line/60 bg-rail lg:flex">
       <Link to="/" className="flex h-header-h items-center border-b border-line/60 px-5 text-xl font-black text-primary">SportyBet</Link>
       <nav className="flex-1 space-y-1 overflow-y-auto p-3">
         <NavLink to="/" className={item}>Ana Sayfa</NavLink>
-        <NavLink to="/live" className={item}>Canlı Bahis</NavLink>
-        <NavLink to="/prematch" className={item}>Maç Öncesi</NavLink>
-        <div className="px-3 pt-4 pb-1 text-xs uppercase text-dim">Sporlar</div>
-        {sports.map((s) => <NavLink key={s.id} to={`/sport/${s.id}`} className={item}><span>{s.name}</span><span className="text-xs text-dim">{s.count}</span></NavLink>)}
+        <NavLink to="/sport" className={item}>Spor Bahisleri</NavLink>
         <div className="px-3 pt-4 pb-1 text-xs uppercase text-dim">Diğer</div>
         <NavLink to="/promotions" className={item}>Promosyonlar</NavLink>
       </nav>
@@ -95,26 +90,35 @@ function AuthModal({ onClose }: { onClose: () => void }) {
   );
 }
 
-function EventList() {
-  const [events, setEvents] = useState<any[]>([]);
-  useEffect(() => { api("/api/events").then(setEvents).catch(() => {}); }, []);
-  return (
-    <div className="space-y-2">
-      {events.map((e) => (
-        <div key={e.id} className="rounded-xl bg-card p-4">
-          <div className="mb-2 text-xs text-dim">{e.competition} · {new Date(e.start).toLocaleString("tr-TR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</div>
-          <div className="flex items-center justify-between gap-4">
-            <div className="text-sm font-medium"><div>{e.home}</div><div>{e.away}</div></div>
-            <div className="flex gap-2">{e.markets?.[0]?.outcomes.map((o: any) => (
-              <button key={o.name} className="flex h-12 w-16 flex-col items-center justify-center rounded-lg border border-white/10 bg-white/5 hover:border-primary/50">
-                <span className="text-[10px] font-bold uppercase text-white/45">{o.name}</span><span className="text-sm font-extrabold text-primary">{o.odds.toFixed(2)}</span>
-              </button>
-            ))}</div>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
+/** Betco sportsbook iframe — launch token backend'den, consume frontend'den (secret frontend'e gitmez) */
+function Sportsbook({ me, onAuth }: { me: any; onAuth: () => void }) {
+  const [url, setUrl] = useState(""); const [err, setErr] = useState("");
+  useEffect(() => {
+    if (!me) return;
+    (async () => {
+      try {
+        const { launch_token, base_url } = await api("/api/sportsbook/launch");
+        const r = await fetch(base_url + "/api/v1/launch/consume", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ launch_token }) });
+        const j = await r.json();
+        if (!j.success) throw new Error(j.error_code || "LAUNCH_FAILED");
+        setUrl(j.data.iframe_url);
+      } catch (e: any) { setErr(e.message); }
+    })();
+  }, [me]);
+  useEffect(() => {
+    const onMsg = (ev: MessageEvent) => {
+      if (!url || ev.origin !== new URL(url).origin) return;
+      const { type } = ev.data || {};
+      if (type === "deposit") location.href = "/deposit";
+      if (type === "open_bet_history") location.href = "/my-bets";
+      if (type === "login" || type === "register") onAuth();
+    };
+    window.addEventListener("message", onMsg); return () => window.removeEventListener("message", onMsg);
+  }, [url]);
+  if (!me) return <div className="grid h-[60vh] place-items-center text-center"><div><p className="mb-4 text-muted">Bahis yapmak için giriş yapın.</p><button onClick={onAuth} className="rounded-lg bg-primary px-5 py-2 font-semibold text-black">Giriş Yap</button></div></div>;
+  if (err) return <div className="p-6 text-loss">Sportsbook açılamadı: {err}</div>;
+  if (!url) return <div className="p-6 text-muted">Yükleniyor…</div>;
+  return <iframe src={url} className="h-[calc(100vh-64px)] w-full border-0" allow="fullscreen" />;
 }
 
 function Home() {
@@ -122,7 +126,7 @@ function Home() {
     <div className="space-y-6">
       <BannerSlot group="homepage-hero" />
       <div className="grid gap-4 md:grid-cols-2"><BannerSlot group="homepage-main-left" /><BannerSlot group="homepage-main-right" /></div>
-      <section><h2 className="mb-3 text-lg font-bold">Popüler Maçlar</h2><EventList /></section>
+      <Link to="/sport" className="block rounded-2xl bg-card p-6 text-center font-semibold text-primary">Spor Bahislerine Git →</Link>
     </div>
   );
 }
@@ -146,19 +150,19 @@ function PromotionDetail() {
 
 function App() {
   useCmsCss();
-  const [me, setMe] = useState<any>(null); const [auth, setAuth] = useState(false);
+  const [me, setMe] = useState<any>(null); const [auth, setAuth] = useState(false); const loc = useLocation();
   useEffect(() => { if (getToken()) api("/api/me").then(setMe).catch(() => {}); }, []);
   return (
     <>
       <Sidebar />
       <div className="lg:pl-sidebar-w">
         <Header me={me} onAuth={() => setAuth(true)} />
-        <main className="mx-auto max-w-6xl p-4">
+        <main className={loc.pathname === "/sport" ? "" : "mx-auto max-w-6xl p-4"}>
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/promotions" element={<Promotions />} />
             <Route path="/promotions/:slug" element={<PromotionDetail />} />
-            <Route path="*" element={<EventList />} />
+            <Route path="/sport" element={<Sportsbook me={me} onAuth={() => setAuth(true)} />} />
           </Routes>
         </main>
       </div>

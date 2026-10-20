@@ -6,6 +6,7 @@ const NAV = [
   { to: "/", label: "Dashboard", icon: "▦" },
   { to: "/players", label: "Oyuncular", icon: "👥" },
   { to: "/bets", label: "Spor Bahisleri", icon: "⚽" },
+  { to: "/sportsbook", label: "Sportsbook (Betco)", icon: "🔌" },
   { to: "/bonuses", label: "Bonuslar", icon: "🎁" },
   { to: "/promo-codes", label: "Promo Kodlar", icon: "🏷" },
   { to: "/cms/banners", label: "CMS · Bannerlar", icon: "🖼" },

@@ -5,6 +5,7 @@ import { TxType, WalletType } from "@prisma/client";
 import { db } from "../index.js";
 import { grantBonus } from "../services/bonus.js";
 import { move } from "../services/wallet.js";
+import { sportsbook, sportsbookConfigured } from "../services/sportsbook.js";
 
 type AdminJwt = { adminId: number; role: string; kind: "admin" };
 
@@ -120,14 +121,45 @@ export async function adminRoutes(app: FastifyInstance) {
 
   // ---------- Spor bahisleri (tüm oyuncular) ----------
   app.get("/bets", async (req) => {
-    const q = z.object({ state: z.string().optional(), isLive: z.string().optional(), take: z.coerce.number().default(100) }).parse(req.query);
+    const q = z.object({ state: z.string().optional(), isLive: z.string().optional(), coupon: z.string().optional(), playerId: z.coerce.number().optional(), bonusOnly: z.string().optional(), take: z.coerce.number().default(100) }).parse(req.query);
     return db.bet.findMany({
-      where: { ...(q.state ? { state: q.state as any } : {}), ...(q.isLive ? { isLive: q.isLive === "true" } : {}) },
+      where: {
+        ...(q.state ? { state: q.state as any } : {}), ...(q.isLive ? { isLive: q.isLive === "true" } : {}),
+        ...(q.coupon ? { couponId: q.coupon } : {}), ...(q.playerId ? { playerId: q.playerId } : {}),
+        ...(q.bonusOnly === "true" ? { stakeFromBonus: { gt: 0 } } : {}),
+      },
       include: { selections: true, player: { select: { id: true, username: true } } },
       orderBy: { id: "desc" },
       take: q.take,
     });
   });
+
+  // ---------- Sportsbook (Betco) ----------
+  const sb = (fn: () => Promise<any>) => async (_req: FastifyRequest, reply: any) => {
+    try { return await fn(); } catch (e: any) { return reply.code(502).send({ error: e.message, detail: e.detail }); }
+  };
+  app.get("/sportsbook/status", async () => {
+    const out: any = { configured: sportsbookConfigured(), walletSecretSet: Boolean(process.env.SPORTSBOOK_WALLET_SECRET) };
+    if (out.configured) {
+      out.me = await sportsbook.me().then((r: any) => r.data).catch((e: any) => ({ error: e.message }));
+      out.billing = await sportsbook.billing().then((r: any) => r.data).catch((e: any) => ({ error: e.message }));
+    }
+    out.lastBalanceStatus = (await db.cmsSetting.findUnique({ where: { key: "sportsbook_partner_balance" } }))?.value ?? null;
+    return out;
+  });
+  app.get("/sportsbook/ledger", (req, reply) => sb(() => sportsbook.ledger(req.query as any))(req, reply));
+  app.get("/sportsbook/transactions", (req, reply) => sb(() => sportsbook.transactions(req.query as any))(req, reply));
+  app.get("/sportsbook/bets", (req, reply) => sb(() => sportsbook.bets(req.query as any))(req, reply));
+  app.get("/sportsbook/bets/:id", (req, reply) => sb(() => sportsbook.bet((req.params as any).id))(req, reply));
+  // Bizim taraftaki cüzdan çağrı logu + webhook logu
+  app.get("/wallet-requests", async (req) => {
+    const q = z.object({ kind: z.string().optional(), status: z.string().optional(), playerId: z.coerce.number().optional(), take: z.coerce.number().default(200) }).parse(req.query);
+    return db.walletRequest.findMany({
+      where: { ...(q.kind ? { kind: q.kind } : {}), ...(q.status ? { status: q.status } : {}), ...(q.playerId ? { playerId: q.playerId } : {}) },
+      orderBy: { id: "desc" }, take: q.take,
+    });
+  });
+  app.get("/webhook-events", async () => db.webhookEvent.findMany({ orderBy: { createdAt: "desc" }, take: 200 }));
 
   // ---------- Bonus tanımları ----------
   app.get("/bonuses", async () => db.bonus.findMany({ orderBy: { id: "desc" } }));

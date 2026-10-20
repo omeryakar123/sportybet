@@ -32,10 +32,12 @@ enum TxType {
 
 enum BetState {
   PENDING
+  ACTIVE
   WON
   LOST
   RETURNED
   CASHED_OUT
+  CANCELLED
 }
 
 enum BetType {
@@ -148,6 +150,8 @@ model Transaction {
 
 model Bet {
   id           BigInt   @id @default(autoincrement())
+  providerBetId String? @unique // Betco bet_id
+  couponId     String?  // Betco coupon_id (oyuncunun gördüğü numara)
   playerId     Int
   type         BetType
   stake        Decimal  @db.Decimal(18, 2)
@@ -186,6 +190,45 @@ model BetSelection {
   isLive        Boolean  @default(false)
   info          String?  // skor / dakika bilgisi
   bet           Bet      @relation(fields: [betId], references: [id])
+}
+
+// ---------- Betco seamless wallet ----------
+// Platformdan gelen her /debit /credit /rollback çağrısı. transactionId ile idempotent.
+model WalletRequest {
+  id            Int      @id @default(autoincrement())
+  transactionId String   @unique
+  kind          String   // debit | credit | rollback
+  playerId      Int
+  amount        Decimal  @db.Decimal(18, 2)
+  currency      String
+  providerBetId String?
+  couponId      String?
+  reason        String?
+  fromMain      Decimal  @default(0) @db.Decimal(18, 2) // debit: ana cüzdandan düşülen / credit: ana cüzdana yatan
+  fromBonus     Decimal  @default(0) @db.Decimal(18, 2)
+  status        String   // SUCCESS | REJECTED
+  refunded      Boolean  @default(false) // debit rollback ile iade edildi mi
+  httpStatus    Int      @default(200)
+  response      Json
+  createdAt     DateTime @default(now())
+
+  @@index([playerId, createdAt])
+  @@index([providerBetId])
+}
+
+// Rollback'i debit'ten önce gelen işlemler: bu ID ile debit gelirse 409 TRANSACTION_CANCELLED
+model CancelledTransaction {
+  transactionId String   @id
+  createdAt     DateTime @default(now())
+}
+
+// Webhook tekilleştirme + log (X-Webhook-Id)
+model WebhookEvent {
+  webhookId String   @id
+  event     String
+  payload   Json
+  error     String?
+  createdAt DateTime @default(now())
 }
 
 // Bonus tanımı (Backoffice > Bonuses > Add New Bonus)

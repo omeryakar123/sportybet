@@ -5,6 +5,7 @@ import bcrypt from "bcryptjs";
 import { PrismaClient } from "@prisma/client";
 import { adminRoutes } from "./routes/admin.js";
 import { publicRoutes } from "./routes/public.js";
+import { platformRoutes, launchRoutes } from "./routes/sportsbook.js";
 import { expireBonuses } from "./services/bonus.js";
 
 // BigInt alanları JSON'a string olarak çıksın
@@ -23,6 +24,8 @@ app.get("/health", async () => ({ ok: true, time: new Date().toISOString() }));
 
 await app.register(publicRoutes, { prefix: "/api" });
 await app.register(adminRoutes, { prefix: "/admin" });
+await app.register(platformRoutes); // /wallet/* ve /webhooks/sportsbook (Betco)
+await app.register(launchRoutes, { prefix: "/api" });
 
 // İlk açılışta süper admin oluştur
 async function seedAdmin() {

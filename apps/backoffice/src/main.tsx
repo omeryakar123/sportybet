@@ -11,6 +11,7 @@ import PlayerDetail from "./pages/PlayerDetail";
 import Bonuses from "./pages/Bonuses";
 import PromoCodes from "./pages/PromoCodes";
 import SportsBets from "./pages/SportsBets";
+import Sportsbook from "./pages/Sportsbook";
 import { CmsBanners, CmsPromotions, CmsCss } from "./pages/Cms";
 
 const Private = ({ children }: { children: React.ReactNode }) => (getToken() ? <>{children}</> : <Navigate to="/login" replace />);
@@ -24,6 +25,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         <Route path="players" element={<Players />} />
         <Route path="players/:id" element={<PlayerDetail />} />
         <Route path="bets" element={<SportsBets />} />
+        <Route path="sportsbook" element={<Sportsbook />} />
         <Route path="bonuses" element={<Bonuses />} />
         <Route path="promo-codes" element={<PromoCodes />} />
         <Route path="cms/banners" element={<CmsBanners />} />

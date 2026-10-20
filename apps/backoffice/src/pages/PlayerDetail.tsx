@@ -90,12 +90,12 @@ function Financial({ p, reload }: any) {
 export function BetsTable({ bets, showPlayer }: { bets: any[]; showPlayer?: boolean }) {
   return (
     <div className="overflow-x-auto"><table className="tbl">
-      <thead><tr><th>Bahis ID</th>{showPlayer && <th>Oyuncu</th>}<th>Oluşturma</th><th>Yatırılan</th><th>Ana / Bonus</th><th>Oran</th><th>Durum</th><th>Kazanç</th><th>Tip</th><th>Canlı</th><th>Kaynak</th><th>IP</th></tr></thead>
+      <thead><tr><th>Bahis ID</th><th>Kupon No</th>{showPlayer && <th>Oyuncu</th>}<th>Oluşturma</th><th>Yatırılan</th><th>Ana / Bonus</th><th>Oran</th><th>Durum</th><th>Kazanç</th><th>Tip</th><th>Canlı</th><th>Kaynak</th><th>IP</th></tr></thead>
       <tbody>{bets.map((b) => (<Fragment key={b.id}>
         <tr key={b.id} className="font-medium"><td>{b.id}</td>{showPlayer && <td>{b.player?.username}</td>}<td>{dt(b.createdAt)}</td><td>{money(b.stake)}</td>
           <td>{money(b.stakeFromMain)} / {money(b.stakeFromBonus)}</td><td>{Number(b.totalOdds).toFixed(2)}</td><td><StateBadge s={b.state} /></td>
           <td>{money(b.winAmount)}</td><td>{b.type}</td><td>{b.isLive ? "Evet" : "Hayır"}</td><td>{b.source}</td><td>{b.ip}</td></tr>
-        <tr key={b.id + "s"}><td colSpan={12} className="bg-bo-head/50 p-2">
+        <tr key={b.id + "s"}><td colSpan={13} className="bg-bo-head/50 p-2">
           <table className="tbl"><thead><tr><th>Maç Başlangıç</th><th>Spor</th><th>Bölge</th><th>Lig</th><th>Maç</th><th>Market</th><th>Seçim</th><th>Oran</th><th>Durum</th><th>Canlı</th><th>Bilgi</th></tr></thead>
             <tbody>{b.selections.map((s: any) => (
               <tr key={s.id}><td>{dt(s.matchStart)}</td><td>{s.sport}</td><td>{s.region}</td><td>{s.competition}</td><td>{s.matchName}</td><td>{s.market}</td><td>{s.selection}</td><td>{Number(s.odds).toFixed(2)}</td><td><StateBadge s={s.state} /></td><td>{s.isLive ? "Evet" : "Hayır"}</td><td>{s.info}</td></tr>

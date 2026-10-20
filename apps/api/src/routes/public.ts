@@ -3,7 +3,6 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { db } from "../index.js";
 import { ensureWallets } from "../services/wallet.js";
-import { sportsbook } from "../services/sportsbook.js";
 
 type PlayerJwt = { playerId: number; kind: "player" };
 
@@ -34,10 +33,6 @@ export async function publicRoutes(app: FastifyInstance) {
     const { passwordHash, ...safe } = p;
     return safe;
   });
-
-  // ---------- Sportsbook (sağlayıcı proxy) ----------
-  app.get("/sports", async () => sportsbook.sports());
-  app.get("/events", async (req) => sportsbook.events(req.query as Record<string, string>));
 
   // ---------- CMS (sitede gösterilen içerik) ----------
   app.get("/cms/banners", async (req) => {
