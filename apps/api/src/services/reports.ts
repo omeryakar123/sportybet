@@ -11,19 +11,19 @@ export function range(q: { from?: string; to?: string }) {
 }
 
 /** Backoffice ana sayfa (BC Dashboard) */
-export async function dashboard(db: PrismaClient, from: Date, to: Date) {
+export async function dashboard(db: PrismaClient, from: Date, to: Date, siteId = 1) {
   const between = { gte: from, lt: to };
-  const real = { player: { isTest: false } };
-  const sum = async (type: TxType) => db.transaction.aggregate({ where: { type, createdAt: between }, _sum: { amount: true } });
+  const real = { player: { isTest: false, siteId } };
+  const sum = async (type: TxType) => db.transaction.aggregate({ where: { type, createdAt: between, ...real }, _sum: { amount: true } });
   const [dep, wd, wdRefund, logins, loginPlayers, registered, mainBal, bonusBal, corrUp, corrDown, depPlayers, wdPlayers] = await Promise.all([
     db.paymentRequest.aggregate({ where: { type: PaymentType.DEPOSIT, state: PaymentState.PAID, processedAt: between, ...real }, _sum: { amount: true }, _count: true }),
     db.paymentRequest.aggregate({ where: { type: PaymentType.WITHDRAWAL, state: PaymentState.PAID, processedAt: between, ...real }, _sum: { amount: true }, _count: true }),
     sum(TxType.WITHDRAWAL_REFUND),
     db.loginLog.count({ where: { createdAt: between, ...real } }),
     db.loginLog.groupBy({ by: ["playerId"], where: { createdAt: between, ...real } }).then((r) => r.length),
-    db.player.count({ where: { createdAt: between, isTest: false } }),
-    db.wallet.aggregate({ where: { type: WalletType.MAIN, player: { isTest: false } }, _sum: { balance: true } }),
-    db.wallet.aggregate({ where: { type: WalletType.BONUS, player: { isTest: false } }, _sum: { balance: true } }),
+    db.player.count({ where: { createdAt: between, isTest: false, siteId } }),
+    db.wallet.aggregate({ where: { type: WalletType.MAIN, player: { isTest: false, siteId } }, _sum: { balance: true } }),
+    db.wallet.aggregate({ where: { type: WalletType.BONUS, player: { isTest: false, siteId } }, _sum: { balance: true } }),
     db.transaction.aggregate({ where: { type: { in: [TxType.CORRECTION_UP] }, createdAt: between, ...real }, _sum: { amount: true } }),
     db.transaction.aggregate({ where: { type: { in: [TxType.CORRECTION_DOWN] }, createdAt: between, ...real }, _sum: { amount: true } }),
     db.paymentRequest.groupBy({ by: ["playerId"], where: { type: PaymentType.DEPOSIT, state: PaymentState.PAID, processedAt: between, ...real } }).then((r) => r.length),
@@ -40,16 +40,16 @@ export async function dashboard(db: PrismaClient, from: Date, to: Date) {
       playersMakingDeposit: depPlayers, playersMakingWithdrawal: wdPlayers,
       correctionUp: N(corrUp._sum.amount), correctionDown: Math.abs(N(corrDown._sum.amount)),
     },
-    sportsbook: await sportsbookOverview(db, from, to),
-    bonus: await bonusOverview(db, from, to),
-    topSports: await topSports(db, from, to),
+    sportsbook: await sportsbookOverview(db, from, to, siteId),
+    bonus: await bonusOverview(db, from, to, siteId),
+    topSports: await topSports(db, from, to, siteId),
   };
 }
 
-export async function sportsbookOverview(db: PrismaClient, from: Date, to: Date) {
+export async function sportsbookOverview(db: PrismaClient, from: Date, to: Date, siteId = 1) {
   const between = { gte: from, lt: to };
   const col = async (isLive?: boolean) => {
-    const where: Prisma.BetWhereInput = { createdAt: between, state: { in: COUNTED }, ...(isLive === undefined ? {} : { isLive }), player: { isTest: false } };
+    const where: Prisma.BetWhereInput = { createdAt: between, state: { in: COUNTED }, ...(isLive === undefined ? {} : { isLive }), player: { isTest: false, siteId } };
     const [agg, open, settled, players] = await Promise.all([
       db.bet.aggregate({ where, _sum: { stake: true }, _count: true, _avg: { stake: true } }),
       db.bet.aggregate({ where: { ...where, state: BetState.ACTIVE }, _sum: { stake: true } }),
@@ -66,22 +66,22 @@ export async function sportsbookOverview(db: PrismaClient, from: Date, to: Date)
   };
   const [prematch, live, total, types] = await Promise.all([
     col(false), col(true), col(),
-    db.bet.groupBy({ by: ["type"], where: { createdAt: between, state: { in: COUNTED } }, _count: true }),
+    db.bet.groupBy({ by: ["type"], where: { createdAt: between, state: { in: COUNTED }, player: { siteId } }, _count: true }),
   ]);
   return { prematch, live, total, types: Object.fromEntries(types.map((t) => [t.type, t._count])) };
 }
 
-export async function bonusOverview(db: PrismaClient, from: Date, to: Date) {
+export async function bonusOverview(db: PrismaClient, from: Date, to: Date, siteId = 1) {
   const rows = await db.$queryRaw<{ type: string; product: string; awarded: unknown; players: unknown; converted: unknown }[]>`
     SELECT b.type::text AS type, b.product, COALESCE(SUM(pb.amount),0) AS awarded, COUNT(DISTINCT pb."playerId") AS players,
            COALESCE(SUM(pb."convertedAmount"),0) AS converted
     FROM "PlayerBonus" pb JOIN "Bonus" b ON b.id = pb."bonusId" JOIN "Player" p ON p.id = pb."playerId"
-    WHERE pb."createdAt" >= ${from} AND pb."createdAt" < ${to} AND p."isTest" = false
+    WHERE pb."createdAt" >= ${from} AND pb."createdAt" < ${to} AND p."isTest" = false AND p."siteId" = ${siteId}
     GROUP BY b.type, b.product ORDER BY awarded DESC`;
   return rows.map((r) => ({ type: r.type, product: r.product, awarded: N(r.awarded), players: N(r.players), converted: N(r.converted) }));
 }
 
-export async function topSports(db: PrismaClient, from: Date, to: Date) {
+export async function topSports(db: PrismaClient, from: Date, to: Date, siteId = 1) {
   const rows = await db.$queryRaw<{ sport: string; bet: unknown; win: unknown }[]>`
     SELECT COALESCE(NULLIF(s.sport,''),'Diğer') AS sport,
            SUM(b.stake / GREATEST(cnt.n,1)) AS bet,
@@ -90,7 +90,7 @@ export async function topSports(db: PrismaClient, from: Date, to: Date) {
     JOIN "Bet" b ON b.id = s."betId"
     JOIN (SELECT "betId", COUNT(*) n FROM "BetSelection" GROUP BY "betId") cnt ON cnt."betId" = b.id
     JOIN "Player" p ON p.id = b."playerId"
-    WHERE b."createdAt" >= ${from} AND b."createdAt" < ${to} AND b.state <> 'CANCELLED' AND p."isTest" = false
+    WHERE b."createdAt" >= ${from} AND b."createdAt" < ${to} AND b.state <> 'CANCELLED' AND p."isTest" = false AND p."siteId" = ${siteId}
     GROUP BY 1 ORDER BY bet DESC LIMIT 5`;
   return rows.map((r) => ({ sport: r.sport, bet: N(r.bet), win: N(r.win), profit: N(r.bet) - N(r.win) }));
 }
@@ -132,7 +132,7 @@ export async function playerKpis(db: PrismaClient, playerId: number) {
 }
 
 /** Günlük sportsbook raporu */
-export async function sportsbookDaily(db: PrismaClient, from: Date, to: Date) {
+export async function sportsbookDaily(db: PrismaClient, from: Date, to: Date, siteId = 1) {
   const rows = await db.$queryRaw<any[]>`
     SELECT to_char(date_trunc('day', b."createdAt"), 'YYYY-MM-DD') AS day,
       COUNT(*) AS bets, COUNT(DISTINCT b."playerId") AS players,
@@ -142,13 +142,13 @@ export async function sportsbookDaily(db: PrismaClient, from: Date, to: Date) {
       SUM(CASE WHEN b.state IN ('WON','RETURNED','CASHED_OUT','LOST') THEN b."winAmount" ELSE 0 END) AS win,
       SUM(CASE WHEN b.state = 'ACTIVE' THEN b.stake ELSE 0 END) AS open
     FROM "Bet" b JOIN "Player" p ON p.id = b."playerId"
-    WHERE b."createdAt" >= ${from} AND b."createdAt" < ${to} AND b.state NOT IN ('CANCELLED','PENDING') AND p."isTest" = false
+    WHERE b."createdAt" >= ${from} AND b."createdAt" < ${to} AND b.state NOT IN ('CANCELLED','PENDING') AND p."isTest" = false AND p."siteId" = ${siteId}
     GROUP BY 1 ORDER BY 1 DESC`;
   return rows.map((r) => ({ day: r.day, bets: N(r.bets), players: N(r.players), stake: N(r.stake), liveStake: N(r.liveStake), bonusStake: N(r.bonusStake), win: N(r.win), open: N(r.open), ggr: N(r.stake) - N(r.open) - N(r.win) }));
 }
 
 /** Günlük finans raporu + ödeme sistemi kırılımı */
-export async function financialReport(db: PrismaClient, from: Date, to: Date) {
+export async function financialReport(db: PrismaClient, from: Date, to: Date, siteId = 1) {
   const daily = await db.$queryRaw<any[]>`
     SELECT to_char(date_trunc('day', "processedAt"), 'YYYY-MM-DD') AS day,
       SUM(CASE WHEN type='DEPOSIT' THEN amount ELSE 0 END) AS deposits,
@@ -157,12 +157,12 @@ export async function financialReport(db: PrismaClient, from: Date, to: Date) {
       COUNT(*) FILTER (WHERE type='WITHDRAWAL') AS "withdrawalCount",
       COUNT(DISTINCT "playerId") FILTER (WHERE type='DEPOSIT') AS depositors
     FROM "PaymentRequest" pr WHERE state='PAID' AND "processedAt" >= ${from} AND "processedAt" < ${to}
-      AND NOT EXISTS (SELECT 1 FROM "Player" p WHERE p.id = pr."playerId" AND p."isTest")
+      AND EXISTS (SELECT 1 FROM "Player" p WHERE p.id = pr."playerId" AND p."isTest" = false AND p."siteId" = ${siteId})
     GROUP BY 1 ORDER BY 1 DESC`;
   const bySystem = await db.$queryRaw<any[]>`
     SELECT "paymentSystem", type::text AS type, COUNT(*) AS count, SUM(amount) AS amount
     FROM "PaymentRequest" pr WHERE state='PAID' AND "processedAt" >= ${from} AND "processedAt" < ${to}
-      AND NOT EXISTS (SELECT 1 FROM "Player" p WHERE p.id = pr."playerId" AND p."isTest")
+      AND EXISTS (SELECT 1 FROM "Player" p WHERE p.id = pr."playerId" AND p."isTest" = false AND p."siteId" = ${siteId})
     GROUP BY 1,2 ORDER BY amount DESC`;
   return {
     daily: daily.map((r) => ({ day: r.day, deposits: N(r.deposits), depositCount: N(r.depositCount), withdrawals: N(r.withdrawals), withdrawalCount: N(r.withdrawalCount), depositors: N(r.depositors), net: N(r.deposits) - N(r.withdrawals) })),

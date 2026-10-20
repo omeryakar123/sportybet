@@ -233,3 +233,15 @@ cd apps/web && npm i && npm run dev          # http://localhost:5173
 - **2026-10-20** — Backoffice tamamlandı (BC referansıyla tüm menü). Kararlar: tek aktif bonus; çekim talepte bloke; manuel yatırım/çekim raporlara PaymentRequest ile girer; test oyuncuları raporlardan hariç; roller URL önekine göre (PERMS).
 - **2026-10-20** — Tahmin piyasaları eklendi (motor + API + backoffice). Cüzdanlar ayrıldı: oyuncu aktif cüzdan seçer. Backoffice görünümü BC'ye yaklaştırıldı. Demo veri araçları.
 - **2026-10-20** — Site frontend'i kullanıcı tasarımıyla (nolurKi referansı) yeniden yazıldı; SportyBet markası. VITE_API_URL boşsa `api-<host>` tahmini. Betco live-games widget ucu eklendi (`GET /api/sportsbook/widgets/live-games`).
+
+
+## Çoklu Site (Multi-tenant) — 2026-10-20
+- **Site** modeli: code (benzersiz), name, domain (benzersiz), isActive, not + site bazlı Betco kimliği (sbApiUrl/sbApiKey/sbApiSecret/sbWalletSecret; boşsa env varsayılanı).
+- Site bazlı veriler: Player (username site içinde benzersiz), Bonus, PromoCode, PaymentSystem (+config Json: kripto için depositAddress/network/requireTxid), CmsBanner/CmsPromotion/CmsPage, CmsSetting (@@id [siteId,key]). **Tahmin piyasaları GLOBAL** (tüm siteler aynı piyasaları görür; prediction_* ayarları siteId=1'de).
+- Site çözümü (oyuncu API): X-Site başlığı (kod) → Origin/Referer domaini → varsayılan site 1. Web build'ine VITE_SITE_CODE verilirse hep o kod gönderilir.
+- Backoffice: üst barda **Site seçici** (localStorage bo_site → tüm /admin isteklerine X-Site); **Kullanıcı Yönetimi → Siteler** sayfasından site oluştur/düzenle (SUPERADMIN yazar, ADMIN görür). Yeni site açılınca ödeme sistemleri + site_general CMS ayarı otomatik kurulur (seedSiteDefaults).
+- Tüm admin listeleri/raporlar/dashboard seçili siteye göre süzülür (reports.ts fonksiyonları siteId parametresi aldı).
+- Betco: launch/widget oyuncunun sitesinin kimliğiyle (sbClient(sbCreds(site))); wallet/webhook imzası env + tüm sitelerin wallet secret'ları denenerek doğrulanır (verifyPlatformSignature multi-secret). Cüzdan/webhook URL'leri tüm siteler için ortak.
+- Açılışta varsayılan Site id=1 seed edilir (DEFAULT_SITE_CODE/NAME/DOMAIN env). PUBLIC_API_URL env → Siteler sayfasında wallet/webhook URL gösterimi.
+- **Kripto yatırım akışı**: PaymentSystem.config.depositAddress varsa sitede adres + kopyala + ağ uyarısı + (requireTxid ise) zorunlu TXID alanı; TXID info.txid olarak talebe yazılır ve backoffice Finans ekranında görünür. CryptoUSDT (site 1) açılışta config ile dolduruldu.
+- Spor Bahisleri (BO) 15 sn'de bir otomatik yenilenir (kapatılabilir).

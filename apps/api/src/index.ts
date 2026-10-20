@@ -11,6 +11,7 @@ import { predictionSiteRoutes } from "./routes/predictions.js";
 import { autoClose, syncFeed } from "./services/predictions.js";
 import { seedDemo } from "./services/demo.js";
 import { expireBonuses } from "./services/bonus.js";
+import { seedSiteDefaults, bustSiteCache } from "./services/sites.js";
 
 // BigInt alanları JSON'a string olarak çıksın
 (BigInt.prototype as any).toJSON = function () { return this.toString(); };
@@ -18,10 +19,9 @@ import { expireBonuses } from "./services/bonus.js";
 export const db = new PrismaClient();
 const app = Fastify({ logger: true });
 
-await app.register(cors, {
-  origin: (process.env.CORS_ORIGINS ?? "*").split(",").map((s) => s.trim()),
-  credentials: true,
-});
+// Çoklu site: her sitenin kendi domaini olabileceği için origin'i yansıtıyoruz.
+// (Kimlik doğrulama Bearer token ile yapılır, çerez kullanılmaz; bu yüzden güvenli.)
+await app.register(cors, { origin: true, credentials: true });
 await app.register(jwt, { secret: process.env.JWT_SECRET ?? "dev-secret" });
 
 app.get("/health", async () => ({ ok: true, time: new Date().toISOString() }));
@@ -46,12 +46,19 @@ async function seedAdmin() {
 }
 
 await seedAdmin();
-// Hiç ödeme sistemi yoksa örnekleri oluştur (backoffice'ten düzenlenir)
-if ((await db.paymentSystem.count()) === 0) {
-  await db.paymentSystem.createMany({ data: [
-    { name: "BankTransfer", displayName: "Havale / EFT", kind: "BOTH", minAmount: 100, fields: [{ key: "fullName", label: "Ad Soyad" }, { key: "iban", label: "IBAN" }] },
-    { name: "CryptoUSDT", displayName: "USDT (TRC20)", kind: "BOTH", minAmount: 100, fields: [{ key: "address", label: "TRC20 Cüzdan Adresi" }] },
-  ] });
+// Varsayılan site (id 1) — tüm eski kayıtlar @default(1) ile buna bağlanır
+{
+  let s = await db.site.findUnique({ where: { id: 1 } });
+  if (!s) {
+    s = await db.site.create({ data: { code: process.env.DEFAULT_SITE_CODE ?? "sportybet", name: process.env.DEFAULT_SITE_NAME ?? "SportyBet", domain: process.env.DEFAULT_SITE_DOMAIN ?? null } });
+    // id'nin 1 olduğundan emin ol (boş tabloda ilk kayıt 1'dir)
+    app.log.info({ site: s.id }, "Varsayılan site oluşturuldu");
+    bustSiteCache();
+  }
+  await seedSiteDefaults(db, s);
+  // Mevcut kripto yönteminde config yoksa varsayılanı yaz (eski kurulumlar için)
+  const cu = await db.paymentSystem.findFirst({ where: { siteId: 1, name: "CryptoUSDT" } });
+  if (cu && !cu.config) await db.paymentSystem.update({ where: { id: cu.id }, data: { config: { network: "TRC20", depositAddress: "", requireTxid: true } } });
 }
 setInterval(() => expireBonuses(db).catch((e) => app.log.error(e)), 5 * 60_000);
 setInterval(() => autoClose(db).catch((e) => app.log.error(e)), 60_000); // süresi dolan tahmin piyasalarını kapat

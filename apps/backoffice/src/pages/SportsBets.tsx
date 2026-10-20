@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import { Panel, Field, DataTable, DateRange, presetRange, money, Err, useForm } from "../ui";
 import { betCols, Selections } from "./PlayerDetail";
@@ -7,8 +7,13 @@ export default function SportsBets() {
   const [range, setRange] = useState(presetRange("today"));
   const { f, bind, check } = useForm({ state: "", isLive: "", coupon: "", playerId: "", type: "", minStake: "", bonusOnly: false as any });
   const [bets, setBets] = useState<any[]>([]); const [e, setE] = useState("");
-  const load = () => api(`/admin/bets?${new URLSearchParams(Object.fromEntries(Object.entries({ ...f, bonusOnly: f.bonusOnly ? "true" : "", from: range.from, to: range.to, take: "1000" }).filter(([, v]) => v)))}`).then(setBets).catch((x) => setE(x.message));
+  const [auto, setAuto] = useState(true);
+  const [last, setLast] = useState<Date | null>(null);
+  const loadRef = useRef<() => void>(() => {});
+  const load = () => api(`/admin/bets?${new URLSearchParams(Object.fromEntries(Object.entries({ ...f, bonusOnly: f.bonusOnly ? "true" : "", from: range.from, to: range.to, take: "1000" }).filter(([, v]) => v)))}`).then((r) => { setBets(r); setLast(new Date()); }).catch((x) => setE(x.message));
+  loadRef.current = load;
   useEffect(() => { load(); }, [range]);
+  useEffect(() => { if (!auto) return; const t = setInterval(() => loadRef.current(), 15_000); return () => clearInterval(t); }, [auto]);
   const tot = (k: string) => bets.filter((b) => b.state !== "CANCELLED").reduce((a, b) => a + Number(b[k] ?? 0), 0);
   const settled = bets.filter((b) => ["WON", "LOST", "RETURNED", "CASHED_OUT"].includes(b.state));
   const ggr = settled.reduce((a, b) => a + Number(b.stake) - Number(b.winAmount), 0);
@@ -27,7 +32,10 @@ export default function SportsBets() {
         </div>
         <div className="mt-3 flex justify-end"><button className="btn-blue w-28" onClick={load}>Uygula</button></div>
       </Panel>
-      <Panel title="Spor Bahisleri" right={<span className="text-bo-text">Kupon: {bets.length} · Yatırılan: {money(tot("stake"))} · Ödenen: {money(tot("winAmount"))} · GGR (sonuçlanan): <b className={ggr < 0 ? "text-bo-red" : "text-bo-green"}>{money(ggr)}</b></span>}>
+      <Panel title="Spor Bahisleri" right={<span className="flex items-center gap-3 text-bo-text">
+        <label className="flex items-center gap-1 text-xs text-bo-muted"><input type="checkbox" checked={auto} onChange={(e) => setAuto(e.target.checked)} />Otomatik yenile (15 sn){last ? ` · ${last.toLocaleTimeString("tr-TR")}` : ""}</label>
+        <span>Kupon: {bets.length} · Yatırılan: {money(tot("stake"))} · Ödenen: {money(tot("winAmount"))} · GGR (sonuçlanan): <b className={ggr < 0 ? "text-bo-red" : "text-bo-green"}>{money(ggr)}</b></span>
+      </span>}>
         <Err e={e} />
         <DataTable rows={bets} cols={betCols(true)} csvName="spor_bahisleri" expand={(b) => <Selections b={b} />} />
       </Panel>

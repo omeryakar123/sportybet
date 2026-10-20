@@ -92,6 +92,24 @@ enum AdminRole {
   CMS
 }
 
+// Bir kurulumda birden çok marka/site. Her oyuncu, bonus, promo, ödeme yöntemi ve CMS içeriği bir siteye bağlıdır.
+// Tahmin piyasaları GLOBALDİR (tüm siteler aynı piyasaları görür); pozisyonlar oyuncu üzerinden siteye bağlanır.
+model Site {
+  id             Int      @id @default(autoincrement())
+  code           String   @unique // kısa ad: sportybet, cryptobet...
+  name           String
+  domain         String?  @unique // oyuncu sitesinin domaini (Origin ile eşleşir)
+  isActive       Boolean  @default(true)
+  // Betco sportsbook kimlikleri (boşsa env'deki varsayılan kullanılır)
+  sbApiUrl       String?
+  sbApiKey       String?
+  sbApiSecret    String?
+  sbWalletSecret String?
+  note           String?
+  createdAt      DateTime @default(now())
+  players        Player[]
+}
+
 model Admin {
   id           Int       @id @default(autoincrement())
   username     String    @unique
@@ -106,8 +124,9 @@ model Admin {
 
 model Player {
   id             Int       @id @default(autoincrement())
-  username       String    @unique
-  email          String?   @unique
+  siteId         Int       @default(1)
+  username       String
+  email          String?
   phone          String?
   passwordHash   String
   firstName      String?
@@ -268,6 +287,7 @@ model WebhookEvent {
 // Bonus tanımı (Backoffice > Bonuses > Add New Bonus)
 model Bonus {
   id              Int       @id @default(autoincrement())
+  siteId          Int       @default(1)
   name            String
   type            BonusType
   product         String    @default("SPORT") // SPORT, CASINO
@@ -317,7 +337,8 @@ model PlayerBonus {
 
 model PromoCode {
   id          Int      @id @default(autoincrement())
-  code        String   @unique
+  siteId      Int      @default(1)
+  code        String
   bonusId     Int
   amount      Decimal  @db.Decimal(18, 2)
   currency    String   @default("TRY")
@@ -331,6 +352,8 @@ model PromoCode {
   createdAt   DateTime @default(now())
   bonus       Bonus    @relation(fields: [bonusId], references: [id])
   redemptions PromoRedemption[]
+
+  @@unique([siteId, code])
 }
 
 model PromoRedemption {
@@ -366,7 +389,8 @@ model BonusRequest {
 // ---------- Ödemeler ----------
 model PaymentSystem {
   id          Int      @id @default(autoincrement())
-  name        String   @unique
+  siteId      Int      @default(1)
+  name        String
   displayName String
   kind        String   @default("BOTH") // DEPOSIT, WITHDRAWAL, BOTH
   logoUrl     String?
@@ -374,9 +398,12 @@ model PaymentSystem {
   maxAmount   Decimal? @db.Decimal(18, 2)
   fields      Json?    // çekimde istenecek alanlar: [{key:"iban",label:"IBAN"}]
   instructions String?
+  config      Json?    // kripto: { depositAddress, network, requireTxid } vb.
   isActive    Boolean  @default(true)
   sortOrder   Int      @default(0)
   createdAt   DateTime @default(now())
+
+  @@unique([siteId, name])
 }
 
 model PaymentRequest {
@@ -435,6 +462,7 @@ model AuditLog {
 // ---------- CMS (sitedeki her görselin panelde karşılığı) ----------
 model CmsBanner {
   id         Int      @id @default(autoincrement())
+  siteId     Int      @default(1)
   group      String   // ör. homepage-main-left
   title      String
   imageUrl   String
@@ -450,8 +478,9 @@ model CmsBanner {
 
 model CmsPromotion {
   id         Int      @id @default(autoincrement())
+  siteId     Int      @default(1)
   title      String
-  slug       String   @unique
+  slug       String
   category   String   @default("TUMU")
   imageUrl   String?
   contentHtml String
@@ -463,20 +492,28 @@ model CmsPromotion {
   startsAt   DateTime?
   endsAt     DateTime?
   updatedAt  DateTime @updatedAt
+
+  @@unique([siteId, slug])
 }
 
 model CmsPage {
   id         Int      @id @default(autoincrement())
-  slug       String   @unique
+  siteId     Int      @default(1)
+  slug       String
   title      String
   contentHtml String
   isPublished Boolean @default(true)
   updatedAt  DateTime @updatedAt
+
+  @@unique([siteId, slug])
 }
 
 model CmsSetting {
-  key   String @id // web_css, mobile_css, logo_url, menus, seo...
-  value Json
+  siteId Int    @default(1)
+  key    String // web_css, mobile_css, site_general, menus, seo... (prediction_* anahtarları globaldir, siteId=1)
+  value  Json
+
+  @@id([siteId, key])
 }
 
 // ---------- Tahmin piyasaları ----------

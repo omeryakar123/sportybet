@@ -16,6 +16,7 @@ import Sportsbook from "./pages/Sportsbook";
 import { PaymentRequests, Transactions, PaymentSystems } from "./pages/Finance";
 import { SportsbookReport, FinancialReport, BonusReport } from "./pages/Reports";
 import { Users, AuditLogs, Profile } from "./pages/Users";
+import Sites from "./pages/Sites";
 import { CmsBanners, CmsPromotions, CmsCss, CmsPages, CmsSettings } from "./pages/Cms";
 import { PredictionList, PredictionDetail, PredictionPositions, PredictionCategories, PredictionSettings } from "./pages/Predictions";
 import System from "./pages/System";
@@ -50,6 +51,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         <Route path="prediction-settings" element={<PredictionSettings />} />
         <Route path="system" element={<System />} />
         <Route path="users" element={<Users />} />
+        <Route path="sites" element={<Sites />} />
         <Route path="audit-logs" element={<AuditLogs />} />
         <Route path="profile" element={<Profile />} />
         <Route path="cms/banners" element={<CmsBanners />} />

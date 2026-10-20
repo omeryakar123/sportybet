@@ -32,6 +32,10 @@ services:
       SPORTSBOOK_API_SECRET: ${SPORTSBOOK_API_SECRET:-}
       SPORTSBOOK_WALLET_SECRET: ${SPORTSBOOK_WALLET_SECRET:-}
       DEMO_SEED: ${DEMO_SEED:-0}
+      PUBLIC_API_URL: ${VITE_API_URL:-}            # Siteler sayfasında wallet/webhook URL'si göstermek için
+      DEFAULT_SITE_CODE: ${DEFAULT_SITE_CODE:-sportybet}
+      DEFAULT_SITE_NAME: ${DEFAULT_SITE_NAME:-SportyBet}
+      DEFAULT_SITE_DOMAIN: ${DEFAULT_SITE_DOMAIN:-}
     expose:
       - "4000"
 

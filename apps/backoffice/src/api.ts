@@ -1,11 +1,15 @@
 const guess = () => { try { const h = location.host; return location.protocol + "//" + (h.includes("localhost") ? "localhost:4000" : "api-" + h.replace(/^(www\.|bo-)/, "")); } catch { return "http://localhost:4000"; } };
 export const API_URL = (import.meta as any).env?.VITE_API_URL || guess();
 const TOKEN_KEY = "sb_backoffice_token";
+const SITE_KEY = "bo_site"; // seçili site kodu — tüm admin istekleri X-Site ile gider
+export const getSite = () => { try { return localStorage.getItem(SITE_KEY) || ""; } catch { return ""; } };
+export const setSite = (code: string) => { try { code ? localStorage.setItem(SITE_KEY, code) : localStorage.removeItem(SITE_KEY); } catch {} };
 export const getToken = () => { try { return localStorage.getItem(TOKEN_KEY); } catch { return null; } };
 export const setToken = (t: string | null) => { try { t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY); } catch {} };
 export async function api<T = any>(path: string, opts: RequestInit & { json?: any } = {}): Promise<T> {
   const headers: Record<string, string> = { ...(opts.headers as any) };
   const t = getToken(); if (t) headers.Authorization = `Bearer ${t}`;
+  const site = getSite(); if (site) headers["X-Site"] = site;
   if (opts.json !== undefined) { headers["Content-Type"] = "application/json"; opts.body = JSON.stringify(opts.json); }
   const res = await fetch(API_URL + path, { ...opts, headers });
   if (res.status === 401 && t) { setToken(null); }

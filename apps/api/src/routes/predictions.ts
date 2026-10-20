@@ -272,19 +272,19 @@ export async function predictionAdminRoutes(app: FastifyInstance) {
   // Ayarlar + feed
   app.get("/prediction-settings", async () => ({
     settings: await predictionSettings(db),
-    feed: (await db.cmsSetting.findUnique({ where: { key: "prediction_feed" } }))?.value ?? { enabled: false, url: "", autoActivate: false, limit: 50, maxPages: 10 },
+    feed: (await db.cmsSetting.findUnique({ where: { siteId_key: { siteId: 1, key: "prediction_feed" } } }))?.value ?? { enabled: false, url: "", autoActivate: false, limit: 50, maxPages: 10 },
   }));
   app.put("/prediction-settings", async (req) => {
     const b = z.object({ tradingMode: z.enum(["NORMAL", "PAUSED"]), notice: z.string().nullable().optional(), sellFeePct: z.coerce.number().min(0).max(20).default(0) }).parse(req.body);
-    await db.cmsSetting.upsert({ where: { key: "prediction_settings" }, update: { value: b }, create: { key: "prediction_settings", value: b } });
+    await db.cmsSetting.upsert({ where: { siteId_key: { siteId: 1, key: "prediction_settings" } }, update: { value: b }, create: { siteId: 1, key: "prediction_settings", value: b } });
     await audit(req, "PREDICTION_SETTINGS", "prediction_settings", b);
     return b;
   });
   app.put("/prediction-feed", async (req) => {
     const b = z.object({ enabled: z.boolean(), url: z.string().url().or(z.literal("")), apiKey: z.string().optional(), autoActivate: z.boolean().default(false), limit: z.coerce.number().default(50), maxPages: z.coerce.number().default(10) }).parse(req.body);
-    const prev: any = (await db.cmsSetting.findUnique({ where: { key: "prediction_feed" } }))?.value ?? {};
+    const prev: any = (await db.cmsSetting.findUnique({ where: { siteId_key: { siteId: 1, key: "prediction_feed" } } }))?.value ?? {};
     const v = { ...prev, ...b, apiKey: b.apiKey || prev.apiKey };
-    await db.cmsSetting.upsert({ where: { key: "prediction_feed" }, update: { value: v }, create: { key: "prediction_feed", value: v } });
+    await db.cmsSetting.upsert({ where: { siteId_key: { siteId: 1, key: "prediction_feed" } }, update: { value: v }, create: { siteId: 1, key: "prediction_feed", value: v } });
     return { ...v, apiKey: v.apiKey ? "••••" : "" };
   });
   app.post("/prediction-feed/sync", async () => syncFeed(db));

@@ -6,6 +6,7 @@ export const setToken = (t: string | null) => { try { t ? localStorage.setItem(T
 export async function api<T = any>(path: string, opts: RequestInit & { json?: any } = {}): Promise<T> {
   const headers: Record<string, string> = { ...(opts.headers as any) };
   const t = getToken(); if (t) headers.Authorization = `Bearer ${t}`;
+  const site = (import.meta as any).env?.VITE_SITE_CODE; if (site) headers["X-Site"] = site; // domain eşleşmezse site kodu env'den
   if (opts.json !== undefined) { headers["Content-Type"] = "application/json"; opts.body = JSON.stringify(opts.json); }
   const res = await fetch(API_URL + path, { ...opts, headers });
   if (res.status === 401 && t) { setToken(null); }

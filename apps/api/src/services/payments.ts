@@ -15,8 +15,8 @@ import { grantBonus } from "./bonus.js";
 const D = (v: Prisma.Decimal.Value) => new Prisma.Decimal(v);
 export class BizError extends Error {}
 
-async function checkSystem(db: PrismaClient, name: string, type: PaymentType, amount: Prisma.Decimal) {
-  const ps = await db.paymentSystem.findUnique({ where: { name } });
+async function checkSystem(db: PrismaClient, siteId: number, name: string, type: PaymentType, amount: Prisma.Decimal) {
+  const ps = await db.paymentSystem.findFirst({ where: { siteId, name } });
   if (!ps || !ps.isActive) throw new BizError("PAYMENT_SYSTEM_NOT_AVAILABLE");
   if (ps.kind !== "BOTH" && ps.kind !== type) throw new BizError("PAYMENT_SYSTEM_NOT_AVAILABLE");
   if (amount.lt(ps.minAmount)) throw new BizError("BELOW_MIN_AMOUNT");
@@ -29,7 +29,7 @@ export async function createWithdrawal(db: PrismaClient, playerId: number, b: { 
   if (amount.lte(0)) throw new BizError("INVALID_AMOUNT");
   const player = await db.player.findUniqueOrThrow({ where: { id: playerId } });
   if (player.status !== "OPEN") throw new BizError("ACCOUNT_BLOCKED");
-  await checkSystem(db, b.paymentSystem, PaymentType.WITHDRAWAL, amount);
+  await checkSystem(db, player.siteId, b.paymentSystem, PaymentType.WITHDRAWAL, amount);
   const blocking = await db.playerBonus.findFirst({ where: { playerId, state: PlayerBonusState.ACTIVE, bonus: { allowWithdrawal: false } }, include: { bonus: true } });
   if (blocking) throw new BizError("ACTIVE_BONUS_BLOCKS_WITHDRAWAL");
   const open = await db.paymentRequest.count({ where: { playerId, type: PaymentType.WITHDRAWAL, state: { in: [PaymentState.NEW, PaymentState.PENDING] } } });
@@ -54,10 +54,10 @@ export async function createDeposit(db: PrismaClient, playerId: number, b: { pay
   if (amount.lte(0)) throw new BizError("INVALID_AMOUNT");
   const player = await db.player.findUniqueOrThrow({ where: { id: playerId } });
   if (player.status !== "OPEN") throw new BizError("ACCOUNT_BLOCKED");
-  await checkSystem(db, b.paymentSystem, PaymentType.DEPOSIT, amount);
+  await checkSystem(db, player.siteId, b.paymentSystem, PaymentType.DEPOSIT, amount);
   if (b.bonusId) {
     const bonus = await db.bonus.findUnique({ where: { id: b.bonusId } });
-    if (!bonus || !bonus.isActive || bonus.type !== BonusType.DEPOSIT) throw new BizError("BONUS_NOT_AVAILABLE");
+    if (!bonus || !bonus.isActive || bonus.type !== BonusType.DEPOSIT || bonus.siteId !== player.siteId) throw new BizError("BONUS_NOT_AVAILABLE");
   }
   return db.paymentRequest.create({
     data: { playerId, type: PaymentType.DEPOSIT, amount, paymentSystem: b.paymentSystem, bonusId: b.bonusId, info: (b.info ?? {}) as any, currency: player.currency },

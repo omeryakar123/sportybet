@@ -40,7 +40,7 @@ export async function seedDemo(db: PrismaClient) {
   const welcome = await upsertBonus("Hoş Geldin %100 Spor Bonusu", { type: "DEPOSIT", product: "SPORT", percent: 100, minAmount: 100, maxAmount: 2500, wageringMultiplier: 8, expirationDays: 14, description: "İlk yatırımına %100, en fazla 2.500 ₺. 8x çevrim, min 1.50 oran, kombine.", rules: { betType: "MULTIPLE", eventType: "ANY", minSelections: 3, minSelectionOdds: 1.5 } });
   const loss = await upsertBonus("Kayıp Bonusu Spor %20", { type: "MANUAL", product: "SPORT", minAmount: 50, maxAmount: 5000, wageringMultiplier: 1, expirationDays: 7, availableOnRequest: true, description: "Haftalık kayıplarının %20'si. 1x çevrim." });
   const freebet = await upsertBonus("Freebet 100 ₺", { type: "FREEBET", product: "SPORT", minAmount: 100, maxAmount: 100, wageringMultiplier: 1, expirationDays: 3, maxPayout: 1000, description: "100 ₺ freebet, maks 1.000 ₺ kazanç." });
-  if (!(await db.promoCode.findUnique({ where: { code: "SPORTY100" } })))
+  if (!(await db.promoCode.findFirst({ where: { siteId: 1, code: "SPORTY100" } })))
     await db.promoCode.create({ data: { code: "SPORTY100", bonusId: freebet.id, amount: 100, maxCount: 500, description: "Lansman promo kodu" } });
 
   // --- Oyuncular ---

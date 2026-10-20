@@ -305,7 +305,7 @@ export async function handleWebhook(db: PrismaClient, webhookId: string, payload
         break;
       }
       case "balance_status_changed": {
-        await db.cmsSetting.upsert({ where: { key: "sportsbook_partner_balance" }, update: { value: d }, create: { key: "sportsbook_partner_balance", value: d } });
+        await db.cmsSetting.upsert({ where: { siteId_key: { siteId: 1, key: "sportsbook_partner_balance" } }, update: { value: d }, create: { siteId: 1, key: "sportsbook_partner_balance", value: d } });
         break;
       }
       // bet_won: bet_settled ile aynı bilgiyi taşır, ayrıca işlem gerekmez

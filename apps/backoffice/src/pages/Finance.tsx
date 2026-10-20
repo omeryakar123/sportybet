@@ -137,14 +137,16 @@ export function PaymentSystems() {
   async function save() {
     setE("");
     try {
-      const { id, createdAt, ...d } = edit;
-      const body = { ...d, fields: typeof d.fields === "string" ? JSON.parse(d.fields || "[]") : d.fields, minAmount: Number(d.minAmount || 0), maxAmount: d.maxAmount === "" || d.maxAmount === null ? undefined : Number(d.maxAmount), sortOrder: Number(d.sortOrder || 0) };
+      const { id, createdAt, siteId, cfgAddress, cfgNetwork, cfgRequireTxid, ...d } = edit;
+      const config = { ...(d.config ?? {}), depositAddress: cfgAddress || "", network: cfgNetwork || "", requireTxid: !!cfgRequireTxid };
+      const hasCfg = config.depositAddress || config.network || config.requireTxid;
+      const body = { ...d, config: hasCfg ? config : d.config ?? undefined, fields: typeof d.fields === "string" ? JSON.parse(d.fields || "[]") : d.fields, minAmount: Number(d.minAmount || 0), maxAmount: d.maxAmount === "" || d.maxAmount === null ? undefined : Number(d.maxAmount), sortOrder: Number(d.sortOrder || 0) };
       await api(id ? `/admin/payment-systems/${id}` : "/admin/payment-systems", { method: id ? "PATCH" : "POST", json: body }); setEdit(null); load();
     } catch (x: any) { setE(x.message); }
   }
   return (
     <>
-      <Panel title="Ödeme Sistemleri" right={<button className="btn-green" onClick={() => setEdit({ name: "", displayName: "", kind: "BOTH", minAmount: 100, maxAmount: "", fields: "[]", instructions: "", logoUrl: "", isActive: true, sortOrder: 0 })}>Yeni Ödeme Sistemi</button>}>
+      <Panel title="Ödeme Sistemleri" right={<button className="btn-green" onClick={() => setEdit({ name: "", displayName: "", kind: "BOTH", minAmount: 100, maxAmount: "", fields: "[]", instructions: "", logoUrl: "", isActive: true, sortOrder: 0, cfgAddress: "", cfgNetwork: "", cfgRequireTxid: false })}>Yeni Ödeme Sistemi</button>}>
         <p className="mb-2 text-bo-muted">Sitede yatırım/çekim ekranında listelenen yöntemler. Çekimde istenecek alanlar (IBAN, cüzdan adresi…) "Alanlar" ile tanımlanır.</p>
         <DataTable rows={rows} search={false} cols={[
           { key: "sortOrder", label: "Sıra" }, { key: "logoUrl", label: "Logo", sortable: false, render: (r) => r.logoUrl ? <img src={r.logoUrl} className="h-6" /> : null },
@@ -152,7 +154,7 @@ export function PaymentSystems() {
           { key: "minAmount", label: "Min", money: true }, { key: "maxAmount", label: "Maks", money: true },
           { key: "fields", label: "Alanlar", value: (r) => (r.fields ?? []).map((x: any) => x.label).join(", ") },
           { key: "isActive", label: "Aktif", value: (r) => (r.isActive ? "Evet" : "Hayır") },
-          { key: "x", label: "", sortable: false, render: (r) => <button className="text-bo-blue" onClick={() => setEdit({ ...r, fields: JSON.stringify(r.fields ?? [], null, 0), maxAmount: r.maxAmount ?? "" })}>Düzenle</button> },
+          { key: "x", label: "", sortable: false, render: (r) => <button className="text-bo-blue" onClick={() => setEdit({ ...r, fields: JSON.stringify(r.fields ?? [], null, 0), maxAmount: r.maxAmount ?? "", cfgAddress: r.config?.depositAddress ?? "", cfgNetwork: r.config?.network ?? "", cfgRequireTxid: !!r.config?.requireTxid })}>Düzenle</button> },
         ]} />
       </Panel>
       {edit && <Modal title="Ödeme Sistemi" onClose={() => setEdit(null)}>
@@ -166,6 +168,14 @@ export function PaymentSystems() {
           <Field label="Logo URL" className="col-span-2"><input className="inp" value={edit.logoUrl ?? ""} onChange={(e) => setEdit({ ...edit, logoUrl: e.target.value })} /></Field>
           <Field label='Alanlar (JSON) — ör. [{"key":"iban","label":"IBAN"}]' className="col-span-2"><textarea className="inp h-16 py-1 font-mono text-xs" value={edit.fields} onChange={(e) => setEdit({ ...edit, fields: e.target.value })} /></Field>
           <Field label="Oyuncuya talimat (yatırım ekranında görünür)" className="col-span-2"><textarea className="inp h-16 py-1" value={edit.instructions ?? ""} onChange={(e) => setEdit({ ...edit, instructions: e.target.value })} /></Field>
+          <div className="col-span-2 rounded border border-bo-line bg-bo-head/40 p-3">
+            <div className="mb-2 font-semibold">Kripto ayarları (kripto yöntemiyse doldurun)</div>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Yatırım cüzdan adresi (oyuncuya gösterilir)"><input className="inp font-mono text-xs" value={edit.cfgAddress ?? ""} placeholder="ör. TXy3...k9Q (TRC20)" onChange={(e) => setEdit({ ...edit, cfgAddress: e.target.value })} /></Field>
+              <Field label="Ağ (network)"><input className="inp" value={edit.cfgNetwork ?? ""} placeholder="ör. TRC20 / ERC20 / BEP20" onChange={(e) => setEdit({ ...edit, cfgNetwork: e.target.value })} /></Field>
+            </div>
+            <label className="mt-2 flex items-center gap-2"><input type="checkbox" checked={!!edit.cfgRequireTxid} onChange={(e) => setEdit({ ...edit, cfgRequireTxid: e.target.checked })} />Yatırımda işlem no (TXID) zorunlu olsun</label>
+          </div>
           <label className="flex items-center gap-2"><input type="checkbox" checked={edit.isActive} onChange={(e) => setEdit({ ...edit, isActive: e.target.checked })} />Aktif</label>
         </div>
         <Err e={e} />

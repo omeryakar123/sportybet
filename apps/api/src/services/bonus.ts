@@ -103,7 +103,8 @@ export async function cancelBonus(db: PrismaClient, playerBonusId: number, admin
 
 /** Oyuncu promo kod kullanır — koşullar PromoCode.conditions içinde */
 export async function redeemPromo(db: PrismaClient, playerId: number, code: string) {
-  const promo = await db.promoCode.findUnique({ where: { code } });
+  const player0 = await db.player.findUniqueOrThrow({ where: { id: playerId }, select: { siteId: true } });
+  const promo = await db.promoCode.findFirst({ where: { siteId: player0.siteId, code } });
   const now = new Date();
   if (!promo || !promo.isActive) throw new Error("PROMO_NOT_FOUND");
   if ((promo.startsAt && promo.startsAt > now) || (promo.endsAt && promo.endsAt < now)) throw new Error("PROMO_NOT_ACTIVE");

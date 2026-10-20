@@ -1,6 +1,6 @@
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { api, setToken } from "./api";
+import { api, setToken, getSite, setSite } from "./api";
 
 type Role = "SUPERADMIN" | "ADMIN" | "FINANCE" | "RISK" | "SUPPORT" | "CMS";
 type Item = { to: string; label: string; roles?: Role[] };
@@ -39,6 +39,7 @@ export const NAV: Group[] = [
   ] },
   { label: "Kullanıcı Yönetimi", icon: "👤", roles: ["ADMIN"], items: [
     { to: "/users", label: "Admin Kullanıcıları", roles: [] },
+    { to: "/sites", label: "Siteler (Çoklu Site)", roles: ["ADMIN"] },
     { to: "/audit-logs", label: "İşlem Geçmişi (Audit)" },
     { to: "/system", label: "Sistem / Demo Veri", roles: [] },
   ] },
@@ -51,7 +52,7 @@ export const NAV: Group[] = [
   ] },
 ];
 
-const EXTRA_TITLES: [RegExp, string][] = [[/^\/players\/\d+/, "Oyuncular › Oyuncu Detayı"], [/^\/predictions\/.+/, "Tahminler › Piyasa Detayı"], [/^\/profile/, "Profil"], [/^\/system/, "Sistem"]];
+const EXTRA_TITLES: [RegExp, string][] = [[/^\/players\/\d+/, "Oyuncular › Oyuncu Detayı"], [/^\/predictions\/.+/, "Tahminler › Piyasa Detayı"], [/^\/profile/, "Profil"], [/^\/system/, "Sistem"], [/^\/sites/, "Kullanıcı Yönetimi › Siteler"]];
 function pageTitle(path: string) {
   for (const [re, t] of EXTRA_TITLES) if (re.test(path)) return t;
   for (const g of NAV) {
@@ -70,7 +71,11 @@ export default function Layout() {
   const [now, setNow] = useState(new Date());
   const [collapsed, setCollapsed] = useState(false);
   const [open, setOpen] = useState<Record<string, boolean>>({});
+  const [sites, setSites] = useState<any[]>([]);
   useEffect(() => { api("/admin/me").then(setMe).catch(() => { setToken(null); nav("/login"); }); }, []);
+  useEffect(() => { api("/admin/sites").then(setSites).catch(() => setSites([])); }, []);
+  const curSite = getSite() || sites[0]?.code || "";
+  const switchSite = (code: string) => { setSite(code === sites[0]?.code ? "" : code); location.reload(); };
   useEffect(() => { const t = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(t); }, []);
   useEffect(() => { // aktif grubu aç
     const g = NAV.find((g) => g.items?.some((i) => loc.pathname.startsWith(i.to)));
@@ -106,7 +111,14 @@ export default function Layout() {
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-30 flex h-11 items-center justify-end gap-6 border-b border-bo-line bg-white px-5 text-xs text-bo-blue">
-          <span>sportybet</span>
+          {sites.length > 0 && (
+            <label className="flex items-center gap-1.5">
+              <span className="text-bo-muted">Site:</span>
+              <select value={curSite} onChange={(e) => switchSite(e.target.value)} className="rounded border border-bo-line bg-white px-2 py-1 text-xs font-semibold text-bo-blue outline-none">
+                {sites.map((s) => <option key={s.code} value={s.code}>{s.name}{s.isActive ? "" : " (pasif)"}</option>)}
+              </select>
+            </label>
+          )}
           <span>🕑 {now.toLocaleTimeString("tr-TR")}</span>
           <NavLink to="/profile" className="hover:underline">👤 {me?.username} <span className="text-bo-muted">({me?.role})</span></NavLink>
           <button onClick={() => { setToken(null); nav("/login"); }} className="text-bo-muted hover:text-bo-red">Çıkış</button>

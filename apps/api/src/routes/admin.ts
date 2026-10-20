@@ -5,7 +5,8 @@ import { Prisma, TxType, WalletType, PaymentType, PaymentState, AdminRole } from
 import { db } from "../index.js";
 import { grantBonus, cancelBonus } from "../services/bonus.js";
 import { move, ensureWallets } from "../services/wallet.js";
-import { sportsbook, sportsbookConfigured } from "../services/sportsbook.js";
+import { sbClient, sbCreds } from "../services/sportsbook.js";
+import { allSites, bustSiteCache, seedSiteDefaults } from "../services/sites.js";
 import { processPayment, BizError } from "../services/payments.js";
 import { dashboard, playerKpis, range, sportsbookDaily, financialReport } from "../services/reports.js";
 import { predictionAdminRoutes } from "./predictions.js";
@@ -19,6 +20,7 @@ type AdminJwt = { adminId: number; role: AdminRole; kind: "admin" };
  */
 const PERMS: Record<string, { read: AdminRole[]; write: AdminRole[] }> = {
   "/admin/users": { read: ["SUPERADMIN"], write: ["SUPERADMIN"] },
+  "/admin/sites": { read: ["SUPERADMIN", "ADMIN"], write: ["SUPERADMIN"] },
   "/admin/audit-logs": { read: ["SUPERADMIN", "ADMIN"], write: [] },
   "/admin/payment-requests": { read: ["ADMIN", "FINANCE", "RISK"], write: ["ADMIN", "FINANCE"] },
   "/admin/payment-systems": { read: ["ADMIN", "FINANCE"], write: ["ADMIN", "FINANCE"] },
@@ -108,6 +110,13 @@ export async function adminRoutes(app: FastifyInstance) {
   const audit = (req: FastifyRequest, action: string, target: string, payload?: unknown) =>
     db.auditLog.create({ data: { adminId: adminId(req), action, target, payload: (payload ?? {}) as any } });
   const idParam = (req: FastifyRequest) => Number((req.params as any).id);
+  /** Backoffice'in seçtiği site (X-Site: kod). Bulunamazsa varsayılan site 1. */
+  const sid = async (req: FastifyRequest) => {
+    const code = ((req.headers["x-site"] as string) || "").trim().toLowerCase();
+    if (!code) return 1;
+    const s = (await allSites(db)).find((x) => x.code.toLowerCase() === code);
+    return s?.id ?? 1;
+  };
 
   // ---------- Kendi hesabım ----------
   app.get("/me", async (req) => {
@@ -145,10 +154,51 @@ export async function adminRoutes(app: FastifyInstance) {
     });
   });
 
+  // ---------- Siteler (çoklu site yönetimi) ----------
+  const siteBody = z.object({
+    code: z.string().min(2).max(30).regex(/^[a-z0-9-]+$/),
+    name: z.string().min(2), domain: z.string().nullable().optional(),
+    isActive: z.boolean().default(true), note: z.string().nullable().optional(),
+    sbApiUrl: z.string().nullable().optional(), sbApiKey: z.string().nullable().optional(),
+    sbApiSecret: z.string().nullable().optional(), sbWalletSecret: z.string().nullable().optional(),
+  });
+  const cleanDomain = (d?: string | null) => (d ? d.toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "") : null);
+  const siteUrls = (s: { domain: string | null }) => {
+    const apiHost = process.env.PUBLIC_API_URL || "";
+    return {
+      walletUrl: apiHost ? `${apiHost}/wallet` : null,
+      webhookUrl: apiHost ? `${apiHost}/webhooks/sportsbook` : null,
+      siteUrl: s.domain ? `https://${s.domain}` : null,
+    };
+  };
+  const safeSite = (s: any) => ({ ...s, sbApiSecret: s.sbApiSecret ? "•••" + s.sbApiSecret.slice(-4) : null, sbWalletSecret: s.sbWalletSecret ? "•••" + s.sbWalletSecret.slice(-4) : null, ...siteUrls(s) });
+  app.get("/sites", async () => {
+    const sites = await db.site.findMany({ orderBy: { id: "asc" } });
+    const counts = await db.player.groupBy({ by: ["siteId"], _count: true });
+    return sites.map((s) => ({ ...safeSite(s), playerCount: counts.find((c) => c.siteId === s.id)?._count ?? 0 }));
+  });
+  app.post("/sites", async (req) => {
+    const b = siteBody.parse(req.body);
+    const s = await db.site.create({ data: { ...b, domain: cleanDomain(b.domain) } });
+    await seedSiteDefaults(db, s); // ödeme sistemleri + temel CMS ayarları hazır gelsin
+    bustSiteCache();
+    await audit(req, "SITE_CREATE", `site:${s.id}`, { code: b.code, name: b.name, domain: b.domain });
+    return safeSite(s);
+  });
+  app.patch("/sites/:id", async (req) => {
+    const b = siteBody.partial().parse(req.body);
+    // Boş string gelen gizli alanlar "değiştirme" demektir
+    for (const k of ["sbApiKey", "sbApiSecret", "sbWalletSecret"] as const) if (b[k] === "") delete (b as any)[k];
+    const s = await db.site.update({ where: { id: idParam(req) }, data: { ...b, ...(b.domain !== undefined ? { domain: cleanDomain(b.domain) } : {}) } });
+    bustSiteCache();
+    await audit(req, "SITE_UPDATE", `site:${s.id}`, { code: b.code, name: b.name, domain: b.domain, isActive: b.isActive });
+    return safeSite(s);
+  });
+
   // ---------- Dashboard ----------
   app.get("/dashboard", async (req) => {
     const { from, to } = range(dateQ.parse(req.query));
-    return dashboard(db, from, to);
+    return dashboard(db, from, to, await sid(req));
   });
 
   // ---------- Oyuncular ----------
@@ -160,6 +210,7 @@ export async function adminRoutes(app: FastifyInstance) {
       sort: z.string().default("id"), dir: z.enum(["asc", "desc"]).default("desc"),
     }).parse(req.query);
     const where: Prisma.PlayerWhereInput = {
+      siteId: await sid(req),
       ...(q.id ? { id: q.id } : {}),
       ...(q.search ? { OR: [
         { username: { contains: q.search, mode: "insensitive" } }, { email: { contains: q.search, mode: "insensitive" } },
@@ -183,7 +234,7 @@ export async function adminRoutes(app: FastifyInstance) {
   app.post("/players", async (req) => {
     const b = z.object({ username: z.string().min(3), password: z.string().min(6), email: z.string().email().optional(), phone: z.string().optional(), firstName: z.string().optional(), lastName: z.string().optional(), isTest: z.boolean().default(false) }).parse(req.body);
     const { password, ...rest } = b;
-    const p = await db.player.create({ data: { ...rest, passwordHash: await bcrypt.hash(password, 10), regSource: "Backoffice" } });
+    const p = await db.player.create({ data: { ...rest, siteId: await sid(req), passwordHash: await bcrypt.hash(password, 10), regSource: "Backoffice" } });
     await ensureWallets(db, p.id);
     await audit(req, "PLAYER_CREATE", `player:${p.id}`, rest);
     return { id: p.id };
@@ -279,10 +330,10 @@ export async function adminRoutes(app: FastifyInstance) {
       from: z.string().optional(), to: z.string().optional(), page: z.coerce.number().default(1), size: z.coerce.number().max(500).default(50),
     }).parse(req.query);
     const where: Prisma.PaymentRequestWhereInput = {
+      player: { siteId: await sid(req), ...(q.username ? { username: { contains: q.username, mode: "insensitive" } } : {}) },
       type: q.type,
       ...(q.state ? { state: { in: q.state.split(",") as PaymentState[] } } : {}),
       ...(q.playerId ? { playerId: q.playerId } : {}), ...(q.id && /^\d+$/.test(q.id) ? { id: BigInt(q.id) } : {}),
-      ...(q.username ? { player: { username: { contains: q.username, mode: "insensitive" } } } : {}),
       ...(q.paymentSystem ? { paymentSystem: q.paymentSystem } : {}),
       ...(q.minAmount !== undefined || q.maxAmount !== undefined ? { amount: { ...(q.minAmount !== undefined ? { gte: q.minAmount } : {}), ...(q.maxAmount !== undefined ? { lte: q.maxAmount } : {}) } } : {}),
       ...(q.from || q.to ? { createdAt: { ...(q.from ? { gte: new Date(q.from) } : {}), ...(q.to ? { lt: new Date(q.to) } : {}) } } : {}),
@@ -311,13 +362,13 @@ export async function adminRoutes(app: FastifyInstance) {
   });
 
   // ---------- Ödeme sistemleri ----------
-  app.get("/payment-systems", async () => db.paymentSystem.findMany({ orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }));
+  app.get("/payment-systems", async (req) => db.paymentSystem.findMany({ where: { siteId: await sid(req) }, orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }));
   const psBody = z.object({
     name: z.string().min(2), displayName: z.string(), kind: z.enum(["DEPOSIT", "WITHDRAWAL", "BOTH"]), logoUrl: z.string().nullable().optional(),
     minAmount: z.coerce.number().default(0), maxAmount: z.preprocess(toNum, z.number().optional()), fields: z.any().optional(), instructions: z.string().nullable().optional(),
-    isActive: z.boolean().default(true), sortOrder: z.coerce.number().default(0),
+    isActive: z.boolean().default(true), sortOrder: z.coerce.number().default(0), config: z.any().optional(),
   });
-  app.post("/payment-systems", async (req) => db.paymentSystem.create({ data: psBody.parse(req.body) }));
+  app.post("/payment-systems", async (req) => db.paymentSystem.create({ data: { ...psBody.parse(req.body), siteId: await sid(req) } }));
   app.patch("/payment-systems/:id", async (req) => db.paymentSystem.update({ where: { id: idParam(req) }, data: psBody.partial().parse(req.body) }));
 
   // ---------- Tüm işlemler ----------
@@ -325,6 +376,7 @@ export async function adminRoutes(app: FastifyInstance) {
     const q = z.object({ type: z.string().optional(), playerId: z.coerce.number().optional(), wallet: z.string().optional(), from: z.string().optional(), to: z.string().optional(), take: z.coerce.number().max(1000).default(300) }).parse(req.query);
     return db.transaction.findMany({
       where: {
+        player: { siteId: await sid(req) },
         ...(q.type ? { type: { in: q.type.split(",") as TxType[] } } : {}), ...(q.playerId ? { playerId: q.playerId } : {}), ...(q.wallet ? { wallet: { type: q.wallet as WalletType } } : {}),
         ...(q.from || q.to ? { createdAt: { ...(q.from ? { gte: new Date(q.from) } : {}), ...(q.to ? { lt: new Date(q.to) } : {}) } } : {}),
       },
@@ -333,12 +385,13 @@ export async function adminRoutes(app: FastifyInstance) {
   });
 
   // ---------- Raporlar ----------
-  app.get("/reports/sportsbook", async (req) => { const { from, to } = range(dateQ.parse(req.query)); return sportsbookDaily(db, from, to); });
-  app.get("/reports/financial", async (req) => { const { from, to } = range(dateQ.parse(req.query)); return financialReport(db, from, to); });
+  app.get("/reports/sportsbook", async (req) => { const { from, to } = range(dateQ.parse(req.query)); return sportsbookDaily(db, from, to, await sid(req)); });
+  app.get("/reports/financial", async (req) => { const { from, to } = range(dateQ.parse(req.query)); return financialReport(db, from, to, await sid(req)); });
   app.get("/player-bonuses", async (req) => {
     const q = z.object({ state: z.string().optional(), bonusId: z.coerce.number().optional(), type: z.string().optional(), playerId: z.coerce.number().optional(), from: z.string().optional(), to: z.string().optional(), take: z.coerce.number().max(1000).default(300) }).parse(req.query);
     return db.playerBonus.findMany({
       where: {
+        player: { siteId: await sid(req) },
         ...(q.state ? { state: q.state as any } : {}), ...(q.bonusId ? { bonusId: q.bonusId } : {}), ...(q.type ? { bonus: { type: q.type as any } } : {}),
         ...(q.playerId ? { playerId: q.playerId } : {}),
         ...(q.from || q.to ? { createdAt: { ...(q.from ? { gte: new Date(q.from) } : {}), ...(q.to ? { lt: new Date(q.to) } : {}) } } : {}),
@@ -355,7 +408,7 @@ export async function adminRoutes(app: FastifyInstance) {
   // ---------- Bonus talepleri ----------
   app.get("/bonus-requests", async (req) => {
     const q = z.object({ state: z.string().optional() }).parse(req.query);
-    return db.bonusRequest.findMany({ where: q.state ? { state: q.state } : {}, include: { bonus: { select: { name: true, type: true, minAmount: true, maxAmount: true } }, player: { select: { username: true } } }, orderBy: { id: "desc" }, take: 300 });
+    return db.bonusRequest.findMany({ where: { ...(q.state ? { state: q.state } : {}), player: { siteId: await sid(req) } }, include: { bonus: { select: { name: true, type: true, minAmount: true, maxAmount: true } }, player: { select: { username: true } } }, orderBy: { id: "desc" }, take: 300 });
   });
   app.post("/bonus-requests/:id/:action", async (req) => {
     const { action } = req.params as { action: string };
@@ -381,6 +434,7 @@ export async function adminRoutes(app: FastifyInstance) {
     }).parse(req.query);
     return db.bet.findMany({
       where: {
+        player: { siteId: await sid(req) },
         ...(q.state ? { state: { in: q.state.split(",") as any } } : {}), ...(q.isLive ? { isLive: q.isLive === "true" } : {}),
         ...(q.coupon ? { couponId: q.coupon } : {}), ...(q.playerId ? { playerId: q.playerId } : {}),
         ...(q.bonusOnly === "true" ? { stakeFromBonus: { gt: 0 } } : {}), ...(q.type ? { type: q.type as any } : {}),
@@ -396,23 +450,29 @@ export async function adminRoutes(app: FastifyInstance) {
   const sb = (fn: () => Promise<any>) => async (_req: FastifyRequest, reply: FastifyReply) => {
     try { return await fn(); } catch (e: any) { return reply.code(502).send({ error: e.message, detail: e.detail }); }
   };
-  app.get("/sportsbook/status", async () => {
-    const out: any = { configured: sportsbookConfigured(), walletSecretSet: Boolean(process.env.SPORTSBOOK_WALLET_SECRET) };
+  const siteSb = async (req: FastifyRequest) => {
+    const id = await sid(req);
+    const site = (await allSites(db)).find((s) => s.id === id) ?? null;
+    return { site, client: sbClient(sbCreds(site)) };
+  };
+  app.get("/sportsbook/status", async (req) => {
+    const { site, client } = await siteSb(req);
+    const out: any = { configured: client.configured, walletSecretSet: Boolean(site?.sbWalletSecret || process.env.SPORTSBOOK_WALLET_SECRET) };
     if (out.configured) {
-      out.me = await sportsbook.me().then((r: any) => r.data).catch((e: any) => ({ error: e.message }));
-      out.billing = await sportsbook.billing().then((r: any) => r.data).catch((e: any) => ({ error: e.message }));
+      out.me = await client.me().then((r: any) => r.data).catch((e: any) => ({ error: e.message }));
+      out.billing = await client.billing().then((r: any) => r.data).catch((e: any) => ({ error: e.message }));
     }
-    out.lastBalanceStatus = (await db.cmsSetting.findUnique({ where: { key: "sportsbook_partner_balance" } }))?.value ?? null;
+    out.lastBalanceStatus = (await db.cmsSetting.findUnique({ where: { siteId_key: { siteId: 1, key: "sportsbook_partner_balance" } } }))?.value ?? null;
     return out;
   });
-  app.get("/sportsbook/ledger", (req, reply) => sb(() => sportsbook.ledger(req.query as any))(req, reply));
-  app.get("/sportsbook/transactions", (req, reply) => sb(() => sportsbook.transactions(req.query as any))(req, reply));
-  app.get("/sportsbook/bets", (req, reply) => sb(() => sportsbook.bets(req.query as any))(req, reply));
-  app.get("/sportsbook/bets/:id", (req, reply) => sb(() => sportsbook.bet((req.params as any).id))(req, reply));
+  app.get("/sportsbook/ledger", async (req, reply) => { const { client } = await siteSb(req); return sb(() => client.ledger(req.query as any))(req, reply); });
+  app.get("/sportsbook/transactions", async (req, reply) => { const { client } = await siteSb(req); return sb(() => client.transactions(req.query as any))(req, reply); });
+  app.get("/sportsbook/bets", async (req, reply) => { const { client } = await siteSb(req); return sb(() => client.bets(req.query as any))(req, reply); });
+  app.get("/sportsbook/bets/:id", async (req, reply) => { const { client } = await siteSb(req); return sb(() => client.bet((req.params as any).id))(req, reply); });
   app.get("/wallet-requests", async (req) => {
     const q = z.object({ kind: z.string().optional(), status: z.string().optional(), playerId: z.coerce.number().optional(), take: z.coerce.number().default(200) }).parse(req.query);
     return db.walletRequest.findMany({
-      where: { ...(q.kind ? { kind: q.kind } : {}), ...(q.status ? { status: q.status } : {}), ...(q.playerId ? { playerId: q.playerId } : {}) },
+      where: { player: { siteId: await sid(req) }, ...(q.kind ? { kind: q.kind } : {}), ...(q.status ? { status: q.status } : {}), ...(q.playerId ? { playerId: q.playerId } : {}) },
       orderBy: { id: "desc" }, take: q.take,
     });
   });
@@ -432,12 +492,12 @@ export async function adminRoutes(app: FastifyInstance) {
     percent: z.preprocess(toNum, z.number().optional()).nullable(), rules: z.any().optional(),
   });
   const nullify = (o: Record<string, unknown>) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, v === undefined && ["minAmount", "maxAmount", "maxPayout", "maxPayoutPct", "percent"].includes(k) ? null : v]));
-  app.get("/bonuses", async () => {
-    const list = await db.bonus.findMany({ orderBy: { id: "desc" } });
+  app.get("/bonuses", async (req) => {
+    const list = await db.bonus.findMany({ where: { siteId: await sid(req) }, orderBy: { id: "desc" } });
     const stats = await db.playerBonus.groupBy({ by: ["bonusId"], _count: true, _sum: { amount: true, convertedAmount: true } });
     return list.map((b) => { const s = stats.find((x) => x.bonusId === b.id); return { ...b, awardedCount: s?._count ?? 0, awardedSum: Number(s?._sum.amount ?? 0), convertedSum: Number(s?._sum.convertedAmount ?? 0) }; });
   });
-  app.post("/bonuses", async (req) => { const b = await db.bonus.create({ data: nullify(bonusBody.parse(req.body)) as any }); await audit(req, "BONUS_CREATE", `bonus:${b.id}`); return b; });
+  app.post("/bonuses", async (req) => { const b = await db.bonus.create({ data: { ...nullify(bonusBody.parse(req.body)), siteId: await sid(req) } as any }); await audit(req, "BONUS_CREATE", `bonus:${b.id}`); return b; });
   app.patch("/bonuses/:id", async (req) => { const b = await db.bonus.update({ where: { id: idParam(req) }, data: nullify(bonusBody.partial().parse(req.body)) as any }); await audit(req, "BONUS_UPDATE", `bonus:${b.id}`); return b; });
 
   // ---------- Promo kodlar ----------
@@ -448,8 +508,8 @@ export async function adminRoutes(app: FastifyInstance) {
     endsAt: z.preprocess((v) => (v ? new Date(v as string) : null), z.date().nullable()).optional(),
     conditions: z.any().optional(),
   });
-  app.get("/promo-codes", async () => db.promoCode.findMany({ include: { bonus: { select: { name: true, type: true } } }, orderBy: { id: "desc" } }));
-  app.post("/promo-codes", async (req) => db.promoCode.create({ data: promoBody.parse(req.body) }));
+  app.get("/promo-codes", async (req) => db.promoCode.findMany({ where: { siteId: await sid(req) }, include: { bonus: { select: { name: true, type: true } } }, orderBy: { id: "desc" } }));
+  app.post("/promo-codes", async (req) => db.promoCode.create({ data: { ...promoBody.parse(req.body), siteId: await sid(req) } }));
   app.patch("/promo-codes/:id", async (req) => db.promoCode.update({ where: { id: idParam(req) }, data: promoBody.partial().parse(req.body) }));
   app.get("/promo-codes/:id/redemptions", async (req) => db.promoRedemption.findMany({ where: { promoCodeId: idParam(req) }, include: { player: { select: { username: true } } }, orderBy: { id: "desc" } }));
 
@@ -465,17 +525,18 @@ export async function adminRoutes(app: FastifyInstance) {
   for (const [path, model] of [["banners", db.cmsBanner], ["promotions", db.cmsPromotion], ["pages", db.cmsPage]] as const) {
     const m = model as any;
     const clean = (b: any) => { const { id, updatedAt, ...rest } = b ?? {}; for (const k of ["startsAt", "endsAt"]) if (k in rest) rest[k] = rest[k] ? new Date(rest[k]) : null; if ("sortOrder" in rest) rest.sortOrder = Number(rest.sortOrder) || 0; return rest; };
-    app.get(`/cms/${path}`, async () => m.findMany({ orderBy: [{ id: "desc" }] }));
-    app.post(`/cms/${path}`, async (req) => { const r = await m.create({ data: clean(req.body) }); await audit(req, `CMS_${path.toUpperCase()}_CREATE`, `${path}:${r.id}`); return r; });
-    app.patch(`/cms/${path}/:id`, async (req) => { const r = await m.update({ where: { id: idParam(req) }, data: clean(req.body) }); await audit(req, `CMS_${path.toUpperCase()}_UPDATE`, `${path}:${r.id}`); return r; });
+    app.get(`/cms/${path}`, async (req) => m.findMany({ where: { siteId: await sid(req) }, orderBy: [{ id: "desc" }] }));
+    app.post(`/cms/${path}`, async (req) => { const { siteId: _s, ...data } = clean(req.body); const r = await m.create({ data: { ...data, siteId: await sid(req) } }); await audit(req, `CMS_${path.toUpperCase()}_CREATE`, `${path}:${r.id}`); return r; });
+    app.patch(`/cms/${path}/:id`, async (req) => { const { siteId: _s, ...data } = clean(req.body); const r = await m.update({ where: { id: idParam(req) }, data }); await audit(req, `CMS_${path.toUpperCase()}_UPDATE`, `${path}:${r.id}`); return r; });
     app.delete(`/cms/${path}/:id`, async (req) => { await m.delete({ where: { id: idParam(req) } }); await audit(req, `CMS_${path.toUpperCase()}_DELETE`, `${path}:${idParam(req)}`); return { ok: true }; });
   }
-  app.get("/cms/settings/:key", async (req) => db.cmsSetting.findUnique({ where: { key: (req.params as any).key } }));
+  app.get("/cms/settings/:key", async (req) => db.cmsSetting.findUnique({ where: { siteId_key: { siteId: await sid(req), key: (req.params as any).key } } }));
   app.put("/cms/settings/:key", async (req) => {
     const key = (req.params as any).key;
     if (!/^[a-z0-9_]+$/.test(key) || key.startsWith("sportsbook_") || key.startsWith("prediction_")) throw new BizError("INVALID_KEY");
-    const r = await db.cmsSetting.upsert({ where: { key }, update: { value: req.body as any }, create: { key, value: req.body as any } });
-    await audit(req, "CMS_SETTING_UPDATE", `setting:${key}`);
+    const siteId = await sid(req);
+    const r = await db.cmsSetting.upsert({ where: { siteId_key: { siteId, key } }, update: { value: req.body as any }, create: { siteId, key, value: req.body as any } });
+    await audit(req, "CMS_SETTING_UPDATE", `setting:${siteId}/${key}`);
     return r;
   });
 }

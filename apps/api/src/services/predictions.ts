@@ -47,7 +47,7 @@ export function fpmmSell(r: number[], i: number, s: number) {
 
 // ---------------- Yardımcılar ----------------
 export async function predictionSettings(db: PrismaClient | Tx) {
-  const s = await db.cmsSetting.findUnique({ where: { key: "prediction_settings" } });
+  const s = await db.cmsSetting.findUnique({ where: { siteId_key: { siteId: 1, key: "prediction_settings" } } });
   return { tradingMode: "NORMAL", notice: null as string | null, sellFeePct: 0, ...((s?.value as any) ?? {}) } as { tradingMode: "NORMAL" | "PAUSED"; notice: string | null; sellFeePct: number };
 }
 
@@ -301,7 +301,7 @@ export async function importFeed(db: PrismaClient, payload: any, activate: boole
 
 /** Ayarlarda feed URL'si varsa sayfa sayfa çekip senkronlar (cron) */
 export async function syncFeed(db: PrismaClient) {
-  const s = await db.cmsSetting.findUnique({ where: { key: "prediction_feed" } });
+  const s = await db.cmsSetting.findUnique({ where: { siteId_key: { siteId: 1, key: "prediction_feed" } } });
   const cfg: any = s?.value ?? {};
   if (!cfg.enabled || !cfg.url) return { skipped: true };
   let page = 1; let total = 0;
@@ -316,6 +316,6 @@ export async function syncFeed(db: PrismaClient) {
     if (!j.pagination || page >= j.pagination.totalPages) break;
     page++;
   }
-  await db.cmsSetting.update({ where: { key: "prediction_feed" }, data: { value: { ...cfg, lastSyncAt: new Date().toISOString(), lastSyncCount: total } } });
+  await db.cmsSetting.update({ where: { siteId_key: { siteId: 1, key: "prediction_feed" } }, data: { value: { ...cfg, lastSyncAt: new Date().toISOString(), lastSyncCount: total } } });
   return { imported: total };
 }

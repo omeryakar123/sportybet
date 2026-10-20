@@ -81,9 +81,10 @@ export async function siteRoutes(app: FastifyInstance) {
   // ---- Ödemeler ----
   app.get("/payment-systems", async (req) => {
     const { type } = z.object({ type: z.nativeEnum(PaymentType).optional() }).parse(req.query);
+    const p = await db.player.findUniqueOrThrow({ where: { id: pid(req) }, select: { siteId: true } });
     return db.paymentSystem.findMany({
-      where: { isActive: true, ...(type ? { kind: { in: [type, "BOTH"] } } : {}) },
-      select: { name: true, displayName: true, kind: true, logoUrl: true, minAmount: true, maxAmount: true, fields: true, instructions: true },
+      where: { siteId: p.siteId, isActive: true, ...(type ? { kind: { in: [type, "BOTH"] } } : {}) },
+      select: { name: true, displayName: true, kind: true, logoUrl: true, minAmount: true, maxAmount: true, fields: true, instructions: true, config: true },
       orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
     });
   });
@@ -109,16 +110,16 @@ export async function siteRoutes(app: FastifyInstance) {
     if (p.excludedFromBonuses) return [];
     const pending = await db.bonusRequest.findMany({ where: { playerId: p.id, state: "PENDING" }, select: { bonusId: true } });
     const list = await db.bonus.findMany({
-      where: { isActive: true, OR: [{ availableOnRequest: true }, { type: "DEPOSIT" }], AND: [{ OR: [{ startsAt: null }, { startsAt: { lte: now } }] }, { OR: [{ endsAt: null }, { endsAt: { gte: now } }] }] },
+      where: { siteId: p.siteId, isActive: true, OR: [{ availableOnRequest: true }, { type: "DEPOSIT" }], AND: [{ OR: [{ startsAt: null }, { startsAt: { lte: now } }] }, { OR: [{ endsAt: null }, { endsAt: { gte: now } }] }] },
       select: { id: true, name: true, type: true, product: true, description: true, percent: true, minAmount: true, maxAmount: true, wageringMultiplier: true, expirationDays: true, availableOnRequest: true },
     });
     return list.map((b) => ({ ...b, requested: pending.some((x) => x.bonusId === b.id), claimable: b.availableOnRequest, depositBonus: b.type === "DEPOSIT" }));
   });
   app.post("/bonuses/:id/request", async (req) => {
     const bonusId = Number((req.params as any).id);
-    const b = await db.bonus.findUnique({ where: { id: bonusId } });
-    if (!b || !b.isActive || !b.availableOnRequest) throw new BizError("BONUS_NOT_AVAILABLE");
     const p = await db.player.findUniqueOrThrow({ where: { id: pid(req) } });
+    const b = await db.bonus.findUnique({ where: { id: bonusId } });
+    if (!b || !b.isActive || !b.availableOnRequest || b.siteId !== p.siteId) throw new BizError("BONUS_NOT_AVAILABLE");
     if (p.excludedFromBonuses) throw new BizError("PLAYER_EXCLUDED_FROM_BONUSES");
     if (await db.playerBonus.findFirst({ where: { playerId: p.id, state: PlayerBonusState.ACTIVE } })) throw new BizError("ACTIVE_BONUS_EXISTS");
     if (await db.bonusRequest.findFirst({ where: { playerId: p.id, bonusId, state: "PENDING" } })) throw new BizError("ALREADY_REQUESTED");
