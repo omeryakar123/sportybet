@@ -13,20 +13,21 @@ export function range(q: { from?: string; to?: string }) {
 /** Backoffice ana sayfa (BC Dashboard) */
 export async function dashboard(db: PrismaClient, from: Date, to: Date) {
   const between = { gte: from, lt: to };
+  const real = { player: { isTest: false } };
   const sum = async (type: TxType) => db.transaction.aggregate({ where: { type, createdAt: between }, _sum: { amount: true } });
   const [dep, wd, wdRefund, logins, loginPlayers, registered, mainBal, bonusBal, corrUp, corrDown, depPlayers, wdPlayers] = await Promise.all([
-    db.paymentRequest.aggregate({ where: { type: PaymentType.DEPOSIT, state: PaymentState.PAID, processedAt: between }, _sum: { amount: true }, _count: true }),
-    db.paymentRequest.aggregate({ where: { type: PaymentType.WITHDRAWAL, state: PaymentState.PAID, processedAt: between }, _sum: { amount: true }, _count: true }),
+    db.paymentRequest.aggregate({ where: { type: PaymentType.DEPOSIT, state: PaymentState.PAID, processedAt: between, ...real }, _sum: { amount: true }, _count: true }),
+    db.paymentRequest.aggregate({ where: { type: PaymentType.WITHDRAWAL, state: PaymentState.PAID, processedAt: between, ...real }, _sum: { amount: true }, _count: true }),
     sum(TxType.WITHDRAWAL_REFUND),
-    db.loginLog.count({ where: { createdAt: between } }),
-    db.loginLog.groupBy({ by: ["playerId"], where: { createdAt: between } }).then((r) => r.length),
+    db.loginLog.count({ where: { createdAt: between, ...real } }),
+    db.loginLog.groupBy({ by: ["playerId"], where: { createdAt: between, ...real } }).then((r) => r.length),
     db.player.count({ where: { createdAt: between, isTest: false } }),
     db.wallet.aggregate({ where: { type: WalletType.MAIN, player: { isTest: false } }, _sum: { balance: true } }),
     db.wallet.aggregate({ where: { type: WalletType.BONUS, player: { isTest: false } }, _sum: { balance: true } }),
-    db.transaction.aggregate({ where: { type: { in: [TxType.CORRECTION_UP] }, createdAt: between }, _sum: { amount: true } }),
-    db.transaction.aggregate({ where: { type: { in: [TxType.CORRECTION_DOWN] }, createdAt: between }, _sum: { amount: true } }),
-    db.paymentRequest.groupBy({ by: ["playerId"], where: { type: PaymentType.DEPOSIT, state: PaymentState.PAID, processedAt: between } }).then((r) => r.length),
-    db.paymentRequest.groupBy({ by: ["playerId"], where: { type: PaymentType.WITHDRAWAL, state: PaymentState.PAID, processedAt: between } }).then((r) => r.length),
+    db.transaction.aggregate({ where: { type: { in: [TxType.CORRECTION_UP] }, createdAt: between, ...real }, _sum: { amount: true } }),
+    db.transaction.aggregate({ where: { type: { in: [TxType.CORRECTION_DOWN] }, createdAt: between, ...real }, _sum: { amount: true } }),
+    db.paymentRequest.groupBy({ by: ["playerId"], where: { type: PaymentType.DEPOSIT, state: PaymentState.PAID, processedAt: between, ...real } }).then((r) => r.length),
+    db.paymentRequest.groupBy({ by: ["playerId"], where: { type: PaymentType.WITHDRAWAL, state: PaymentState.PAID, processedAt: between, ...real } }).then((r) => r.length),
   ]);
   void wdRefund;
   const deposits = N(dep._sum.amount), withdrawals = N(wd._sum.amount);
@@ -74,8 +75,8 @@ export async function bonusOverview(db: PrismaClient, from: Date, to: Date) {
   const rows = await db.$queryRaw<{ type: string; product: string; awarded: unknown; players: unknown; converted: unknown }[]>`
     SELECT b.type::text AS type, b.product, COALESCE(SUM(pb.amount),0) AS awarded, COUNT(DISTINCT pb."playerId") AS players,
            COALESCE(SUM(pb."convertedAmount"),0) AS converted
-    FROM "PlayerBonus" pb JOIN "Bonus" b ON b.id = pb."bonusId"
-    WHERE pb."createdAt" >= ${from} AND pb."createdAt" < ${to}
+    FROM "PlayerBonus" pb JOIN "Bonus" b ON b.id = pb."bonusId" JOIN "Player" p ON p.id = pb."playerId"
+    WHERE pb."createdAt" >= ${from} AND pb."createdAt" < ${to} AND p."isTest" = false
     GROUP BY b.type, b.product ORDER BY awarded DESC`;
   return rows.map((r) => ({ type: r.type, product: r.product, awarded: N(r.awarded), players: N(r.players), converted: N(r.converted) }));
 }
@@ -88,7 +89,8 @@ export async function topSports(db: PrismaClient, from: Date, to: Date) {
     FROM "BetSelection" s
     JOIN "Bet" b ON b.id = s."betId"
     JOIN (SELECT "betId", COUNT(*) n FROM "BetSelection" GROUP BY "betId") cnt ON cnt."betId" = b.id
-    WHERE b."createdAt" >= ${from} AND b."createdAt" < ${to} AND b.state <> 'CANCELLED'
+    JOIN "Player" p ON p.id = b."playerId"
+    WHERE b."createdAt" >= ${from} AND b."createdAt" < ${to} AND b.state <> 'CANCELLED' AND p."isTest" = false
     GROUP BY 1 ORDER BY bet DESC LIMIT 5`;
   return rows.map((r) => ({ sport: r.sport, bet: N(r.bet), win: N(r.win), profit: N(r.bet) - N(r.win) }));
 }
@@ -154,11 +156,13 @@ export async function financialReport(db: PrismaClient, from: Date, to: Date) {
       SUM(CASE WHEN type='WITHDRAWAL' THEN amount ELSE 0 END) AS withdrawals,
       COUNT(*) FILTER (WHERE type='WITHDRAWAL') AS "withdrawalCount",
       COUNT(DISTINCT "playerId") FILTER (WHERE type='DEPOSIT') AS depositors
-    FROM "PaymentRequest" WHERE state='PAID' AND "processedAt" >= ${from} AND "processedAt" < ${to}
+    FROM "PaymentRequest" pr WHERE state='PAID' AND "processedAt" >= ${from} AND "processedAt" < ${to}
+      AND NOT EXISTS (SELECT 1 FROM "Player" p WHERE p.id = pr."playerId" AND p."isTest")
     GROUP BY 1 ORDER BY 1 DESC`;
   const bySystem = await db.$queryRaw<any[]>`
     SELECT "paymentSystem", type::text AS type, COUNT(*) AS count, SUM(amount) AS amount
-    FROM "PaymentRequest" WHERE state='PAID' AND "processedAt" >= ${from} AND "processedAt" < ${to}
+    FROM "PaymentRequest" pr WHERE state='PAID' AND "processedAt" >= ${from} AND "processedAt" < ${to}
+      AND NOT EXISTS (SELECT 1 FROM "Player" p WHERE p.id = pr."playerId" AND p."isTest")
     GROUP BY 1,2 ORDER BY amount DESC`;
   return {
     daily: daily.map((r) => ({ day: r.day, deposits: N(r.deposits), depositCount: N(r.depositCount), withdrawals: N(r.withdrawals), withdrawalCount: N(r.withdrawalCount), depositors: N(r.depositors), net: N(r.deposits) - N(r.withdrawals) })),
