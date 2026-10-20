@@ -2,7 +2,6 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { api, getToken, setToken } from "./api";
 
 // ---------- biçimleme ----------
-export const money0 = (v: any) => "₺" + Number(v ?? 0).toLocaleString("tr-TR", { maximumFractionDigits: 0 });
 export const money = (v: any) => "₺" + Number(v ?? 0).toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 export const money0 = (v: any) => "₺" + Number(v ?? 0).toLocaleString("tr-TR", { maximumFractionDigits: 0 });
 export const pct = (p: any) => `${Math.round(Number(p ?? 0))} %`;
