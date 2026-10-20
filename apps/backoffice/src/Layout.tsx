@@ -31,9 +31,16 @@ export const NAV: Group[] = [
     { to: "/bets", label: "Spor Bahisleri" },
     { to: "/sportsbook", label: "Betco Entegrasyonu", roles: ["ADMIN", "RISK", "FINANCE"] },
   ] },
+  { label: "Tahminler", icon: "🔮", roles: ["ADMIN", "RISK", "CMS", "SUPPORT", "FINANCE"], items: [
+    { to: "/predictions", label: "Tahmin Piyasaları", roles: ["ADMIN", "RISK", "CMS", "SUPPORT"] },
+    { to: "/prediction-positions", label: "Pozisyonlar", roles: ["ADMIN", "RISK", "SUPPORT", "FINANCE"] },
+    { to: "/prediction-categories", label: "Kategoriler", roles: ["ADMIN", "RISK", "CMS"] },
+    { to: "/prediction-settings", label: "Ayarlar / Feed / İçe Aktar", roles: ["ADMIN", "RISK"] },
+  ] },
   { label: "Kullanıcı Yönetimi", icon: "👤", roles: ["ADMIN"], items: [
     { to: "/users", label: "Admin Kullanıcıları", roles: [] },
     { to: "/audit-logs", label: "İşlem Geçmişi (Audit)" },
+    { to: "/system", label: "Sistem / Demo Veri", roles: [] },
   ] },
   { label: "CMS", icon: "🧩", roles: ["ADMIN", "CMS"], items: [
     { to: "/cms/banners", label: "Bannerlar" },
@@ -43,6 +50,17 @@ export const NAV: Group[] = [
     { to: "/cms/css", label: "Web / Mobil CSS" },
   ] },
 ];
+
+const EXTRA_TITLES: [RegExp, string][] = [[/^\/players\/\d+/, "Oyuncular › Oyuncu Detayı"], [/^\/predictions\/.+/, "Tahminler › Piyasa Detayı"], [/^\/profile/, "Profil"], [/^\/system/, "Sistem"]];
+function pageTitle(path: string) {
+  for (const [re, t] of EXTRA_TITLES) if (re.test(path)) return t;
+  for (const g of NAV) {
+    if (g.to && (g.to === path || (g.to !== "/" && path.startsWith(g.to)))) return g.label;
+    const i = g.items?.find((i) => path === i.to || path.startsWith(i.to + "/"));
+    if (i) return `${g.label} › ${i.label}`;
+  }
+  return "Dashboard";
+}
 
 export const can = (role: Role | undefined, roles?: Role[]) => role === "SUPERADMIN" || !roles || (!!role && roles.includes(role));
 
@@ -93,6 +111,7 @@ export default function Layout() {
           <NavLink to="/profile" className="hover:underline">👤 {me?.username} <span className="text-bo-muted">({me?.role})</span></NavLink>
           <button onClick={() => { setToken(null); nav("/login"); }} className="text-bo-muted hover:text-bo-red">Çıkış</button>
         </header>
+        <div className="flex h-11 items-center border-b border-bo-line bg-white px-5 text-[14px] text-bo-text">{pageTitle(loc.pathname)}</div>
         <main className="min-w-0 flex-1 p-4"><Outlet context={{ me }} /></main>
       </div>
     </div>

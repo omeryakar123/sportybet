@@ -29,6 +29,10 @@ enum TxType {
   BONUS_CANCEL
   ADJUSTMENT // admin manuel düzeltme
   WITHDRAWAL_REFUND // reddedilen/iptal edilen çekim iadesi
+  PREDICTION_BUY
+  PREDICTION_SELL
+  PREDICTION_WIN
+  PREDICTION_REFUND
   CORRECTION_UP
   CORRECTION_DOWN
 }
@@ -123,6 +127,7 @@ model Player {
   promoCode      String?
   regSource      String    @default("Web")
   isTest         Boolean   @default(false)
+  activeWallet   WalletType @default(MAIN) // oyuncunun oynadığı cüzdan (sportsbook + tahmin sadece bunu görür)
   city           String?
   address        String?
   gender         String?
@@ -140,6 +145,8 @@ model Player {
   notes         PlayerNote[]
   logins        LoginLog[]
   payments      PaymentRequest[]
+  predictionPositions PredictionPosition[]
+  predictionSaves PredictionSave[]
   bonusRequests BonusRequest[]
   promoRedemptions PromoRedemption[]
 }
@@ -470,4 +477,115 @@ model CmsPage {
 model CmsSetting {
   key   String @id // web_css, mobile_css, logo_url, menus, seo...
   value Json
+}
+
+// ---------- Tahmin piyasaları ----------
+// Fiyat = 1 TL ödeyen bir payın fiyatı (0–1). Olasılık = fiyat × 100.
+// NO_IMPACT: fiyatı admin belirler (sabit). AFFECTS_ODDS: FPMM — rezervlerden hesaplanır, alım/satımla değişir.
+model PredictionCategory {
+  id          String   @id @default(uuid())
+  name        String
+  slug        String   @unique
+  description String?
+  icon        String?
+  parentId    String?
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  markets     PredictionMarketCategory[]
+}
+
+model PredictionMarket {
+  id             String   @id @default(uuid())
+  slug           String   @unique
+  question       String
+  structure      String   @default("STANDALONE") // STANDALONE, GROUP_PARENT, GROUP_CHILD
+  type           String   @default("PREDICTION")
+  oddsImpactMode String   @default("NO_IMPACT")  // NO_IMPACT, AFFECTS_ODDS
+  parentMarketId String?
+  externalMatchId String?
+  externalId     String?  @unique // dış sağlayıcıdan senkron edildiyse
+  source         String   @default("local")      // local, feed
+  metadata       Json?    // lockReason, lockedAt, lockedBy ...
+  isHomepage     Boolean  @default(false)
+  sortOrder      Int      @default(0)
+  buyEnabled     Boolean  @default(true)
+  sellEnabled    Boolean  @default(true)
+  status         String   @default("draft")       // draft, active, locked, closed, resolved, cancelled
+  image          String?
+  rules          String?
+  deadline       DateTime?
+  minStake       Decimal  @default(10) @db.Decimal(18, 2)
+  maxStake       Decimal  @default(5000) @db.Decimal(18, 2)
+  feePct         Decimal  @default(0) @db.Decimal(6, 3)  // AFFECTS_ODDS alım komisyonu
+  liquidity      Decimal  @default(10000) @db.Decimal(18, 2) // AFFECTS_ODDS başlangıç likiditesi
+  totalVolume    Decimal  @default(0) @db.Decimal(18, 2)
+  resolvedOutcomeId String?
+  resolvedAt     DateTime?
+  resolvedByAdminId Int?
+  activatedAt    DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  outcomes       PredictionOutcome[]
+  categories     PredictionMarketCategory[]
+  positions      PredictionPosition[]
+  saves          PredictionSave[]
+
+  @@index([status, deadline])
+  @@index([parentMarketId])
+}
+
+model PredictionMarketCategory {
+  marketId   String
+  categoryId String
+  market     PredictionMarket   @relation(fields: [marketId], references: [id], onDelete: Cascade)
+  category   PredictionCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([marketId, categoryId])
+}
+
+model PredictionOutcome {
+  id          String   @id @default(uuid())
+  marketId    String
+  name        String
+  color       String?
+  image       String?
+  price       Decimal  @db.Decimal(10, 4)  // NO_IMPACT'te admin fiyatı; AFFECTS_ODDS'ta hesaplanıp yazılır
+  reserve     Decimal  @default(0) @db.Decimal(30, 10) // AFFECTS_ODDS havuzu
+  buyEnabled  Boolean  @default(true)
+  sellEnabled Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  market      PredictionMarket @relation(fields: [marketId], references: [id], onDelete: Cascade)
+  positions   PredictionPosition[]
+}
+
+model PredictionPosition {
+  id         BigInt   @id @default(autoincrement())
+  playerId   Int
+  marketId   String
+  outcomeId  String
+  wallet     WalletType
+  stake      Decimal  @db.Decimal(18, 2)
+  shares     Decimal  @db.Decimal(24, 6)
+  price      Decimal  @db.Decimal(10, 4) // ortalama alış fiyatı
+  status     String   @default("OPEN") // OPEN, SOLD, WON, LOST, REFUNDED
+  payout     Decimal  @default(0) @db.Decimal(18, 2)
+  playerBonusId Int?
+  createdAt  DateTime @default(now())
+  closedAt   DateTime?
+  player     Player   @relation(fields: [playerId], references: [id])
+  market     PredictionMarket @relation(fields: [marketId], references: [id])
+  outcome    PredictionOutcome @relation(fields: [outcomeId], references: [id])
+
+  @@index([marketId, status])
+  @@index([playerId, createdAt])
+}
+
+model PredictionSave {
+  playerId  Int
+  marketId  String
+  createdAt DateTime @default(now())
+  player    Player   @relation(fields: [playerId], references: [id])
+  market    PredictionMarket @relation(fields: [marketId], references: [id], onDelete: Cascade)
+
+  @@id([playerId, marketId])
 }

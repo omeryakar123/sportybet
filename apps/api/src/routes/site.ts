@@ -49,6 +49,13 @@ export async function siteRoutes(app: FastifyInstance) {
     return { ok: true };
   });
 
+  // ---- Aktif cüzdan (Ana Para / Bonus) — sportsbook ve tahminler sadece seçili cüzdanı kullanır ----
+  app.put("/me/wallet", async (req) => {
+    const { wallet } = z.object({ wallet: z.enum(["MAIN", "BONUS"]) }).parse(req.body);
+    const p = await db.player.update({ where: { id: pid(req) }, data: { activeWallet: wallet }, include: { wallets: true } });
+    return { activeWallet: p.activeWallet, wallets: p.wallets.map((w) => ({ type: w.type, balance: w.balance, currency: w.currency })) };
+  });
+
   // ---- Geçmiş ----
   app.get("/me/transactions", async (req) => {
     const q = z.object({ type: z.string().optional(), take: z.coerce.number().max(200).default(50), cursor: z.string().optional() }).parse(req.query);

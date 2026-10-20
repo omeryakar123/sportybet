@@ -2,16 +2,22 @@
 @tailwind components;
 @tailwind utilities;
 
-body { @apply bg-bo-bg text-bo-text text-[13px] font-sans; }
-.panel { @apply bg-bo-panel rounded border border-bo-line; }
-.panel-title { @apply px-3 py-2 text-bo-blue border-b border-bo-line; }
-.inp { @apply h-8 w-full rounded-sm border border-bo-line bg-white px-2 text-[13px] outline-none focus:border-bo-blue; }
-.lbl { @apply mb-1 block text-[13px] text-bo-text; }
-.btn { @apply h-8 rounded-sm px-4 text-[13px] text-white disabled:opacity-50; }
-.btn-blue { @apply btn bg-bo-blue hover:brightness-95; }
-.btn-green { @apply btn bg-bo-green hover:brightness-95; }
-.btn-ghost { @apply h-8 rounded-sm border border-bo-blue/40 bg-bo-blue/10 px-4 text-bo-blue; }
+/* BetConstruct backoffice görünümü */
+body { @apply bg-[#eef1f6] text-bo-text text-[13px] font-sans; }
+.panel { @apply rounded-[3px] bg-white shadow-[0_1px_2px_rgba(16,24,40,0.06)]; }
+.panel-title { @apply border-b border-[#dbe7f3] px-3 py-2 text-[14px] text-bo-blue; }
+.inp { @apply h-[30px] w-full rounded-[2px] border border-[#d9dee6] bg-white px-2 text-[13px] text-bo-text outline-none placeholder:text-[#a7afbb] focus:border-bo-blue disabled:bg-[#f4f6f9]; }
+select.inp { @apply pr-6; }
+.lbl { @apply mb-1 block text-[13px] text-[#4a5361]; }
+.btn { @apply inline-flex h-[30px] items-center justify-center rounded-[2px] px-4 text-[13px] text-white transition disabled:opacity-50; }
+.btn-blue { @apply btn bg-[#2e8ae6] hover:bg-[#1f7bd6]; }
+.btn-green { @apply btn bg-[#3ec27a] hover:bg-[#33b06c]; }
+.btn-ghost { @apply inline-flex h-[30px] items-center justify-center rounded-[2px] border border-[#bcd8f5] bg-[#e3f0fd] px-4 text-[13px] text-[#2e8ae6] hover:bg-[#d4e8fc] disabled:opacity-50; }
 .tbl { @apply w-full border-collapse text-[13px]; }
-.tbl th { @apply bg-bo-head px-3 py-2 text-left font-normal text-bo-text whitespace-nowrap; }
-.tbl td { @apply border-t border-bo-line px-3 py-2 whitespace-nowrap; }
-.tbl tbody tr:nth-child(even) td { @apply bg-[#f8fafc]; }
+.tbl th { @apply h-9 whitespace-nowrap border-b border-[#d8e1ec] bg-[#e7edf5] px-3 text-left font-normal text-[#3b4351]; }
+.tbl td { @apply h-[34px] whitespace-nowrap border-b border-[#edf1f6] px-3; }
+.tbl tbody tr:nth-child(even) td { @apply bg-[#f7f9fc]; }
+.tbl tbody tr:hover td { @apply bg-[#eaf3fc]; }
+.tbl tfoot td { @apply bg-[#e7edf5]; }
+::-webkit-scrollbar { height: 8px; width: 8px; }
+::-webkit-scrollbar-thumb { background: #c9d3df; border-radius: 4px; }

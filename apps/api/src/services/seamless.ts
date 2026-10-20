@@ -7,9 +7,10 @@
  *  - Credit ve rollback asla reddedilmez.
  *  - Bilinmeyen debit için rollback → "iptal edildi" kaydı; sonradan o debit gelirse 409 TRANSACTION_CANCELLED.
  *
- * Bakiye politikası:
- *  - /balance = ANA + BONUS toplamı (oyuncu sportsbook'ta tek bakiye görür).
- *  - /debit önce ANA paradan, yetmezse kalanı BONUS cüzdanından düşer. Bölüşüm kaydedilir.
+ * Bakiye politikası (cüzdanlar AYRI):
+ *  - Oyuncu sitede aktif cüzdanını seçer (Player.activeWallet = MAIN | BONUS).
+ *  - /balance sadece aktif cüzdanın bakiyesini döner.
+ *  - /debit sadece aktif cüzdandan düşer (yetmezse INSUFFICIENT_BALANCE). Hangi cüzdandan düştüğü kaydedilir.
  *  - /credit aynı oranla geri yazılır: kazancın bonus payı BONUS cüzdanına, kalanı ANA paraya.
  *    (bonus COMPLETED olduysa bonus payı da ANA paraya gider)
  *  - Çevrim: bonuslu kupon sonuçlanınca (won/lost) bonus kurallarına uyuyorsa stake çevrime eklenir.
@@ -52,8 +53,9 @@ export async function balance(db: PrismaClient, b: any): Promise<WalletReply> {
   if (!p) return reject(400, "USER_NOT_FOUND", "Unknown user");
   const currency = b.currency || p.currency;
   await ensureWallets(db, playerId, currency);
-  const { total } = await totalBalance(db, playerId, currency);
-  return { http: 200, body: { success: true, balance: n2(total), currency } };
+  const bal = await totalBalance(db, playerId, currency);
+  const v = p.activeWallet === WalletType.BONUS ? bal.bonus : bal.main;
+  return { http: 200, body: { success: true, balance: n2(v), currency } };
 }
 
 // ---------------- /debit ----------------
@@ -89,15 +91,17 @@ export async function debit(db: PrismaClient, b: any): Promise<WalletReply> {
       // satırları kilitle
       await tx.$queryRaw`SELECT id FROM "Wallet" WHERE "playerId" = ${player.id} AND currency = ${currency} FOR UPDATE`;
       const bal = await totalBalance(tx, player.id, currency);
-      if (bal.total.lt(amount)) {
+      const useBonus = player.activeWallet === WalletType.BONUS;
+      const available = useBonus ? bal.bonus : bal.main;
+      if (available.lt(amount)) {
         const r = reject(400, "INSUFFICIENT_BALANCE", "Insufficient balance");
         await tx.walletRequest.create({
           data: { transactionId: txId, kind: "debit", playerId: player.id, amount, currency, providerBetId: b.bet_id, couponId: b.coupon_id, status: "REJECTED", httpStatus: 400, response: r.body as any },
         });
         return r;
       }
-      const fromMain = Prisma.Decimal.min(bal.main, amount);
-      const fromBonus = amount.sub(fromMain);
+      const fromMain = useBonus ? D(0) : amount;
+      const fromBonus = useBonus ? amount : D(0);
       const ref = `sb:${b.bet_id}`;
       if (fromMain.gt(0)) await move(tx, { playerId: player.id, wallet: WalletType.MAIN, type: TxType.BET_STAKE, amount: fromMain.neg(), reference: ref, currency, note: `Kupon ${b.coupon_id}` });
       if (fromBonus.gt(0)) await move(tx, { playerId: player.id, wallet: WalletType.BONUS, type: TxType.BET_STAKE, amount: fromBonus.neg(), reference: ref, currency, note: `Kupon ${b.coupon_id}` });
@@ -117,7 +121,7 @@ export async function debit(db: PrismaClient, b: any): Promise<WalletReply> {
         },
       });
 
-      const after = bal.total.sub(amount);
+      const after = available.sub(amount);
       const body = { success: true, transaction_id: txId, balance_after: n2(after) };
       await tx.walletRequest.create({
         data: { transactionId: txId, kind: "debit", playerId: player.id, amount, currency, providerBetId: b.bet_id, couponId: b.coupon_id, fromMain, fromBonus, status: "SUCCESS", response: body },
@@ -176,8 +180,9 @@ export async function credit(db: PrismaClient, b: any): Promise<WalletReply> {
           },
         });
       }
-      const { total } = await totalBalance(tx, player.id, currency);
-      const body = { success: true, transaction_id: txId, balance_after: n2(total) };
+      const b2 = await totalBalance(tx, player.id, currency);
+      const fresh = await tx.player.findUniqueOrThrow({ where: { id: player.id }, select: { activeWallet: true } });
+      const body = { success: true, transaction_id: txId, balance_after: n2(fresh.activeWallet === WalletType.BONUS ? b2.bonus : b2.main) };
       await tx.walletRequest.create({
         data: { transactionId: txId, kind: "credit", playerId: player.id, amount, currency, providerBetId: b.bet_id, couponId: b.coupon_id, reason, fromMain: toMain, fromBonus: toBonus, status: "SUCCESS", response: body },
       });
@@ -214,7 +219,9 @@ export async function rollback(db: PrismaClient, b: any): Promise<WalletReply> {
         if (D(orig.fromBonus).gt(0)) await move(tx, { playerId: orig.playerId, wallet: WalletType.BONUS, type: TxType.BET_REFUND, amount: orig.fromBonus, reference: ref, currency: orig.currency, note: `rollback · ${b.reason ?? ""}` });
         await tx.walletRequest.update({ where: { id: orig.id }, data: { refunded: true } });
         if (orig.providerBetId) await tx.bet.updateMany({ where: { providerBetId: orig.providerBetId }, data: { state: BetState.CANCELLED, settledAt: new Date() } });
-        balanceAfter = n2((await totalBalance(tx, orig.playerId, orig.currency)).total);
+        const b3 = await totalBalance(tx, orig.playerId, orig.currency);
+        const pw = await tx.player.findUniqueOrThrow({ where: { id: orig.playerId }, select: { activeWallet: true } });
+        balanceAfter = n2(pw.activeWallet === WalletType.BONUS ? b3.bonus : b3.main);
       }
       // orig REJECTED veya zaten iade edilmiş → para hareketi yok
 

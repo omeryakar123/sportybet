@@ -17,6 +17,8 @@ import { PaymentRequests, Transactions, PaymentSystems } from "./pages/Finance";
 import { SportsbookReport, FinancialReport, BonusReport } from "./pages/Reports";
 import { Users, AuditLogs, Profile } from "./pages/Users";
 import { CmsBanners, CmsPromotions, CmsCss, CmsPages, CmsSettings } from "./pages/Cms";
+import { PredictionList, PredictionDetail, PredictionPositions, PredictionCategories, PredictionSettings } from "./pages/Predictions";
+import System from "./pages/System";
 
 const Private = ({ children }: { children: React.ReactNode }) => (getToken() ? <>{children}</> : <Navigate to="/login" replace />);
 
@@ -41,6 +43,12 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         <Route path="promo-codes" element={<PromoCodes />} />
         <Route path="bets" element={<SportsBets />} />
         <Route path="sportsbook" element={<Sportsbook />} />
+        <Route path="predictions" element={<PredictionList />} />
+        <Route path="predictions/:id" element={<PredictionDetail />} />
+        <Route path="prediction-positions" element={<PredictionPositions />} />
+        <Route path="prediction-categories" element={<PredictionCategories />} />
+        <Route path="prediction-settings" element={<PredictionSettings />} />
+        <Route path="system" element={<System />} />
         <Route path="users" element={<Users />} />
         <Route path="audit-logs" element={<AuditLogs />} />
         <Route path="profile" element={<Profile />} />

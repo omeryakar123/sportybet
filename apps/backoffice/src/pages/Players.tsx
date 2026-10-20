@@ -47,6 +47,7 @@ export default function Players({ title = "Oyuncular", reportMode = false }: { t
           { key: "category", label: "Kategori" },
           { key: "main", label: "Ana Para", money: true, value: (p) => bal(p, "MAIN"), sum: true },
           { key: "bonus", label: "Bonus", money: true, value: (p) => bal(p, "BONUS"), sum: true },
+          { key: "activeWallet", label: "Oynadığı", value: (p) => (p.activeWallet === "BONUS" ? "Bonus" : "Ana") },
           { key: "isVerified", label: "Doğrulandı", value: (p) => (p.isVerified ? "Evet" : "Hayır") },
           { key: "createdAt", label: "Kayıt", render: (p) => dt(p.createdAt) },
           { key: "lastLoginAt", label: "Son Giriş", render: (p) => dt(p.lastLoginAt) },

@@ -10,11 +10,16 @@ export const pct = (v: any) => `${Number(v ?? 0).toFixed(2)}%`;
 export const dt = (v: any) => (v ? new Date(v).toLocaleString("tr-TR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "");
 export const dOnly = (v: any) => (v ? new Date(v).toLocaleDateString("tr-TR") : "");
 
-export function Panel({ title, right, children, pad = true }: { title: ReactNode; right?: ReactNode; children: ReactNode; pad?: boolean }) {
+export function Panel({ title, right, children, pad = true, collapsible }: { title: ReactNode; right?: ReactNode; children: ReactNode; pad?: boolean; collapsible?: boolean }) {
+  const isFilter = collapsible ?? title === "Filtre";
+  const [open, setOpen] = useState(true);
   return (
     <section className="panel mb-3">
-      <div className="panel-title flex min-h-10 items-center justify-between gap-3"><span>{title}</span>{right}</div>
-      <div className={pad ? "p-3" : ""}>{children}</div>
+      <div className="panel-title flex min-h-10 items-center justify-between gap-3">
+        <span className={isFilter ? "cursor-pointer select-none" : ""} onClick={() => isFilter && setOpen(!open)}>{title}</span>
+        <div className="flex items-center gap-3">{right}{isFilter && <button className="text-bo-blue" onClick={() => setOpen(!open)}>{open ? "⌃" : "⌄"}</button>}</div>
+      </div>
+      {open && <div className={pad ? "p-3" : ""}>{children}</div>}
     </section>
   );
 }
@@ -60,9 +65,9 @@ export const StateBadge = ({ s }: { s: string }) => <span className={STATE_COLOR
 export function Kpi({ label, value, icon, color = "bo-blue" }: { label: string; value: ReactNode; icon: string; color?: string }) {
   const bg: Record<string, string> = { "bo-blue": "bg-sky-100 text-sky-600", "bo-red": "bg-rose-100 text-rose-600", "bo-orange": "bg-amber-100 text-amber-600", "bo-green": "bg-emerald-100 text-emerald-600", "bo-purple": "bg-violet-100 text-violet-600", lime: "bg-lime-100 text-lime-700", teal: "bg-teal-100 text-teal-600" };
   return (
-    <div className="panel flex items-stretch overflow-hidden">
-      <div className={`grid w-16 shrink-0 place-items-center text-2xl ${bg[color] ?? bg["bo-blue"]}`}>{icon}</div>
-      <div className="min-w-0 p-3"><div className="truncate text-[11px] uppercase text-bo-text">{label}</div><div className="mt-1 truncate text-lg text-bo-muted">{value}</div></div>
+    <div className="panel flex h-[74px] items-stretch overflow-hidden">
+      <div className={`grid w-[74px] shrink-0 place-items-center ${bg[color] ?? bg["bo-blue"]}`}><div className="grid size-10 place-items-center rounded-full bg-white/80 text-xl shadow-sm">{icon}</div></div>
+      <div className="flex min-w-0 flex-col justify-center px-3"><div className="truncate text-[11px] uppercase tracking-wide text-[#3b4351]">{label}</div><div className="mt-1 truncate text-[19px] text-[#8a93a1]">{value}</div></div>
     </div>
   );
 }
@@ -202,7 +207,8 @@ export function useForm<T extends Record<string, any>>(init: T) {
 }
 
 export const TX_TR: Record<string, string> = {
-  DEPOSIT: "Yatırım", WITHDRAWAL: "Çekim", BET_STAKE: "Bahis", BET_WIN: "Kazanç", BET_REFUND: "Bahis İadesi", BONUS_GRANT: "Bonus Verildi",
+  DEPOSIT: "Yatırım", WITHDRAWAL: "Çekim", BET_STAKE: "Bahis", BET_WIN: "Kazanç",
+  PREDICTION_BUY: "Tahmin Alımı", PREDICTION_SELL: "Tahmin Bozdurma", PREDICTION_WIN: "Tahmin Kazancı", PREDICTION_REFUND: "Tahmin İadesi", BET_REFUND: "Bahis İadesi", BONUS_GRANT: "Bonus Verildi",
   BONUS_CONVERT: "Bonus Dönüşümü", BONUS_EXPIRE: "Bonus Süresi Doldu", BONUS_CANCEL: "Bonus İptal", ADJUSTMENT: "Düzeltme",
   WITHDRAWAL_REFUND: "Çekim İadesi", CORRECTION_UP: "Düzeltme (+)", CORRECTION_DOWN: "Düzeltme (−)",
 };

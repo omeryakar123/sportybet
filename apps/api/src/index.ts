@@ -7,6 +7,8 @@ import { adminRoutes } from "./routes/admin.js";
 import { publicRoutes } from "./routes/public.js";
 import { platformRoutes, launchRoutes } from "./routes/sportsbook.js";
 import { siteRoutes } from "./routes/site.js";
+import { predictionSiteRoutes } from "./routes/predictions.js";
+import { autoClose, syncFeed } from "./services/predictions.js";
 import { expireBonuses } from "./services/bonus.js";
 
 // BigInt alanları JSON'a string olarak çıksın
@@ -28,6 +30,7 @@ await app.register(adminRoutes, { prefix: "/admin" });
 await app.register(platformRoutes); // /wallet/* ve /webhooks/sportsbook (Betco)
 await app.register(launchRoutes, { prefix: "/api" });
 await app.register(siteRoutes, { prefix: "/api" }); // oyuncu hesabı, ödemeler, bonuslar
+await app.register(predictionSiteRoutes, { prefix: "/api" }); // tahminler
 
 // İlk açılışta süper admin oluştur
 async function seedAdmin() {
@@ -50,5 +53,7 @@ if ((await db.paymentSystem.count()) === 0) {
   ] });
 }
 setInterval(() => expireBonuses(db).catch((e) => app.log.error(e)), 5 * 60_000);
+setInterval(() => autoClose(db).catch((e) => app.log.error(e)), 60_000); // süresi dolan tahmin piyasalarını kapat
+setInterval(() => syncFeed(db).catch((e) => app.log.error(e)), 5 * 60_000); // tahmin feed senkronu (ayarlıysa)
 
 await app.listen({ port: Number(process.env.PORT ?? 4000), host: "0.0.0.0" });

@@ -2,6 +2,7 @@ import { Fragment, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api";
 import { Panel, Field, Modal, DataTable, Kpi, Tabs, money, dt, pct, num, StateBadge, Err, TX_TR, useForm } from "../ui";
+import { PositionTable } from "./Predictions";
 
 const MAIN_TABS = ["Genel", "Finansal", "Raporlar", "Ayarlar"] as const;
 
@@ -17,7 +18,10 @@ export default function PlayerDetail() {
     <>
       <div className="mb-2 flex items-center justify-between">
         <div><Link to="/players" className="text-bo-blue">Oyuncular</Link> › <b>{p.username}</b> <span className="text-bo-muted">#{p.id}</span> {p.isTest && <span className="ml-2 rounded bg-amber-100 px-2 text-xs text-amber-700">TEST</span>}</div>
-        <div className="flex gap-4"><span>Ana Para: <b>{money(w("MAIN"))}</b></span><span>Bonus: <b className="text-bo-purple">{money(w("BONUS"))}</b></span><StateBadge s={p.status} /></div>
+        <div className="flex items-center gap-4">
+          <span className={`rounded px-2 py-0.5 ${p.activeWallet !== "BONUS" ? "bg-bo-blue text-white" : "bg-bo-head"}`}>Ana Para: <b>{money(w("MAIN"))}</b></span>
+          <span className={`rounded px-2 py-0.5 ${p.activeWallet === "BONUS" ? "bg-bo-purple text-white" : "bg-bo-head"}`}>Bonus: <b>{money(w("BONUS"))}</b></span>
+          <span className="text-bo-muted">Oynadığı cüzdan: <b>{p.activeWallet === "BONUS" ? "Bonus" : "Ana Para"}</b></span><StateBadge s={p.status} /></div>
       </div>
       <Tabs tabs={MAIN_TABS} value={tab} onChange={setTab} />
       {tab === "Genel" && <General p={p} reload={load} />}
@@ -170,7 +174,7 @@ function Adjust({ p, onClose, onDone }: any) {
   );
 }
 
-const REPORT_TABS = ["Spor Bahisleri", "Bonuslar", "Girişler"] as const;
+const REPORT_TABS = ["Spor Bahisleri", "Tahminler", "Bonuslar", "Girişler"] as const;
 function Reports({ p, reload }: any) {
   const [t, setT] = useState<(typeof REPORT_TABS)[number]>("Spor Bahisleri");
   return (
@@ -180,6 +184,7 @@ function Reports({ p, reload }: any) {
       </div>
       <div className="min-w-0 flex-1">
         {t === "Spor Bahisleri" && <PlayerBets id={p.id} />}
+        {t === "Tahminler" && <PlayerPredictions id={p.id} />}
         {t === "Bonuslar" && <PlayerBonuses id={p.id} reload={reload} />}
         {t === "Girişler" && <Logins id={p.id} />}
       </div>
@@ -253,6 +258,12 @@ function PlayerBonuses({ id, reload }: any) {
   );
 }
 
+function PlayerPredictions({ id }: { id: number }) {
+  const [rows, setRows] = useState<any[]>([]);
+  useEffect(() => { api(`/admin/players/${id}/predictions`).then(setRows); }, [id]);
+  return <Panel title="Tahmin Pozisyonları"><PositionTable rows={rows} /></Panel>;
+}
+
 function Logins({ id }: { id: number }) {
   const [rows, setRows] = useState<any[]>([]);
   useEffect(() => { api(`/admin/players/${id}/logins`).then(setRows); }, [id]);
@@ -272,6 +283,7 @@ function Settings({ p, reload }: any) {
           <Field label="Durum"><select className="inp" value={p.status} onChange={(e) => patch({ status: e.target.value })}><option value="OPEN">Açık</option><option value="BLOCKED">Bloke</option><option value="CLOSED">Kapalı</option><option value="SELF_EXCLUDED">Kendini dışladı</option></select></Field>
           <Field label="Kategori"><select className="inp" value={p.category} onChange={(e) => patch({ category: e.target.value })}>{["LOW_RISK", "MEDIUM_RISK", "HIGH_RISK", "VIP", "FRAUD", "BONUS_HUNTER"].map((c) => <option key={c}>{c}</option>)}</select></Field>
         </div>
+        <Field label="Oynadığı cüzdan (sportsbook + tahmin sadece bunu kullanır)" className="mt-3"><select className="inp" value={p.activeWallet} onChange={(e) => patch({ activeWallet: e.target.value })}><option value="MAIN">Ana Para</option><option value="BONUS">Bonus</option></select></Field>
         <div className="mt-3">
           <Toggle k="isVerified" label="Doğrulanmış oyuncu (KYC)" />
           <Toggle k="isSportBlocked" label="Spor bahsi engelli" />

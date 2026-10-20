@@ -6,6 +6,7 @@ RUN npm install
 COPY prisma ./prisma
 COPY tsconfig.json ./
 COPY src ./src
+COPY seed ./seed
 RUN npm run build
 ENV NODE_ENV=production PORT=4000
 EXPOSE 4000

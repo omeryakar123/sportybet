@@ -8,6 +8,8 @@ import { move, ensureWallets } from "../services/wallet.js";
 import { sportsbook, sportsbookConfigured } from "../services/sportsbook.js";
 import { processPayment, BizError } from "../services/payments.js";
 import { dashboard, playerKpis, range, sportsbookDaily, financialReport } from "../services/reports.js";
+import { predictionAdminRoutes } from "./predictions.js";
+import { seedDemo, purgeDemo } from "../services/demo.js";
 
 type AdminJwt = { adminId: number; role: AdminRole; kind: "admin" };
 
@@ -33,6 +35,13 @@ const PERMS: Record<string, { read: AdminRole[]; write: AdminRole[] }> = {
   "/admin/player-bonuses": { read: ["ADMIN", "RISK", "SUPPORT", "FINANCE"], write: ["ADMIN", "RISK"] },
   "/admin/promo-codes": { read: ["ADMIN", "CMS"], write: ["ADMIN"] },
   "/admin/cms": { read: ["ADMIN", "CMS"], write: ["ADMIN", "CMS"] },
+  "/admin/predictions": { read: ["ADMIN", "RISK", "CMS", "SUPPORT"], write: ["ADMIN", "RISK"] },
+  "/admin/prediction-categories": { read: ["ADMIN", "RISK", "CMS"], write: ["ADMIN", "CMS"] },
+  "/admin/prediction-positions": { read: ["ADMIN", "RISK", "SUPPORT", "FINANCE"], write: [] },
+  "/admin/prediction-stats": { read: ["ADMIN", "RISK", "FINANCE"], write: [] },
+  "/admin/prediction-settings": { read: ["ADMIN", "RISK"], write: ["ADMIN"] },
+  "/admin/prediction-feed": { read: ["ADMIN"], write: ["ADMIN"] },
+  "/admin/demo": { read: [], write: [] },
 };
 // Oyuncu alt kaynakları: finans işlemleri ve bonus verme daha sıkı
 const PLAYER_WRITE_EXTRA: [RegExp, AdminRole[]][] = [
@@ -196,6 +205,7 @@ export async function adminRoutes(app: FastifyInstance) {
       email: z.string().nullable().optional(), phone: z.string().nullable().optional(), firstName: z.string().nullable().optional(), lastName: z.string().nullable().optional(),
       city: z.string().nullable().optional(), address: z.string().nullable().optional(), gender: z.string().nullable().optional(),
       birthDate: z.string().nullable().optional(), btag: z.string().nullable().optional(), loyaltyLevel: z.string().nullable().optional(), language: z.string().optional(),
+      activeWallet: z.nativeEnum(WalletType).optional(),
     }).parse(req.body);
     const p = await db.player.update({ where: { id }, data: { ...data, ...(data.birthDate !== undefined ? { birthDate: data.birthDate ? new Date(data.birthDate) : null } : {}) } });
     await audit(req, "PLAYER_UPDATE", `player:${id}`, data);
@@ -443,6 +453,14 @@ export async function adminRoutes(app: FastifyInstance) {
   app.patch("/promo-codes/:id", async (req) => db.promoCode.update({ where: { id: idParam(req) }, data: promoBody.partial().parse(req.body) }));
   app.get("/promo-codes/:id/redemptions", async (req) => db.promoRedemption.findMany({ where: { promoCodeId: idParam(req) }, include: { player: { select: { username: true } } }, orderBy: { id: "desc" } }));
 
+  // ---------- Tahminler ----------
+  await app.register(predictionAdminRoutes);
+  app.get("/players/:id/predictions", async (req) => db.predictionPosition.findMany({ where: { playerId: idParam(req) }, include: { market: { select: { question: true, slug: true, status: true } }, outcome: { select: { name: true } } }, orderBy: { id: "desc" }, take: 300 }));
+
+  // ---------- Demo veri (sadece SUPERADMIN) ----------
+  app.post("/demo/seed", async (req) => { const r = await seedDemo(db); await audit(req, "DEMO_SEED", "demo", r); return r; });
+  app.post("/demo/purge", async (req) => { const r = await purgeDemo(db); await audit(req, "DEMO_PURGE", "demo", r); return r; });
+
   // ---------- CMS ----------
   for (const [path, model] of [["banners", db.cmsBanner], ["promotions", db.cmsPromotion], ["pages", db.cmsPage]] as const) {
     const m = model as any;
@@ -455,7 +473,7 @@ export async function adminRoutes(app: FastifyInstance) {
   app.get("/cms/settings/:key", async (req) => db.cmsSetting.findUnique({ where: { key: (req.params as any).key } }));
   app.put("/cms/settings/:key", async (req) => {
     const key = (req.params as any).key;
-    if (!/^[a-z0-9_]+$/.test(key) || key.startsWith("sportsbook_")) throw new BizError("INVALID_KEY");
+    if (!/^[a-z0-9_]+$/.test(key) || key.startsWith("sportsbook_") || key.startsWith("prediction_")) throw new BizError("INVALID_KEY");
     const r = await db.cmsSetting.upsert({ where: { key }, update: { value: req.body as any }, create: { key, value: req.body as any } });
     await audit(req, "CMS_SETTING_UPDATE", `setting:${key}`);
     return r;
