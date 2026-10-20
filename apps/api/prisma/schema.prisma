@@ -107,7 +107,6 @@ model Site {
   sbWalletSecret String?
   note           String?
   createdAt      DateTime @default(now())
-  players        Player[]
 }
 
 model Admin {
