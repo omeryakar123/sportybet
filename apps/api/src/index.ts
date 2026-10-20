@@ -9,6 +9,7 @@ import { platformRoutes, launchRoutes } from "./routes/sportsbook.js";
 import { siteRoutes } from "./routes/site.js";
 import { predictionSiteRoutes } from "./routes/predictions.js";
 import { autoClose, syncFeed } from "./services/predictions.js";
+import { seedDemo } from "./services/demo.js";
 import { expireBonuses } from "./services/bonus.js";
 
 // BigInt alanları JSON'a string olarak çıksın
@@ -55,5 +56,8 @@ if ((await db.paymentSystem.count()) === 0) {
 setInterval(() => expireBonuses(db).catch((e) => app.log.error(e)), 5 * 60_000);
 setInterval(() => autoClose(db).catch((e) => app.log.error(e)), 60_000); // süresi dolan tahmin piyasalarını kapat
 setInterval(() => syncFeed(db).catch((e) => app.log.error(e)), 5 * 60_000); // tahmin feed senkronu (ayarlıysa)
+
+// DEMO_SEED=1 ise açılışta demo veri yüklenir (zaten varsa atlar). Yükledikten sonra env'den kaldırın.
+if (process.env.DEMO_SEED === "1") seedDemo(db).then((r) => app.log.info({ demo: r }, "demo seed")).catch((e) => app.log.error(e, "demo seed failed"));
 
 await app.listen({ port: Number(process.env.PORT ?? 4000), host: "0.0.0.0" });
