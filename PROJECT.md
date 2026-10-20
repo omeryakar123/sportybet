@@ -60,6 +60,12 @@ Her oyuncunun **2 cüzdanı** var (`Wallet` tablosu, `type` alanı):
 - Süresi dolan bonus → BONUS cüzdanı sıfırlanır, `EXPIRED` (5 dakikada bir cron).
 - Her hareket `Transaction` tablosuna `balanceAfter` ile yazılır; bakiye eksiye düşemez; satır kilidi (`FOR UPDATE`) kullanılır.
 
+## 3a. Cüzdanlar AYRI (kullanıcı kararı)
+- Oyuncu sitede **hangi cüzdanla oynayacağını seçer**: `Player.activeWallet = MAIN | BONUS` (`PUT /api/me/wallet`).
+- Sportsbook `/wallet/balance` sadece seçili cüzdanı döner; `/debit` sadece ondan düşer. Tahminler de aynı.
+- Kazanç/iade parayı düştüğü cüzdana döner (bonus tamamlandıysa ana paraya).
+- Backoffice'te oyuncu başlığında iki bakiye + oynadığı cüzdan; Ayarlar'dan değiştirilebilir.
+
 ## 3b. Betco Sportsbook Entegrasyonu
 
 | Bizim uç | Ne yapar |
@@ -132,6 +138,26 @@ SUPERADMIN her şey · ADMIN kullanıcı yönetimi hariç · FINANCE ödemeler/r
 | `GET /api/sportsbook/launch` | Betco iframe launch token |
 | `GET /api/cms/banners?group=&platform=`, `/api/cms/promotions[/:slug]`, `/api/cms/pages/:slug`, `/api/cms/settings/:key` | CMS içerikleri (`site_general`, `seo`, `social`, `menus`, `web_css`, `mobile_css`) |
 
+## 4c. Tahmin Piyasaları (Polymarket tarzı)
+
+Kullanıcının verdiği örnek feed: `apps/api/seed/predictions-sample.json` (20 piyasa; 957 toplam). Sağlayıcı URL/anahtarı henüz yok → kendi motorumuz + feed senkronu.
+
+- **Pay**: sonuç gerçekleşirse 1 ₺ öder. Fiyat 0–1, olasılık = fiyat × 100, oran = 1/fiyat.
+- **NO_IMPACT** (sabit oran): fiyatı admin belirler (marjlı, toplam > 1). Pay = tutar / fiyat. Bozdurma = pay × güncel fiyat.
+- **AFFECTS_ODDS** (dinamik, FPMM): `fiyat_i ∝ 1/rezerv_i`; alım rezervleri değiştirir. Komisyon % ve başlangıç likiditesi piyasa bazında. (Örnek feed'deki rezerv/fiyat ilişkisi doğrulandı.)
+- **Yapılar**: STANDALONE, GROUP_PARENT (maç sayfası) + GROUP_CHILD (alt piyasalar).
+- **Durumlar**: draft → active ⇄ locked (sebep sitede görünür) → closed (son tarih geçince otomatik, 1 dk cron) → resolved (kazanan seçilir, otomatik ödeme) | cancelled (tam iade).
+- **Bonus**: bonus cüzdanıyla alınan pozisyon sonuçlanınca stake çevrime eklenir.
+- **Feed senkronu**: Backoffice → Tahminler → Ayarlar'da URL + anahtar; 5 dk'da bir `?page=&limit=` ile çekilir, dış ID ile eşleşir, fiyatlar feed'den gelir (yerelde NO_IMPACT), sonuçlandırma bizde. JSON yapıştırarak içe aktarma da var.
+- **Genel işlem modu**: NORMAL / PAUSED + site duyurusu (`site.tradingMode`, `site.notice` feed formatıyla aynı).
+
+Site uçları: `GET /api/predictions` (feed formatı: success/data/pagination/site), `GET /api/predictions/:slug` (myPositions dahil), `GET /api/prediction-categories`, `GET /api/predictions/leaderboard?days=7`, `POST /api/predictions/:id/buy {outcomeId, amount}`, `GET /api/predictions/positions/:id/quote`, `POST /api/predictions/positions/:id/sell`, `POST /api/predictions/:id/save`, `GET /api/me/predictions`.
+
+Backoffice: Tahmin Piyasaları (KPI, filtre, Al/Sat/★ hızlı aç-kapa, Aç/Kilitle/Sonuçlandır), Detay (risk tablosu: sonuç bazında açık tutar, kazanırsa ödeme, kasa K/Z; fiyat güncelle; pozisyonlar; alt piyasalar; kurallar), Pozisyonlar, Kategoriler, Ayarlar/Feed/İçe aktar.
+
+## 4d. Demo veri
+Backoffice → Kullanıcı Yönetimi → Sistem / Demo Veri (SUPERADMIN) veya env `DEMO_SEED=1`. Demo oyuncular btag `DEMO`, şifre `demo123456`. **Canlıdan önce "Demo Veriyi Sil".**
+
 ## 5. Site
 
 - Şu an: sidebar (sporlar), header (Ana para + Bonus bakiyesi), giriş/kayıt, CMS banner slotları, maç listesi, promosyonlar.
@@ -198,3 +224,4 @@ cd apps/web && npm i && npm run dev          # http://localhost:5173
 - **2026-10-20** — Spor sağlayıcısı: Betco Sportsbook (probetlab), iframe + seamless wallet. Kararlar: /balance = ANA+BONUS; debit önce ANA sonra BONUS; credit stake oranıyla geri; çevrim bonuslu kupon won/lost + kural uyumu ile. Kullanıcı: "şimdilik backoffice + spor, site tasarımı sonra". Coolify'daki mevcut uygulama (railpack) Docker Compose'a çevrildi.
 - **2026-10-20** — İlk canlı deploy. Coolify deploy: `POST /api/v1/deploy?uuid=jyiwgs7yf6tdcocutfidsfki`. Backoffice admin kullanıcısı `admin` (şifre Coolify env `ADMIN_PASSWORD`).
 - **2026-10-20** — Backoffice tamamlandı (BC referansıyla tüm menü). Kararlar: tek aktif bonus; çekim talepte bloke; manuel yatırım/çekim raporlara PaymentRequest ile girer; test oyuncuları raporlardan hariç; roller URL önekine göre (PERMS).
+- **2026-10-20** — Tahmin piyasaları eklendi (motor + API + backoffice). Cüzdanlar ayrıldı: oyuncu aktif cüzdan seçer. Backoffice görünümü BC'ye yaklaştırıldı. Demo veri araçları.
