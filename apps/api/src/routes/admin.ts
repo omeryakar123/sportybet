@@ -451,8 +451,9 @@ export async function adminRoutes(app: FastifyInstance) {
   await app.register(sbAdminRoutes);
   app.get("/wallet-requests", async (req) => {
     const q = z.object({ kind: z.string().optional(), status: z.string().optional(), playerId: z.coerce.number().optional(), take: z.coerce.number().default(200) }).parse(req.query);
+    // WalletRequest'in player ilişkisi yok (Betco seamless kalıntısı, artık boş) → site filtresi uygulanmaz
     return db.walletRequest.findMany({
-      where: { player: { siteId: await sid(req) }, ...(q.kind ? { kind: q.kind } : {}), ...(q.status ? { status: q.status } : {}), ...(q.playerId ? { playerId: q.playerId } : {}) },
+      where: { ...(q.kind ? { kind: q.kind } : {}), ...(q.status ? { status: q.status } : {}), ...(q.playerId ? { playerId: q.playerId } : {}) },
       orderBy: { id: "desc" }, take: q.take,
     });
   });
