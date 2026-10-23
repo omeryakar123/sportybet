@@ -27,10 +27,9 @@ services:
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:?set ADMIN_PASSWORD}
       CORS_ORIGINS: ${CORS_ORIGINS:-*}
-      SPORTSBOOK_API_URL: ${SPORTSBOOK_API_URL:-https://sportbook.probetlab.com}
-      SPORTSBOOK_API_KEY: ${SPORTSBOOK_API_KEY:-}
-      SPORTSBOOK_API_SECRET: ${SPORTSBOOK_API_SECRET:-}
-      SPORTSBOOK_WALLET_SECRET: ${SPORTSBOOK_WALLET_SECRET:-}
+      # Kendi sportsbook motoru — API-Football (api-sports.io) beslemesi
+      APISPORTS_URL: ${APISPORTS_URL:-https://v3.football.api-sports.io}
+      APISPORTS_KEY: ${APISPORTS_KEY:-f979d56c0f240da3b8b48c186774a8ae}
       DEMO_SEED: ${DEMO_SEED:-0}
       PUBLIC_API_URL: ${VITE_API_URL:-}            # Siteler sayfasında wallet/webhook URL'si göstermek için
       DEFAULT_SITE_CODE: ${DEFAULT_SITE_CODE:-sportybet}

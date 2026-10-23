@@ -5,7 +5,7 @@ import { Prisma, TxType, WalletType, PaymentType, PaymentState, AdminRole } from
 import { db } from "../index.js";
 import { grantBonus, cancelBonus } from "../services/bonus.js";
 import { move, ensureWallets } from "../services/wallet.js";
-import { sbClient, sbCreds } from "../services/sportsbook.js";
+import { sbAdminRoutes } from "./sb.js";
 import { allSites, bustSiteCache, seedSiteDefaults } from "../services/sites.js";
 import { processPayment, BizError } from "../services/payments.js";
 import { dashboard, playerKpis, range, sportsbookDaily, financialReport } from "../services/reports.js";
@@ -30,6 +30,7 @@ const PERMS: Record<string, { read: AdminRole[]; write: AdminRole[] }> = {
   "/admin/players": { read: ["ADMIN", "FINANCE", "RISK", "SUPPORT"], write: ["ADMIN", "RISK"] },
   "/admin/bets": { read: ["ADMIN", "RISK", "SUPPORT", "FINANCE"], write: [] },
   "/admin/sportsbook": { read: ["ADMIN", "RISK", "FINANCE"], write: [] },
+  "/admin/sb": { read: ["ADMIN", "RISK", "FINANCE"], write: ["ADMIN", "RISK"] },
   "/admin/wallet-requests": { read: ["ADMIN", "RISK", "FINANCE"], write: [] },
   "/admin/webhook-events": { read: ["ADMIN", "RISK"], write: [] },
   "/admin/bonuses": { read: ["ADMIN", "RISK", "SUPPORT", "FINANCE"], write: ["ADMIN"] },
@@ -446,29 +447,8 @@ export async function adminRoutes(app: FastifyInstance) {
     });
   });
 
-  // ---------- Sportsbook (Betco) ----------
-  const sb = (fn: () => Promise<any>) => async (_req: FastifyRequest, reply: FastifyReply) => {
-    try { return await fn(); } catch (e: any) { return reply.code(502).send({ error: e.message, detail: e.detail }); }
-  };
-  const siteSb = async (req: FastifyRequest) => {
-    const id = await sid(req);
-    const site = (await allSites(db)).find((s) => s.id === id) ?? null;
-    return { site, client: sbClient(sbCreds(site)) };
-  };
-  app.get("/sportsbook/status", async (req) => {
-    const { site, client } = await siteSb(req);
-    const out: any = { configured: client.configured, walletSecretSet: Boolean(site?.sbWalletSecret || process.env.SPORTSBOOK_WALLET_SECRET) };
-    if (out.configured) {
-      out.me = await client.me().then((r: any) => r.data).catch((e: any) => ({ error: e.message }));
-      out.billing = await client.billing().then((r: any) => r.data).catch((e: any) => ({ error: e.message }));
-    }
-    out.lastBalanceStatus = (await db.cmsSetting.findUnique({ where: { siteId_key: { siteId: 1, key: "sportsbook_partner_balance" } } }))?.value ?? null;
-    return out;
-  });
-  app.get("/sportsbook/ledger", async (req, reply) => { const { client } = await siteSb(req); return sb(() => client.ledger(req.query as any))(req, reply); });
-  app.get("/sportsbook/transactions", async (req, reply) => { const { client } = await siteSb(req); return sb(() => client.transactions(req.query as any))(req, reply); });
-  app.get("/sportsbook/bets", async (req, reply) => { const { client } = await siteSb(req); return sb(() => client.bets(req.query as any))(req, reply); });
-  app.get("/sportsbook/bets/:id", async (req, reply) => { const { client } = await siteSb(req); return sb(() => client.bet((req.params as any).id))(req, reply); });
+  // ---------- Sportsbook (kendi motorumuz — trading) ----------
+  await app.register(sbAdminRoutes);
   app.get("/wallet-requests", async (req) => {
     const q = z.object({ kind: z.string().optional(), status: z.string().optional(), playerId: z.coerce.number().optional(), take: z.coerce.number().default(200) }).parse(req.query);
     return db.walletRequest.findMany({

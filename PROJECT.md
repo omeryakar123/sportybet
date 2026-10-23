@@ -245,3 +245,13 @@ cd apps/web && npm i && npm run dev          # http://localhost:5173
 - Açılışta varsayılan Site id=1 seed edilir (DEFAULT_SITE_CODE/NAME/DOMAIN env). PUBLIC_API_URL env → Siteler sayfasında wallet/webhook URL gösterimi.
 - **Kripto yatırım akışı**: PaymentSystem.config.depositAddress varsa sitede adres + kopyala + ağ uyarısı + (requireTxid ise) zorunlu TXID alanı; TXID info.txid olarak talebe yazılır ve backoffice Finans ekranında görünür. CryptoUSDT (site 1) açılışta config ile dolduruldu.
 - Spor Bahisleri (BO) 15 sn'de bir otomatik yenilenir (kapatılabilir).
+
+## Kendi Sportsbook Motoru (API-Football) — 2026-10-23
+- **Betco kaldırıldı**: routes/sportsbook.ts, services/seamless.ts, services/sportsbook.ts silindi; site Sport iframe'i ve BO "Betco Entegrasyonu" sayfası değiştirildi.
+- **Feed**: services/feed.ts — API-Football (api-sports.io) adapter, feed-agnostik. Env: APISPORTS_KEY, APISPORTS_URL (v3.football.api-sports.io). Ücretsiz plan 100 istek/gün → kota-dostu senkron.
+- **Motor**: services/sb.ts — marj (withMargin), syncFixtures (30dk), syncOdds (3sa, max 15 maç), syncResults (5dk, sadece başlamış maç varsa, tek çağrı/20 maç), settleEvent (FT+skor → otomatik kazandı/kaybetti/iade), placeBet (kombine/tekli, cüzdan debit, limitler). Config CmsSetting key `sportsbook_config` (siteId=1): enabled, marginPct(6), leagues[], maxStake, maxWin, maxSelections, syncDays.
+- **Modeller**: SbEvent (fixtureId unique, status, skor, isOpen, featured), SbMarket (key: 1x2/ou25/btts), SbSelection (baseOdds, odds=marjlı, result). BetSelection.sbSelectionId → settlement eşleşmesi. Bet/wallet.move yeniden kullanıldı.
+- **API**: site /api/sb/leagues, /sb/events, /sb/event/:id, /sb/bet, /sb/my-bets. Admin /admin/sb/status|config|events|events/:id/toggle|featured|settle, /markets/:id/toggle, /sync, /sync-results.
+- **Frontend**: web Sport.tsx (lig filtresi + maç listesi 1X2/KG + çalışan kupon, kombine/tekli, mobil alt kupon çubuğu); Home "Günün Maçları" teaser. BO Trading.tsx (maçlar: aç/kapa + manuel settle + sync; ayarlar: marj/lig/limit + feed durumu).
+- **Doğrulandı**: key çalışıyor (Ömer Yakar, Free), bugün 441 maç + gerçek oranlar (Alanyaspor 1.95/3.10/3.90). Cloud/cihaz VM api-sports.io'ya çıkamıyor (egress) — motor Coolify sunucusunda çalışır.
+- Not: APISPORTS_KEY compose'da default; Coolify env'ine taşınıp rotate edilmeli. Canlı/in-play faz 2 (feed 15sn gecikmeli, prematch için ideal).

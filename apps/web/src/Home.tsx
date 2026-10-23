@@ -63,11 +63,11 @@ function CmsBanners() {
 export default function Home() {
   const { me, setAuthOpen, settings } = useStore();
   const [markets, setMarkets] = useState<any[]>([]);
-  const [widget, setWidget] = useState<string>("");
+  const [sbEvents, setSbEvents] = useState<any[]>([]);
   const scroller = useRef<HTMLDivElement>(null);
   useEffect(() => {
     api("/api/predictions?homepage=true&limit=12").then((r) => { const d = r.data?.length ? r.data : null; if (d) setMarkets(d); else api("/api/predictions?limit=12").then((r2) => setMarkets(r2.data ?? [])).catch(() => {}); }).catch(() => {});
-    api("/api/sportsbook/widgets/live-games").then((r) => setWidget(r.url ?? "")).catch(() => {});
+    api("/api/sb/events?limit=6").then((r) => setSbEvents(Array.isArray(r) ? r : [])).catch(() => {});
   }, []);
   const top = markets[0];
   const scrollBy = (dir: number) => scroller.current?.scrollBy({ left: dir * 320, behavior: "smooth" });
@@ -150,15 +150,32 @@ export default function Home() {
         </section>
       )}
 
-      {/* Canlı Maçlar (Betco widget) */}
-      {widget && (
+      {/* Günün Maçları (kendi sportsbook motorumuz) */}
+      {sbEvents.length > 0 && (
         <section className="mt-8">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="flex items-center gap-2 text-lg font-extrabold"><I n="live" className="size-5 text-loss" />Canlı Maçlar</h2>
-            <Link to="/spor?page=live" className="flex items-center gap-1 text-sm font-bold text-subtle hover:text-fg">Tümü <I n="right" className="size-4" /></Link>
+            <h2 className="flex items-center gap-2 text-lg font-extrabold"><I n="ball" className="size-5 text-primary" />Günün Maçları</h2>
+            <Link to="/spor" className="flex items-center gap-1 text-sm font-bold text-subtle hover:text-fg">Tümü <I n="right" className="size-4" /></Link>
           </div>
-          <div className="overflow-hidden rounded-lg border border-line bg-card">
-            <iframe src={widget} title="Canlı Maçlar" className="h-[480px] w-full border-0" />
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {sbEvents.map((ev: any) => {
+              const m1 = (ev.markets ?? []).find((m: any) => m.key === "1x2");
+              const o = (code: string) => m1?.selections.find((s: any) => s.code === code)?.odds;
+              return (
+                <Link key={ev.id} to="/spor" className="rounded-lg border border-line bg-card p-3 transition-colors hover:border-primary/50">
+                  <div className="mb-1 text-[11px] font-bold text-subtle">{ev.league} · {new Date(ev.startsAt).toLocaleString("tr-TR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</div>
+                  <div className="truncate text-sm font-bold">{ev.home}</div>
+                  <div className="mb-2 truncate text-sm font-bold">{ev.away}</div>
+                  {m1 && (
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {[["1", "HOME"], ["X", "DRAW"], ["2", "AWAY"]].map(([lab, code]) => (
+                        <span key={code} className="rounded-md bg-field py-1.5 text-center"><span className="block text-[9px] font-extrabold text-dim">{lab}</span><span className="block text-xs font-extrabold">{o(code)?.toFixed(2) ?? "-"}</span></span>
+                      ))}
+                    </div>
+                  )}
+                </Link>
+              );
+            })}
           </div>
         </section>
       )}

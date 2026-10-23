@@ -5,10 +5,11 @@ import bcrypt from "bcryptjs";
 import { PrismaClient } from "@prisma/client";
 import { adminRoutes } from "./routes/admin.js";
 import { publicRoutes } from "./routes/public.js";
-import { platformRoutes, launchRoutes } from "./routes/sportsbook.js";
+import { sbSiteRoutes } from "./routes/sb.js";
 import { siteRoutes } from "./routes/site.js";
 import { predictionSiteRoutes } from "./routes/predictions.js";
 import { autoClose, syncFeed } from "./services/predictions.js";
+import { syncFixtures, syncOdds, syncResults } from "./services/sb.js";
 import { seedDemo } from "./services/demo.js";
 import { expireBonuses } from "./services/bonus.js";
 import { seedSiteDefaults, bustSiteCache } from "./services/sites.js";
@@ -28,9 +29,8 @@ app.get("/health", async () => ({ ok: true, time: new Date().toISOString() }));
 
 await app.register(publicRoutes, { prefix: "/api" });
 await app.register(adminRoutes, { prefix: "/admin" });
-await app.register(platformRoutes); // /wallet/* ve /webhooks/sportsbook (Betco)
-await app.register(launchRoutes, { prefix: "/api" });
 await app.register(siteRoutes, { prefix: "/api" }); // oyuncu hesabı, ödemeler, bonuslar
+await app.register(sbSiteRoutes, { prefix: "/api" }); // kendi sportsbook motorumuz (maç listesi, kupon)
 await app.register(predictionSiteRoutes, { prefix: "/api" }); // tahminler
 
 // İlk açılışta süper admin oluştur
@@ -63,6 +63,17 @@ await seedAdmin();
 setInterval(() => expireBonuses(db).catch((e) => app.log.error(e)), 5 * 60_000);
 setInterval(() => autoClose(db).catch((e) => app.log.error(e)), 60_000); // süresi dolan tahmin piyasalarını kapat
 setInterval(() => syncFeed(db).catch((e) => app.log.error(e)), 5 * 60_000); // tahmin feed senkronu (ayarlıysa)
+
+// ---- Sportsbook feed (API-Football) crons — ücretsiz plan 100 istek/gün olduğu için kota-dostu ----
+const SB_ON = () => Boolean(process.env.APISPORTS_KEY);
+// Program/skor: 30 dk'da bir (gün başına ~1 çağrı/gün sayısı)
+setInterval(() => { if (SB_ON()) syncFixtures(db).catch((e) => app.log.error(e, "sb fixtures")); }, 30 * 60_000);
+// Oranlar: 3 saatte bir, çağrı başı en fazla 15 maç
+setInterval(() => { if (SB_ON()) syncOdds(db, 15).catch((e) => app.log.error(e, "sb odds")); }, 3 * 3600_000);
+// Sonuçlandırma: 5 dk'da bir ama sadece başlamış/bitmemiş maç varsa API'ye gider (tek çağrı/20 maç)
+setInterval(() => { if (SB_ON()) syncResults(db).catch((e) => app.log.error(e, "sb results")); }, 5 * 60_000);
+// Açılışta bir kez programı çek (oranlar ve sonuçlar kendi aralıklarında)
+if (SB_ON()) setTimeout(() => syncFixtures(db).then(() => syncOdds(db, 15)).catch((e) => app.log.error(e, "sb boot sync")), 4000);
 
 // DEMO_SEED=1 ise açılışta demo veri yüklenir (zaten varsa atlar). Yükledikten sonra env'den kaldırın.
 if (process.env.DEMO_SEED === "1") seedDemo(db).then((r) => app.log.info({ demo: r }, "demo seed")).catch((e) => app.log.error(e, "demo seed failed"));

@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>SportyBet Spor</title>
+<meta name="description" content="API-Football verisiyle SportyBet spor bahis önizlemesi — gerçek maçlar, gerçek oranlar, çalışan kupon."/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --page:#17171a; --card:#1e1e22; --row:#1b1b1f; --elevated:#26262b; --elevated-h:#303037;
+  --line:#2e2e34; --fg:#f4f4f5; --muted:#a1a1aa; --dim:#71717a;
+  --primary:#ffbe7b; --primary-fg:#17171a; --win:#2fd476; --loss:#f6383a; --odds:#428dff;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--page);color:var(--fg);font-family:Manrope,system-ui,sans-serif;font-weight:600;-webkit-font-smoothing:antialiased}
+body{min-height:100vh}
+a{color:inherit;text-decoration:none}
+.wrap{max-width:1280px;margin:0 auto;padding:0 16px}
+/* top bar */
+header{position:sticky;top:0;z-index:30;background:rgba(23,23,26,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.bar{display:flex;align-items:center;gap:18px;height:60px}
+.logo{font-weight:800;font-size:22px;letter-spacing:-.5px}
+.logo b{color:var(--primary)}
+.nav{display:flex;gap:4px;margin-left:8px}
+.nav a{padding:8px 14px;border-radius:8px;font-size:14px;font-weight:700;color:var(--muted)}
+.nav a.on{background:var(--elevated);color:var(--fg)}
+.nav a:hover{color:var(--fg)}
+.spacer{flex:1}
+.bal{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:7px 12px}
+.bal .amt{font-weight:800}
+.bal .btn{background:var(--primary);color:var(--primary-fg);border:0;border-radius:7px;padding:6px 12px;font-weight:800;font-family:inherit;cursor:pointer;font-size:13px}
+.chip{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;padding:3px 8px;border-radius:5px}
+/* layout */
+.grid{display:grid;grid-template-columns:210px 1fr 340px;gap:16px;padding:16px 0 60px}
+/* sidebar */
+.side{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px;height:max-content;position:sticky;top:76px}
+.side h4{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--dim);padding:10px 10px 6px}
+.lg{display:flex;align-items:center;gap:9px;padding:9px 10px;border-radius:8px;font-size:13.5px;font-weight:700;color:var(--muted);cursor:pointer}
+.lg:hover{background:var(--elevated);color:var(--fg)}
+.lg.on{background:var(--elevated);color:var(--fg)}
+.lg .n{margin-left:auto;font-size:11px;color:var(--dim);background:var(--page);padding:1px 7px;border-radius:20px}
+.flag{width:18px;height:18px;border-radius:50%;background:var(--elevated);display:grid;place-items:center;font-size:11px}
+/* main */
+.daterow{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.daterow h1{font-size:19px;font-weight:800}
+.daterow .sub{color:var(--muted);font-size:13px;font-weight:600}
+.leaguehdr{display:flex;align-items:center;gap:8px;margin:18px 2px 8px;font-size:13px;font-weight:800;color:var(--muted)}
+.leaguehdr:first-child{margin-top:0}
+.leaguehdr .dot{width:6px;height:6px;border-radius:50%;background:var(--primary)}
+.market-key{display:grid;grid-template-columns:1fr 150px 108px;gap:8px;padding:0 14px 6px;font-size:10.5px;font-weight:800;letter-spacing:.3px;text-transform:uppercase;color:var(--dim)}
+.market-key .mk3{text-align:center}
+.market-key .mk2{text-align:center}
+.match{background:var(--card);border:1px solid var(--line);border-radius:12px;margin-bottom:8px;overflow:hidden}
+.match .top{display:grid;grid-template-columns:1fr 150px 108px;gap:8px;align-items:center;padding:12px 14px}
+.teams{min-width:0}
+.teams .time{font-size:11px;font-weight:800;color:var(--primary);margin-bottom:5px;display:flex;align-items:center;gap:6px}
+.teams .live{background:var(--loss);color:#fff;padding:1px 6px;border-radius:4px;font-size:10px}
+.teams .t{font-size:14.5px;font-weight:700;line-height:1.5}
+.grp{display:grid;gap:5px}
+.grp3{grid-template-columns:repeat(3,1fr)}
+.grp2{grid-template-columns:repeat(2,1fr)}
+.odd{background:var(--elevated);border:1px solid transparent;border-radius:8px;padding:9px 4px;cursor:pointer;text-align:center;transition:.12s;font-family:inherit}
+.odd:hover{background:var(--elevated-h)}
+.odd .lab{display:block;font-size:10px;font-weight:800;color:var(--dim);margin-bottom:3px}
+.odd .val{display:block;font-size:14px;font-weight:800;color:var(--fg)}
+.odd.sel{background:var(--primary);border-color:var(--primary)}
+.odd.sel .lab,.odd.sel .val{color:var(--primary-fg)}
+.odd.up .val{color:var(--win)} .odd.down .val{color:var(--loss)}
+.more{text-align:center;padding:8px;border-top:1px solid var(--line);font-size:12px;font-weight:700;color:var(--odds);cursor:pointer}
+.more:hover{background:var(--row)}
+/* bet slip */
+.slip{position:sticky;top:76px;height:max-content}
+.slip .box{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.slip .hd{display:flex;align-items:center;gap:8px;padding:13px 15px;border-bottom:1px solid var(--line);font-weight:800}
+.slip .hd .cnt{background:var(--primary);color:var(--primary-fg);min-width:22px;height:22px;border-radius:11px;display:grid;place-items:center;font-size:12px}
+.tabs{display:flex;gap:4px;margin-left:auto}
+.tabs button{background:var(--elevated);border:0;color:var(--muted);font-family:inherit;font-weight:700;font-size:12px;padding:5px 11px;border-radius:7px;cursor:pointer}
+.tabs button.on{background:var(--page);color:var(--fg)}
+.sel-list{max-height:none}
+.empty{padding:34px 18px;text-align:center;color:var(--dim)}
+.empty .big{font-size:40px;margin-bottom:8px}
+.sel-item{padding:12px 15px;border-bottom:1px solid var(--line);position:relative}
+.sel-item .x{position:absolute;top:10px;right:12px;color:var(--dim);cursor:pointer;font-size:16px;line-height:1}
+.sel-item .x:hover{color:var(--loss)}
+.sel-item .mkt{font-size:11px;font-weight:700;color:var(--dim)}
+.sel-item .pick{font-size:14px;font-weight:800;margin:3px 0}
+.sel-item .mt{font-size:12px;font-weight:600;color:var(--muted)}
+.sel-item .od{position:absolute;bottom:12px;right:15px;font-weight:800;color:var(--primary)}
+.foot{padding:14px 15px}
+.stake{display:flex;align-items:center;gap:8px;background:var(--elevated);border:1px solid var(--line);border-radius:9px;padding:4px 4px 4px 12px;margin-bottom:10px}
+.stake input{flex:1;background:transparent;border:0;outline:0;color:var(--fg);font-family:inherit;font-weight:800;font-size:16px;width:100%}
+.stake .cur{color:var(--muted);font-weight:800;font-size:13px}
+.quick{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:12px}
+.quick button{background:var(--elevated);border:0;color:var(--muted);font-family:inherit;font-weight:700;font-size:12px;padding:7px 0;border-radius:7px;cursor:pointer}
+.quick button:hover{background:var(--elevated-h);color:var(--fg)}
+.line{display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:5px 0;color:var(--muted)}
+.line b{color:var(--fg);font-weight:800}
+.line.big{font-size:15px;padding-top:10px;margin-top:6px;border-top:1px solid var(--line)}
+.line.big b{color:var(--win);font-size:18px}
+.place{width:100%;background:var(--primary);color:var(--primary-fg);border:0;border-radius:10px;padding:14px;font-family:inherit;font-weight:800;font-size:15px;cursor:pointer;margin-top:12px}
+.place:disabled{opacity:.4;cursor:not-allowed}
+.note{font-size:11px;color:var(--dim);text-align:center;margin-top:9px;line-height:1.5}
+.banner{background:linear-gradient(100deg,#2a2320,#17171a);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:14px;display:flex;align-items:center;gap:12px}
+.banner .ic{font-size:22px}
+.banner .tx{font-size:13px;font-weight:700}
+.banner .tx span{color:var(--primary)}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--win);color:#06331a;font-weight:800;padding:12px 22px;border-radius:10px;opacity:0;transition:.3s;z-index:50}
+.toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+@media(max-width:1000px){.grid{grid-template-columns:1fr}.side{display:none}.slip{position:fixed;inset:auto 0 0 0;top:auto;border-radius:0;z-index:40}.slip .box{border-radius:14px 14px 0 0;max-height:62vh;overflow:auto}.market-key{display:none}.match .top{grid-template-columns:1fr;gap:10px}}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap bar">
+    <div class="logo">Sporty<b>Bet</b></div>
+    <nav class="nav"><a class="on">Spor</a><a>Canlı</a><a>Tahminler</a><a>Casino</a></nav>
+    <div class="spacer"></div>
+    <div class="bal"><span class="amt" id="bal">₺2.500,00</span><button class="btn">Para Yatır</button></div>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="grid">
+    <!-- SIDEBAR -->
+    <aside class="side">
+      <h4>Futbol</h4>
+      <div class="lg on"><span class="flag">⭐</span>Popüler<span class="n">6</span></div>
+      <div class="lg"><span class="flag">🇹🇷</span>Süper Lig<span class="n">1</span></div>
+      <div class="lg"><span class="flag">🏴</span>Premier League<span class="n">1</span></div>
+      <div class="lg"><span class="flag">🇪🇸</span>La Liga<span class="n">1</span></div>
+      <div class="lg"><span class="flag">🇮🇹</span>Serie A<span class="n">1</span></div>
+      <div class="lg"><span class="flag">🇩🇪</span>Bundesliga<span class="n">1</span></div>
+      <div class="lg"><span class="flag">🇫🇷</span>Ligue 1<span class="n">1</span></div>
+      <h4 style="margin-top:6px">Diğer Sporlar</h4>
+      <div class="lg"><span class="flag">🏀</span>Basketbol<span class="n">—</span></div>
+      <div class="lg"><span class="flag">🎾</span>Tenis<span class="n">—</span></div>
+    </aside>
+
+    <!-- MAIN -->
+    <main>
+      <div class="banner"><span class="ic">⚡</span><span class="tx">Veriler <span>API-Football</span>'dan canlı geliyor — maç bitince kuponlar <span>otomatik</span> sonuçlanır.</span></div>
+      <div class="daterow"><h1>Bugünün Maçları</h1><span class="sub" id="datesub"></span></div>
+      <div class="market-key"><span></span><span class="mk3">Maç Sonucu (1 · X · 2)</span><span class="mk2">KG Var/Yok</span></div>
+      <div id="matches"></div>
+    </main>
+
+    <!-- BET SLIP -->
+    <aside class="slip">
+      <div class="box">
+        <div class="hd"><span class="cnt" id="cnt">0</span>Kupon
+          <div class="tabs"><button class="on" id="tbCombo">Kombine</button><button id="tbSingle">Tekli</button></div>
+        </div>
+        <div id="sellist"><div class="empty"><div class="big">🎟️</div>Kupon boş.<br>Oynamak için bir oran seç.</div></div>
+        <div class="foot" id="foot" style="display:none">
+          <div class="stake"><input id="stake" inputmode="decimal" value="100"/><span class="cur">₺</span></div>
+          <div class="quick"><button data-s="50">50</button><button data-s="100">100</button><button data-s="250">250</button><button data-s="500">500</button></div>
+          <div class="line"><span>Toplam Oran</span><b id="totodd">1.00</b></div>
+          <div class="line"><span>Olası Kazanç</span><b id="win">₺0,00</b></div>
+          <button class="place" id="place">Kuponu Oyna</button>
+          <div class="note">Oranlar API-Football beslemesinden; trading motoru site marjını ekler. Bakiye düşümü ve kazanç cüzdandan otomatik işlenir.</div>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>
+<div class="toast" id="toast">Kupon oynandı! ✓</div>
+
+<script>
+const MATCHES=[
+ {lg:"Süper Lig",fl:"🇹🇷",t:"20:00",h:"Alanyaspor",a:"Kocaelispor",o:{h:1.95,d:3.10,a:3.90,by:1.95,bn:1.75}},
+ {lg:"Bundesliga",fl:"🇩🇪",t:"21:30",h:"VfB Stuttgart",a:"B. Mönchengladbach",o:{h:1.36,d:5.00,a:6.50,by:1.44,bn:2.70}},
+ {lg:"Serie A",fl:"🇮🇹",t:"21:45",h:"Torino",a:"Monza",o:{h:2.10,d:3.30,a:3.30,by:1.73,bn:2.05}},
+ {lg:"Ligue 1",fl:"🇫🇷",t:"21:45",h:"Stade Brestois",a:"Nice",o:{h:2.20,d:3.25,a:3.10,by:1.57,bn:2.40}},
+ {lg:"Premier League",fl:"🏴",t:"22:00",h:"Ipswich",a:"Nottingham Forest",o:{h:3.10,d:3.30,a:2.20,by:1.57,bn:2.30}},
+ {lg:"La Liga",fl:"🇪🇸",t:"22:00",h:"Alaves",a:"Malaga",o:{h:1.70,d:3.50,a:5.00,by:1.91,bn:1.83}},
+];
+const TRY=n=>"₺"+n.toLocaleString("tr-TR",{minimumFractionDigits:2,maximumFractionDigits:2});
+let coupon=[]; let mode="combo";
+
+// bugünün tarihi
+document.getElementById("datesub").textContent=new Date().toLocaleDateString("tr-TR",{weekday:"long",day:"numeric",month:"long"})+" · "+MATCHES.length+" maç";
+
+// maçları çiz
+const box=document.getElementById("matches");
+MATCHES.forEach((m,i)=>{
+  const el=document.createElement("div");
+  el.className="match";
+  const key=i+"";
+  el.innerHTML=`
+   <div class="leaguehdr"><span class="dot"></span>${m.fl} ${m.lg}</div>
+   <div class="top">
+     <div class="teams"><div class="time">🕑 ${m.t}</div><div class="t">${m.h}</div><div class="t">${m.a}</div></div>
+     <div class="grp grp3">
+       ${odd(key,"MS","1",m.h+" kazanır",m.o.h)}
+       ${odd(key,"MS","X","Beraberlik",m.o.d)}
+       ${odd(key,"MS","2",m.a+" kazanır",m.o.a)}
+     </div>
+     <div class="grp grp2">
+       ${odd(key,"KG","Var","KG Var",m.o.by)}
+       ${odd(key,"KG","Yok","KG Yok",m.o.bn)}
+     </div>
+   </div>
+   <div class="more">+ 48 oyun (Alt/Üst, İY/MS, Handikap, Korner…)</div>`;
+  box.appendChild(el);
+});
+function odd(mi,mkt,lab,pick,val){
+  const id=mi+"_"+mkt+"_"+lab;
+  return `<button class="odd" data-id="${id}" data-mi="${mi}" data-mkt="${mkt}" data-pick="${pick}" data-val="${val}"><span class="lab">${lab}</span><span class="val">${val.toFixed(2)}</span></button>`;
+}
+
+box.addEventListener("click",e=>{
+  const b=e.target.closest(".odd"); if(!b)return;
+  const id=b.dataset.id, mi=+b.dataset.mi;
+  const ex=coupon.findIndex(c=>c.id===id);
+  if(ex>-1){coupon.splice(ex,1);}
+  else{
+    // aynı maçtan tek seçim (kombinede çakışma olmasın)
+    const same=coupon.findIndex(c=>c.mi===mi);
+    if(same>-1 && mode==="combo") coupon.splice(same,1);
+    const m=MATCHES[mi];
+    coupon.push({id,mi,match:m.h+" - "+m.a,mkt:b.dataset.mkt==="MS"?"Maç Sonucu":"KG Var/Yok",pick:b.dataset.pick,val:+b.dataset.val});
+  }
+  render();
+});
+
+function render(){
+  document.querySelectorAll(".odd").forEach(o=>o.classList.toggle("sel",coupon.some(c=>c.id===o.dataset.id)));
+  document.getElementById("cnt").textContent=coupon.length;
+  const list=document.getElementById("sellist"), foot=document.getElementById("foot");
+  if(!coupon.length){list.innerHTML='<div class="empty"><div class="big">🎟️</div>Kupon boş.<br>Oynamak için bir oran seç.</div>';foot.style.display="none";return;}
+  foot.style.display="block";
+  list.innerHTML=coupon.map(c=>`<div class="sel-item"><span class="x" data-rm="${c.id}">✕</span><div class="mkt">${c.mkt}</div><div class="pick">${c.pick}</div><div class="mt">${c.match}</div><div class="od">${c.val.toFixed(2)}</div></div>`).join("");
+  list.querySelectorAll("[data-rm]").forEach(x=>x.onclick=()=>{coupon=coupon.filter(c=>c.id!==x.dataset.rm);render();});
+  calc();
+}
+function calc(){
+  const stake=parseFloat(document.getElementById("stake").value.replace(",","."))||0;
+  let tot, win;
+  if(mode==="combo"){tot=coupon.reduce((a,c)=>a*c.val,1); win=stake*tot;}
+  else{tot=coupon.reduce((a,c)=>a+c.val,0)/ (coupon.length||1); win=coupon.reduce((a,c)=>a+stake*c.val,0);}
+  document.getElementById("totodd").textContent=tot.toFixed(2);
+  document.getElementById("win").textContent=TRY(win);
+  document.getElementById("place").textContent=mode==="combo"?`Kuponu Oyna · ${TRY(stake)}`:`${coupon.length} Tekli Oyna · ${TRY(stake*coupon.length)}`;
+}
+document.getElementById("stake").addEventListener("input",calc);
+document.querySelectorAll(".quick button").forEach(b=>b.onclick=()=>{document.getElementById("stake").value=b.dataset.s;calc();});
+document.getElementById("tbCombo").onclick=()=>setMode("combo");
+document.getElementById("tbSingle").onclick=()=>setMode("single");
+function setMode(m){mode=m;document.getElementById("tbCombo").classList.toggle("on",m==="combo");document.getElementById("tbSingle").classList.toggle("on",m==="single");calc();}
+
+document.getElementById("place").onclick=()=>{
+  const stake=parseFloat(document.getElementById("stake").value.replace(",","."))||0;
+  const cost=mode==="combo"?stake:stake*coupon.length;
+  let bal=2500; // demo bakiye
+  if(cost>bal){alert("Yetersiz bakiye");return;}
+  bal-=cost; document.getElementById("bal").textContent=TRY(bal);
+  const t=document.getElementById("toast");t.classList.add("show");setTimeout(()=>t.classList.remove("show"),2200);
+  coupon=[];render();
+};
+render();
+</script>
+</body>
+</html>

@@ -29,7 +29,7 @@ export const NAV: Group[] = [
   ] },
   { label: "Sportsbook", icon: "⚽", roles: ["ADMIN", "RISK", "SUPPORT", "FINANCE"], items: [
     { to: "/bets", label: "Spor Bahisleri" },
-    { to: "/sportsbook", label: "Betco Entegrasyonu", roles: ["ADMIN", "RISK", "FINANCE"] },
+    { to: "/sportsbook", label: "Trading (Sportsbook)", roles: ["ADMIN", "RISK", "FINANCE"] },
   ] },
   { label: "Tahminler", icon: "🔮", roles: ["ADMIN", "RISK", "CMS", "SUPPORT", "FINANCE"], items: [
     { to: "/predictions", label: "Tahmin Piyasaları", roles: ["ADMIN", "RISK", "CMS", "SUPPORT"] },

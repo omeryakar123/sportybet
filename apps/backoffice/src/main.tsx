@@ -12,7 +12,7 @@ import Bonuses from "./pages/Bonuses";
 import BonusRequests from "./pages/BonusRequests";
 import PromoCodes from "./pages/PromoCodes";
 import SportsBets from "./pages/SportsBets";
-import Sportsbook from "./pages/Sportsbook";
+import Trading from "./pages/Trading";
 import { PaymentRequests, Transactions, PaymentSystems } from "./pages/Finance";
 import { SportsbookReport, FinancialReport, BonusReport } from "./pages/Reports";
 import { Users, AuditLogs, Profile } from "./pages/Users";
@@ -43,7 +43,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         <Route path="bonus-requests" element={<BonusRequests />} />
         <Route path="promo-codes" element={<PromoCodes />} />
         <Route path="bets" element={<SportsBets />} />
-        <Route path="sportsbook" element={<Sportsbook />} />
+        <Route path="sportsbook" element={<Trading />} />
         <Route path="predictions" element={<PredictionList />} />
         <Route path="predictions/:id" element={<PredictionDetail />} />
         <Route path="prediction-positions" element={<PredictionPositions />} />
