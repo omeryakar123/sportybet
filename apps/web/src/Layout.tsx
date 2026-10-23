@@ -5,12 +5,9 @@ import { Btn, ErrBox, Field, I, inp, money, pct, useStore } from "./lib";
 
 function Logo({ className = "h-9" }: { className?: string }) {
   const { settings } = useStore();
-  if (settings.logoUrl) return <img src={settings.logoUrl} alt={settings.siteName ?? "SportyBet"} className={`${className} w-auto max-w-[220px] object-contain object-left`} draggable={false} />;
-  return (
-    <span className={`${className} flex items-center text-[22px] leading-none font-extrabold tracking-tight`}>
-      <span className="text-fg">{(settings.siteName ?? "SportyBet").replace(/bet/i, "")}</span><span className="text-primary">Bet</span>
-    </span>
-  );
+  // Şimdilik logo kullanılmıyor — yalnızca CMS'ten bir logo yüklenirse gösterilir.
+  if (settings.logoUrl) return <img src={settings.logoUrl} alt={settings.siteName ?? ""} className={`${className} w-auto max-w-[220px] object-contain object-left`} draggable={false} />;
+  return null;
 }
 
 // ---------------- Sidebar ----------------
