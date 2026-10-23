@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "prisma generate && tsc -p .",
-    "start": "prisma db push --skip-generate && node dist/index.js"
+    "start": "prisma db push --skip-generate --accept-data-loss && node dist/index.js"
   },
   "dependencies": {
     "@fastify/cors": "^10.0.1",

@@ -22,3 +22,9 @@ body { @apply bg-page font-sans text-fg antialiased; }
 .cms-content img { @apply my-4 rounded-lg; }
 .cms-content strong, .cms-content b { @apply text-fg; }
 .cms-content code { @apply rounded bg-elevated px-1 text-[13px]; }
+
+/* Sportsbook (BetWin/SportsBet harmanı) — kalın italik condensed display başlıkları */
+.font-display { font-family: "Saira Condensed", "Manrope", system-ui, sans-serif; font-style: italic; font-weight: 800; letter-spacing: -0.01em; line-height: 0.92; text-transform: uppercase; }
+.ribbon { background-image: repeating-linear-gradient(90deg, transparent 0 10px, rgba(255,255,255,.12) 10px 11px); }
+.sb-scroll::-webkit-scrollbar { height: 6px; width: 6px; }
+.sb-scroll::-webkit-scrollbar-thumb { background: #3a2563; border-radius: 10px; }
