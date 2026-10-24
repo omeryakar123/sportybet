@@ -143,26 +143,38 @@ export function CmsPromotions() {
   const load = () => api("/admin/cms/promotions").then(setList).catch(() => {});
   useEffect(() => { load(); }, []);
   const set = (k: string, v: any) => setEdit({ ...edit, [k]: v });
-  async function save() { const { id, updatedAt, ...d } = edit; await api(id ? `/admin/cms/promotions/${id}` : "/admin/cms/promotions", { method: id ? "PATCH" : "POST", json: { ...d, sortOrder: Number(d.sortOrder) } }); setEdit(null); load(); }
+  async function save() { const { id, updatedAt, siteId, ...d } = edit; await api(id ? `/admin/cms/promotions/${id}` : "/admin/cms/promotions", { method: id ? "PATCH" : "POST", json: { ...d, sortOrder: Number(d.sortOrder) || 0, startsAt: d.startsAt || null, endsAt: d.endsAt || null } }); setEdit(null); load(); }
   return (
     <>
       <Panel title="Promosyonlar" right={<button className="btn-blue" onClick={() => setEdit({ title: "", slug: "", category: "TUMU", imageUrl: "", contentHtml: "", platform: "web,mobile", showFor: "ALL", language: "tr", isPublished: true, sortOrder: 0 })}>+ Promosyon Ekle</button>}>
         <table className="tbl"><thead><tr><th>Görsel</th><th>Başlık</th><th>Kategori</th><th>Gösterim</th><th>Durum</th><th></th></tr></thead>
           <tbody>{list.map((p) => <tr key={p.id}><td>{p.imageUrl && <img src={asset(p.imageUrl)} className="h-14 w-24 rounded object-cover" />}</td><td>{p.title}</td><td>{p.category}</td><td>{p.showFor}</td><td>{p.isPublished ? "Yayında" : "Taslak"}</td>
-            <td><button className="text-bo-blue" onClick={() => setEdit(p)}>Düzenle</button></td></tr>)}</tbody></table>
+            <td><button className="text-bo-blue" onClick={() => setEdit({ ...p, startsAt: toLocal(p.startsAt), endsAt: toLocal(p.endsAt) })}>Düzenle</button></td></tr>)}</tbody></table>
       </Panel>
-      {edit && <Modal title="Promosyon" onClose={() => setEdit(null)}>
+      {edit && <Modal title="Promosyon" onClose={() => setEdit(null)} wide>
         <div className="grid grid-cols-3 gap-3">
           <Field label="Başlık"><input className="inp" value={edit.title} onChange={(e) => set("title", e.target.value)} /></Field>
-          <Field label="Slug"><input className="inp" value={edit.slug} onChange={(e) => set("slug", e.target.value)} /></Field>
-          <Field label="Kategori"><input className="inp" value={edit.category} onChange={(e) => set("category", e.target.value)} /></Field>
+          <Field label="Slug (adres)"><input className="inp" value={edit.slug} onChange={(e) => set("slug", e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-"))} /></Field>
+          <Field label="Kategori (sitedeki sekme)"><select className="inp" value={edit.category} onChange={(e) => set("category", e.target.value)}><option value="TUMU">Genel</option><option value="SPOR">Spor (mavi etiket)</option><option value="TAHMIN">Tahminler (yeşil etiket)</option><option value="OZEL">Özel Teklifler (sarı etiket)</option></select></Field>
+          <Field label="Etiket metni (boşsa kategori adı)"><input className="inp" value={edit.tag ?? ""} onChange={(e) => set("tag", e.target.value)} placeholder="ör. Çevrim Promosyonu" /></Field>
           <Field label="Kimlere göster"><select className="inp" value={edit.showFor} onChange={(e) => set("showFor", e.target.value)}><option value="ALL">Misafir + Giriş yapmış</option><option value="GUEST">Misafir</option><option value="LOGGED_IN">Giriş yapmış</option></select></Field>
-          <div className="col-span-2"><ImageField label="Görsel" value={edit.imageUrl} onChange={(v) => set("imageUrl", v)} /></div>
-          <div className="col-span-2"><Field label="İçerik (HTML)"><textarea className="inp h-72 py-1 font-mono text-xs" value={edit.contentHtml} onChange={(e) => set("contentHtml", e.target.value)} /></Field></div>
-          <div className="h-72 overflow-auto rounded border border-bo-line bg-neutral-900 p-2 text-white" dangerouslySetInnerHTML={{ __html: edit.contentHtml }} />
-          <label className="flex items-center gap-2"><input type="checkbox" checked={edit.isPublished} onChange={(e) => set("isPublished", e.target.checked)} />Yayında</label>
+          <Field label="Sıra"><input className="inp" type="number" value={edit.sortOrder} onChange={(e) => set("sortOrder", e.target.value)} /></Field>
+          <Field label="Başlangıç"><input className="inp" type="datetime-local" value={edit.startsAt ?? ""} onChange={(e) => set("startsAt", e.target.value)} /></Field>
+          <Field label="Bitiş (kartta gösterilir)"><input className="inp" type="datetime-local" value={edit.endsAt ?? ""} onChange={(e) => set("endsAt", e.target.value)} /></Field>
+          <div className="flex flex-col justify-end gap-2 pb-1">
+            <label className="flex items-center gap-2"><input type="checkbox" checked={!!edit.featured} onChange={(e) => set("featured", e.target.checked)} />Öne çıkan (listenin en üstünde büyük kart)</label>
+            <label className="flex items-center gap-2"><input type="checkbox" checked={edit.isPublished} onChange={(e) => set("isPublished", e.target.checked)} />Yayında</label>
+          </div>
+          <div className="col-span-3"><ImageField label="Görsel (kart 344×180, detay üstte)" value={edit.imageUrl} onChange={(v) => set("imageUrl", v)} /></div>
+          <div className="col-span-3"><Field label="Kısa açıklama (öne çıkan kartta)"><textarea className="inp h-16 py-1" value={edit.excerpt ?? ""} onChange={(e) => set("excerpt", e.target.value)} /></Field></div>
+          {([["contentHtml", "İçerik (HTML)"], ["howToHtml", "Nasıl Katılırım (HTML, akordeon)"], ["termsHtml", "Şartlar ve Koşullar (HTML, akordeon)"]] as const).map(([k, l]) => (
+            <div key={k} className="col-span-3 grid grid-cols-2 gap-3">
+              <Field label={l}><textarea className="inp h-48 py-1 font-mono text-xs" value={edit[k] ?? ""} onChange={(e) => set(k, e.target.value)} /></Field>
+              <Field label="Önizleme"><div className="h-48 overflow-auto rounded bg-[#080d13] p-3 text-sm text-[#818e9d] [&_b]:text-white [&_h2]:text-lg [&_h2]:font-bold [&_h2]:text-white [&_h3]:font-bold [&_h3]:text-white [&_li]:ml-4 [&_li]:list-disc" dangerouslySetInnerHTML={{ __html: edit[k] ?? "" }} /></Field>
+            </div>
+          ))}
         </div>
-        <div className="mt-5 flex justify-end"><button className="btn-blue" onClick={save}>Kaydet</button></div>
+        <div className="mt-5 flex justify-end gap-2"><button className="btn-ghost" onClick={() => setEdit(null)}>Vazgeç</button><button className="btn-blue" onClick={save}>Kaydet</button></div>
       </Modal>}
     </>
   );
@@ -354,5 +366,43 @@ export function CmsHome() {
       </div>
       <Err e={e} />
     </>
+  );
+}
+
+/* =====================================================================
+ * Ödül seviyeleri (ayar: vip_levels) — sitedeki Ödüller sayfası ve kullanıcı menüsü bunu kullanır.
+ * xp = oyuncunun toplam oynadığı tutar (spor + tahmin, ₺)
+ * ===================================================================== */
+const VIP_DEFAULT: { name: string; xp: number; reward?: string }[] = [
+  ["Bronz 1", 0], ["Bronz 2", 2500], ["Bronz 3", 10000], ["Gümüş 1", 25000], ["Gümüş 2", 50000], ["Gümüş 3", 100000],
+  ["Altın 1", 200000], ["Altın 2", 350000], ["Altın 3", 500000], ["Zümrüt 1", 750000], ["Zümrüt 2", 1000000], ["Zümrüt 3", 1500000],
+  ["Safir 1", 2000000], ["Safir 2", 3000000], ["Safir 3", 4000000], ["Yakut 1", 5000000], ["Yakut 2", 7500000], ["Yakut 3", 10000000],
+  ["Elmas 1", 15000000], ["Elmas 2", 20000000], ["Elmas 3", 30000000], ["Opal 1", 50000000], ["Opal 2", 75000000], ["Opal 3", 100000000],
+].map(([name, xp]) => ({ name: name as string, xp: xp as number }));
+
+export function CmsVip() {
+  const [rows, setRows] = useState<any[] | null>(null); const [msg, setMsg] = useState(""); const [e, setE] = useState("");
+  useEffect(() => { api("/admin/cms/settings/vip_levels").then((r) => setRows(Array.isArray(r?.value?.levels) && r.value.levels.length ? r.value.levels : VIP_DEFAULT)).catch(() => setRows(VIP_DEFAULT)); }, []);
+  if (!rows) return <Panel title="Ödül Seviyeleri">Yükleniyor…</Panel>;
+  const set = (i: number, k: string, v: any) => setRows(rows.map((r, j) => (j === i ? { ...r, [k]: v } : r)));
+  async function save() {
+    setE("");
+    const clean = rows.filter((r) => r.name?.trim()).map((r) => ({ name: r.name.trim(), xp: Number(r.xp) || 0, ...(r.reward ? { reward: r.reward } : {}) }));
+    for (let i = 1; i < clean.length; i++) if (clean[i].xp <= clean[i - 1].xp) return setE(`"${clean[i].name}" hedefi bir önceki seviyeden büyük olmalı`);
+    try { await api("/admin/cms/settings/vip_levels", { method: "PUT", json: { levels: clean } }); setMsg("Yayınlandı ✓"); setTimeout(() => setMsg(""), 2500); } catch (x: any) { setE(x.message); }
+  }
+  return (
+    <Panel title="Ödül Seviyeleri" right={<div className="flex items-center gap-3"><span className="text-bo-green">{msg}</span><button className="btn-ghost" onClick={() => setRows([...rows, { name: "", xp: (rows.at(-1)?.xp ?? 0) * 2 || 1000 }])}>+ Seviye</button><button className="btn-blue" onClick={save}>Yayınla</button></div>}>
+      <p className="mb-3 text-bo-muted">Oyuncunun seviyesi toplam oynadığı tutara (spor kuponları + tahmin alımları) göre hesaplanır. İsim ilk kelimesi renk ailesini belirler: Bronz, Gümüş, Altın, Zümrüt, Safir, Yakut, Elmas, Opal.</p>
+      <table className="tbl"><thead><tr><th>#</th><th>Seviye adı</th><th>Hedef (toplam oynanan ₺)</th><th>Kart etiketi (isteğe bağlı)</th><th></th></tr></thead>
+        <tbody>{rows.map((r, i) => <tr key={i}>
+          <td>{i + 1}</td>
+          <td><input className="inp w-48" value={r.name} onChange={(e) => set(i, "name", e.target.value)} /></td>
+          <td><input className="inp w-48" type="number" min={0} value={r.xp} onChange={(e) => set(i, "xp", e.target.value)} /></td>
+          <td><input className="inp w-56" value={r.reward ?? ""} onChange={(e) => set(i, "reward", e.target.value)} placeholder="ör. ₺100 bonus" /></td>
+          <td><button className="text-bo-red" onClick={() => setRows(rows.filter((_, j) => j !== i))}>Sil</button></td>
+        </tr>)}</tbody></table>
+      <Err e={e} />
+    </Panel>
   );
 }

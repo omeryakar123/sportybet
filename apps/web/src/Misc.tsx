@@ -1,72 +1,105 @@
-import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
-import { api } from "./api";
-import { Btn, Empty, ErrBox, I, Spinner, inp, money, useStore } from "./lib";
+import { useEffect, useRef, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { api, asset } from "./api";
+import { Accordion, Pager, PageTitle, Pill, Progress, SearchBox, Tabs } from "./g";
+import { Btn, Empty, ErrBox, I, Spinner, inp, money, scrollMain, useStore } from "./lib";
 import { BannerSlot } from "./CmsSlot";
 
-// ---------- Promosyonlar ----------
+// ---------- Promosyonlar (gamdom /promotions) ----------
+const PROMO_CATS: [string, string][] = [["", "Tümü"], ["SPOR", "Spor"], ["TAHMIN", "Tahminler"], ["OZEL", "Özel Teklifler"]];
+const CAT_COLOR: Record<string, string> = { SPOR: "#279aff", TAHMIN: "#00ff86", OZEL: "#ffd900" };
+const fmtDate = (d?: string | null) => (d ? new Date(d).toLocaleString("tr-TR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "");
+const promoTag = (p: any) => p.tag || (PROMO_CATS.find(([k]) => k === p.category && k)?.[1] ?? "");
+
+/** Promosyon kartı: #0f1d28 r16 — üstte etiket + 18/700 başlık + bitiş, altta 180px görsel */
+export function PromoCard({ p }: { p: any }) {
+  const tag = promoTag(p);
+  return (
+    <Link to={`/promosyonlar/${p.slug}`} className="lift flex flex-col overflow-hidden rounded-2xl bg-card-blue">
+      <div className="flex flex-1 flex-col justify-end gap-2 px-4 pt-4 pb-4">
+        {tag && <span><Pill color={CAT_COLOR[p.category] ?? "#00ff86"}>{tag}</Pill></span>}
+        <h2 className="line-clamp-2 text-[18px] font-bold leading-[20px] text-fg">{p.title}</h2>
+        {p.endsAt && <div className="text-[13px] font-medium text-subtle">Bitiş: {fmtDate(p.endsAt)}</div>}
+      </div>
+      <div className="h-[180px] shrink-0 bg-card">{p.imageUrl && <img src={asset(p.imageUrl)} alt="" loading="lazy" className="size-full object-cover" />}</div>
+    </Link>
+  );
+}
+
 export function Promotions() {
-  const { me, setAuthOpen, refreshMe } = useStore();
   const [list, setList] = useState<any[] | null>(null);
-  const [q, setQ] = useState(""); const [code, setCode] = useState("");
-  const [msg, setMsg] = useState(""); const [err, setErr] = useState("");
-  useEffect(() => { api("/api/cms/promotions").then(setList).catch(() => setList([])); }, []);
-  async function redeem() {
-    if (!me) return setAuthOpen(true);
-    setMsg(""); setErr("");
-    try { const r = await api("/api/promo/redeem", { method: "POST", json: { code } }); setMsg(`Kod kullanıldı! ${money(r.amount)} bonus hesabına yüklendi.`); setCode(""); refreshMe(); } catch (x: any) { setErr(x.message); }
-  }
-  const shown = (list ?? []).filter((p) => !q || p.title.toLowerCase().includes(q.toLowerCase()));
+  const [q, setQ] = useState(""); const [cat, setCat] = useState(""); const [page, setPage] = useState(1);
+  useEffect(() => { api("/api/cms/promotions").then((r) => setList(Array.isArray(r) ? r : [])).catch(() => setList([])); }, []);
+  useEffect(() => setPage(1), [q, cat]);
+  const all = (list ?? []).filter((p) => !p.endsAt || new Date(p.endsAt) > new Date());
+  const featured = all.find((p) => p.featured);
+  const shown = all.filter((p) => p !== featured && (!cat || p.category === cat) && (!q || p.title.toLowerCase().includes(q.toLowerCase())));
+  const PER = 12, pages = Math.max(1, Math.ceil(shown.length / PER));
   return (
     <div className="animate-sports-fade">
-      <BannerSlot group="promotions-top" className="mb-3" />
-      <section className="relative overflow-hidden rounded-lg bg-[linear-gradient(160deg,#0f231c,#0f1923_70%)] px-6 py-10 text-center">
-        <div className="absolute top-0 left-1/2 -z-0 h-40 w-[420px] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(0,255,134,0.3),transparent)] blur-2xl" />
-        <h1 className="relative text-3xl font-extrabold text-primary">Promosyonlar</h1>
-        <p className="relative mt-1 text-sm font-bold text-muted">Fırsatları kaçırma, kazancını büyüt</p>
-        <div className="relative mx-auto mt-6 grid size-24 rotate-[-8deg] animate-float place-items-center rounded-xl bg-primary text-sm font-extrabold tracking-widest text-primary-fg shadow-[0_20px_50px_rgba(0,255,134,.25)]">BONUS</div>
-      </section>
-      <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-        <label className="flex h-[46px] flex-1 items-center gap-2 rounded-[5px] border border-line-strong bg-field px-3 focus-within:border-primary">
-          <I n="search" className="size-4 text-subtle" />
-          <input className="w-full bg-transparent text-sm font-medium outline-none placeholder:text-subtle" placeholder="Promosyon ara" value={q} onChange={(e) => setQ(e.target.value)} />
-        </label>
-        <div className="flex gap-2">
-          <input aria-label="Promosyon kodu" className={inp + " w-48 uppercase sm:w-56"} placeholder="Promosyon kodunu gir" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} />
-          <Btn className="!h-[46px] shrink-0" disabled={code.length < 3} onClick={redeem}>Kodu al</Btn>
-        </div>
-      </div>
-      <div className="mt-3 space-y-2">{msg && <div className="rounded-md border border-win/30 bg-win/10 px-3 py-2.5 text-sm font-bold text-win">{msg}</div>}<ErrBox e={err} /></div>
-      <h2 className="mt-6 mb-3 text-lg font-extrabold">Promosyonlar</h2>
-      {!list ? <Spinner /> : shown.length === 0 ? <Empty text="Şu an açık promosyon yok. Yakında yenileri gelecek." /> : (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {shown.map((p) => (
-            <Link key={p.id} to={`/promosyonlar/${p.slug}`} className="group overflow-hidden rounded-lg border border-line bg-card transition-all hover:-translate-y-px hover:bg-surface-hover">
-              {p.imageUrl && <img src={p.imageUrl} alt="" className="aspect-[2/1] w-full object-cover" />}
-              <div className="flex items-center justify-between gap-2 p-4">
-                <span className="text-sm font-extrabold">{p.title}</span>
-                <I n="right" className="size-4 shrink-0 text-muted transition-transform group-hover:translate-x-0.5" />
-              </div>
-            </Link>
-          ))}
+      <PageTitle>Promosyonlar</PageTitle>
+      <BannerSlot group="promotions-top" className="mb-4" />
+      {featured && (
+        <Link to={`/promosyonlar/${featured.slug}`} className="mb-4 grid overflow-hidden rounded-2xl bg-white/[.03] md:grid-cols-[1.1fr_1fr]">
+          <div className="h-[180px] md:order-2 md:h-full md:min-h-[300px]">{featured.imageUrl && <img src={asset(featured.imageUrl)} alt="" className="size-full rounded-2xl object-cover" />}</div>
+          <div className="flex flex-col justify-center px-4 py-5 md:px-8">
+            <span className="text-[13px] font-medium text-subtle">{new Date(featured.startsAt ?? featured.updatedAt).toLocaleDateString("tr-TR")}</span>
+            <h2 className="mt-4 text-[24px] font-bold leading-[30px] text-fg">{featured.title}</h2>
+            {featured.excerpt && <p className="mt-3 line-clamp-2 text-[13px] font-medium text-subtle">{featured.excerpt}</p>}
+            <span className="btn btn-primary mt-3 h-9 rounded-lg md:w-fit md:px-6">Devamını oku</span>
+          </div>
+        </Link>
+      )}
+      <Tabs tabs={PROMO_CATS} value={cat} onChange={setCat} />
+      <SearchBox className="mt-3" value={q} onChange={setQ} placeholder={`${all.length} promosyonda ara`} />
+      {!list ? <Spinner /> : shown.length === 0 ? <div className="mt-4"><Empty text="Bu filtrede promosyon yok." /></div> : (
+        <div className="mt-4 grid gap-[10px] sm:grid-cols-2 xl:grid-cols-3">
+          {shown.slice((page - 1) * PER, page * PER).map((p) => <PromoCard key={p.id} p={p} />)}
         </div>
       )}
+      <Pager page={page} pages={pages} onChange={(n) => { setPage(n); scrollMain(0); }} />
     </div>
   );
 }
 
 export function PromotionDetail() {
   const { slug } = useParams();
-  const [p, setP] = useState<any>(null); const [missing, setMissing] = useState(false);
-  useEffect(() => { api(`/api/cms/promotions/${slug}`).then((r) => (r ? setP(r) : setMissing(true))).catch(() => setMissing(true)); }, [slug]);
+  const nav = useNavigate();
+  const [p, setP] = useState<any>(null); const [missing, setMissing] = useState(false); const [more, setMore] = useState<any[]>([]); const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    setP(null); setMissing(false); scrollMain(0);
+    api(`/api/cms/promotions/${slug}`).then((r) => (r ? setP(r) : setMissing(true))).catch(() => setMissing(true));
+    api("/api/cms/promotions").then((r) => setMore((Array.isArray(r) ? r : []).filter((x: any) => x.slug !== slug && (!x.endsAt || new Date(x.endsAt) > new Date())).slice(0, 6))).catch(() => {});
+  }, [slug]);
   if (missing) return <Empty text="Promosyon bulunamadı." />;
   if (!p) return <Spinner />;
+  const url = typeof location !== "undefined" ? location.href : "";
   return (
-    <article className="animate-sports-fade mx-auto max-w-3xl">
-      <Link to="/promosyonlar" className="mb-4 inline-flex items-center gap-1.5 text-sm font-bold text-subtle hover:text-fg"><I n="left" className="size-4" />Promosyonlar</Link>
-      {p.imageUrl && <img src={p.imageUrl} alt="" className="mb-5 w-full rounded-lg" />}
-      <h1 className="text-2xl font-extrabold">{p.title}</h1>
-      <div className="cms-content mt-2" dangerouslySetInnerHTML={{ __html: p.contentHtml }} />
+    <article className="animate-sports-fade mx-auto max-w-[900px]">
+      <button onClick={() => (history.length > 1 ? nav(-1) : nav("/promosyonlar"))} aria-label="Geri" className="mb-3 grid size-11 place-items-center rounded-full bg-card text-white hover:bg-card-2"><I n="left" className="size-6" /></button>
+      {p.imageUrl && <div className="overflow-hidden rounded-2xl"><img src={asset(p.imageUrl)} alt="" className="max-h-[360px] w-full object-cover" /></div>}
+      <div className="mt-[14px] flex flex-wrap items-end gap-4">
+        <div className="flex-1">
+          <p className="text-[16px] font-bold text-fg">{p.endsAt ? "Bitiş" : "Başlangıç"}</p>
+          <div className="mt-1.5 text-[13px] font-medium text-subtle">{p.endsAt ? fmtDate(p.endsAt) : fmtDate(p.startsAt ?? p.updatedAt)}</div>
+        </div>
+        <div className="flex gap-2">
+          <a href={`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(p.title)}`} target="_blank" rel="noreferrer" aria-label="Telegram'da paylaş" className="grid size-9 place-items-center rounded-[10px] bg-card text-white hover:bg-card-2"><I n="send" className="size-4" /></a>
+          <button onClick={() => { navigator.clipboard?.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 1500); }} aria-label="Bağlantıyı kopyala" className="grid size-9 place-items-center rounded-[10px] bg-card text-white hover:bg-card-2"><I n={copied ? "check" : "copy"} className="size-4" /></button>
+        </div>
+      </div>
+      <h1 className="mt-9 text-[18px] font-bold text-fg">{p.title}</h1>
+      <div className="cms-content promo-text mt-4" dangerouslySetInnerHTML={{ __html: p.contentHtml }} />
+      <div className="mt-4 space-y-4">
+        {p.howToHtml && <Accordion title="Nasıl Katılırım"><div className="cms-content promo-text" dangerouslySetInnerHTML={{ __html: p.howToHtml }} /></Accordion>}
+        {p.termsHtml && <Accordion title="Şartlar ve Koşullar"><div className="cms-content promo-text" dangerouslySetInnerHTML={{ __html: p.termsHtml }} /></Accordion>}
+      </div>
+      {more.length > 0 && (
+        <>
+          <h2 className="h-sec mt-8 mb-4">Diğer Promosyonlar</h2>
+          <div className="grid gap-[10px] sm:grid-cols-2 xl:grid-cols-3">{more.map((x) => <PromoCard key={x.id} p={x} />)}</div>
+        </>
+      )}
     </article>
   );
 }
@@ -79,81 +112,139 @@ export function StaticPage() {
   if (missing) return <Empty text="Sayfa bulunamadı." />;
   if (!p) return <Spinner />;
   return (
-    <article className="animate-sports-fade mx-auto max-w-3xl">
-      <h1 className="text-2xl font-extrabold">{p.title}</h1>
-      <div className="cms-content mt-2" dangerouslySetInnerHTML={{ __html: p.contentHtml }} />
+    <article className="animate-sports-fade mx-auto max-w-[900px]">
+      <PageTitle>{p.title}</PageTitle>
+      <div className="cms-content promo-text rounded-2xl bg-panel p-5 sm:p-6" dangerouslySetInnerHTML={{ __html: p.contentHtml }} />
     </article>
   );
 }
 
-// ---------- VIP ----------
-export function Vip() {
-  const LEVELS = [["BRONZ I", "5.000₺", "25₺"], ["BRONZ II", "15.000₺", "75₺"], ["BRONZ III", "40.000₺", "200₺"], ["BRONZ IV", "100.000₺", "500₺"], ["BRONZ V", "250.000₺", "1.250₺"]];
-  const [lvl, setLvl] = useState(0);
-  const FAQ = [
-    ["VIP Kulübü nedir?", "Düzenli oyuncularımız için hazırladığımız sadakat programıdır. Ana seviyeler ve alt seviyelerden oluşur; yükseldikçe bonusların ve ayrıcalıkların artar."],
-    ["Seviyem nasıl hesaplanıyor?", "Spor ve tahminlerde oynadığın her işlemin tutarı VIP hacmine anında yansır. Hacmin hedefe ulaştığında bir sonraki seviyeye otomatik geçersin."],
-    ["Seviye atlama bonusu ne zaman yatar?", "Her yeni seviyede seviye atlama bonusun hesabına otomatik yatar; başvuru gerekmez."],
-    ["Seviyem düşer mi?", "Hayır, ulaştığın seviye sende kalır."],
-  ];
-  const [open, setOpen] = useState(0);
+// ---------- Ödüller (gamdom /rewards): alınabilir bonuslar + seviye ilerlemesi + seviye kartları ----------
+const TIER: Record<string, [string, string]> = {
+  Bronz: ["#f0a46a", "#9a5426"], Gümüş: ["#eef2f7", "#8d99aa"], Altın: ["#ffe27a", "#d08a12"], Zümrüt: ["#6dffb7", "#0c9e5c"],
+  Safir: ["#7fb6ff", "#1f55d8"], Yakut: ["#ff8a9c", "#c4153a"], Elmas: ["#d6fbff", "#4cc9e6"], Opal: ["#f3c8ff", "#8a4fd8"],
+};
+const tierOf = (name: string) => TIER[name.split(" ")[0]] ?? ["#cfd6df", "#6b7785"];
+/** Seviye rozeti: renkli taş (kendi çizimimiz) */
+export function LevelGem({ name, size = 125, dim }: { name: string; size?: number; dim?: boolean }) {
+  const [a, b] = tierOf(name); const id = "g" + name.replace(/\W/g, "");
+  const n = Number(name.split(" ")[1]) || 1;
   return (
-    <div className="animate-sports-fade">
-      <section className="grid items-center gap-8 overflow-hidden rounded-lg bg-[linear-gradient(115deg,#0b1a17,#10291f_60%,#080d13)] p-8 lg:grid-cols-2 lg:p-12">
-        <div>
-          <span className="inline-flex items-center gap-2 rounded-sm bg-black/30 px-2.5 py-1 text-[12px] font-extrabold text-primary"><I n="crown" className="size-3.5" />VIP Kulübü <span className="rounded-sm bg-primary px-1.5 text-primary-fg">Yakında</span></span>
-          <h1 className="mt-4 text-3xl leading-tight font-extrabold lg:text-4xl">Oyna, seviyeni yükselt, ayrıcalıkları topla</h1>
-          <p className="mt-3 max-w-md text-[15px] font-medium text-muted">VIP Kulübü çok yakında açılıyor. Aldığın her tahmin ve kupon şimdiden hacmine sayılıyor; açılışta seviyene yerleşirsin.</p>
-          <div className="mt-6 flex gap-3">
-            <Link to="/tahminler" className="btn btn-primary px-6">Tahmin yap</Link>
-            <a href="#seviyeler" className="btn btn-secondary px-6">Seviyeleri gör</a>
+    <svg viewBox="0 0 100 100" width={size} height={size} className={dim ? "opacity-40 grayscale-[.6]" : ""} aria-hidden>
+      <defs><linearGradient id={id} x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor={a} /><stop offset="1" stopColor={b} /></linearGradient>
+        <radialGradient id={id + "h"} cx="50%" cy="50%" r="50%"><stop offset="0" stopColor={a} stopOpacity=".55" /><stop offset="1" stopColor={a} stopOpacity="0" /></radialGradient></defs>
+      <circle cx="50" cy="52" r="46" fill={`url(#${id}h)`} />
+      <polygon points="50,10 84,32 84,68 50,90 16,68 16,32" fill={`url(#${id})`} />
+      <polygon points="50,10 84,32 50,44 16,32" fill="#fff" opacity=".35" />
+      <polygon points="50,44 84,32 84,68 50,90" fill="#000" opacity=".14" />
+      {Array.from({ length: n }).map((_, i) => <circle key={i} cx={50 + (i - (n - 1) / 2) * 11} cy="62" r="4" fill="#fff" opacity=".9" />)}
+    </svg>
+  );
+}
+
+export function Rewards() {
+  const { me, setAuthOpen, setWalletOpen } = useStore();
+  const [st, setSt] = useState<any>(null); const [avail, setAvail] = useState<any[] | null>(null); const [msg, setMsg] = useState(""); const [err, setErr] = useState("");
+  const load = () => { if (!me) return; api("/api/me/stats").then(setSt).catch(() => {}); api("/api/bonuses/available").then((r) => setAvail(Array.isArray(r) ? r : [])).catch(() => setAvail([])); };
+  useEffect(load, [me?.id]);
+  async function request(id: number) {
+    setErr(""); setMsg("");
+    try { await api(`/api/bonuses/${id}/request`, { method: "POST", json: {} }); setMsg("Talebin alındı, onaylanınca bonus hesabına yüklenecek."); load(); } catch (x: any) { setErr(x.message); }
+  }
+  const levels: any[] = st?.levels ?? [];
+  const cur = st?.level ?? -1; const nextL = st?.nextLevel != null ? levels[st.nextLevel] : null;
+  return (
+    <div className="animate-sports-fade relative isolate">
+      {/* gamdom ödül sayfası arka ışığı */}
+      <div aria-hidden className="pointer-events-none absolute -top-24 left-1/2 -z-10 h-[420px] w-[min(1100px,140vw)] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(0,255,134,.22),transparent)] blur-2xl" />
+      <PageTitle>Ödüller</PageTitle>
+      {!me ? (
+        <div className="rounded-2xl bg-[rgba(8,13,19,.6)] p-8 text-center backdrop-blur">
+          <p className="text-[20px] font-bold">Ödüllerini görmek için giriş yap</p>
+          <p className="mt-2 text-[14px] font-medium text-subtle">Oynadıkça seviyen yükselir, sana özel bonuslar burada açılır.</p>
+          <button onClick={() => setAuthOpen(true)} className="btn btn-primary mt-5 px-8">Giriş yap</button>
+        </div>
+      ) : (
+        <>
+          <div className="no-scrollbar -mx-3 flex snap-x gap-0.5 overflow-x-auto px-3 sm:mx-0 sm:px-0">
+            {(avail ?? []).length === 0 && avail && (
+              <article className="w-full rounded-2xl bg-[rgba(8,13,19,.6)] p-5 backdrop-blur">
+                <h3 className="text-[20px] font-bold">Şu an alınabilir ödül yok</h3>
+                <p className="mt-2 text-[14px] font-medium text-subtle">Yeni bonuslar açıldığında burada görünecek. Promosyon kodun varsa Cüzdan › Kod Kullan'dan girebilirsin.</p>
+                <button onClick={() => setWalletOpen("promo")} className="btn btn-secondary mt-4 w-full">Kod kullan</button>
+              </article>
+            )}
+            {(avail ?? []).map((b, i, arr) => (
+              <article key={b.id} className={`flex w-[344px] shrink-0 snap-start flex-col bg-[rgba(8,13,19,.6)] p-5 backdrop-blur ${i === 0 ? "rounded-l-2xl" : ""} ${i === arr.length - 1 ? "rounded-r-2xl" : ""}`}>
+                <div className="flex items-start gap-3">
+                  <h3 className="line-clamp-2 min-h-12 flex-1 text-[20px] font-bold leading-6">{b.name}</h3>
+                  {b.expirationDays && <p className="flex h-9 shrink-0 items-center gap-1.5 rounded-[10px] bg-white/[.05] px-2 text-[14px] font-bold"><I n="clock" className="size-5" />{b.expirationDays} g</p>}
+                </div>
+                <div className="my-4 grid h-[150px] place-items-center"><svg viewBox="0 0 120 120" className="h-full" aria-hidden><defs><linearGradient id={"bx" + b.id} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#4dffa8" /><stop offset="1" stopColor="#00a85a" /></linearGradient></defs><ellipse cx="60" cy="104" rx="40" ry="8" fill="#000" opacity=".35" /><rect x="22" y="48" width="76" height="54" rx="8" fill={`url(#bx${b.id})`} /><rect x="16" y="36" width="88" height="20" rx="6" fill="#7dffc0" /><rect x="54" y="36" width="12" height="66" fill="#ffd900" /><path d="M60 36c-8-18-30-16-24-4 4 8 24 4 24 4zm0 0c8-18 30-16 24-4-4 8-24 4-24 4z" fill="#ffd900" /></svg></div>
+                <p className="mb-3 line-clamp-2 text-[13px] font-medium text-subtle">{b.description || (b.depositBonus ? `Yatırımına %${Number(b.percent)} bonus` : `Çevrim x${Number(b.wageringMultiplier)}`)}</p>
+                {b.depositBonus ? <Link to={`/para-yatir?bonus=${b.id}`} className="btn btn-primary w-full">Yatırım yap</Link>
+                  : b.requested ? <button disabled className="btn w-full bg-card text-[#45515c]">Talep beklemede</button>
+                  : <button onClick={() => request(b.id)} className="btn btn-primary w-full">Talep et</button>}
+              </article>
+            ))}
           </div>
-        </div>
-        <div className="relative hidden h-[260px] place-items-center lg:grid">
-          <div className="absolute top-0 h-40 w-72 rounded-full bg-[radial-gradient(closest-side,rgba(0,255,134,.35),transparent)] blur-2xl" />
-          <svg viewBox="0 0 120 150" className="relative h-56 animate-float"><polygon points="60,8 108,56 60,142 12,56" fill="#00ff86" /><polygon points="60,8 108,56 60,56" fill="#9cf7c9" /><polygon points="12,56 60,56 60,142" fill="#00c766" /><rect x="20" y="140" width="80" height="8" rx="4" fill="#19212a" /></svg>
-          <span className="absolute top-3 rounded-md bg-elevated px-3 py-1 text-xs font-extrabold">Bronz</span>
-        </div>
-      </section>
-      <div id="seviyeler" className="mt-8 flex justify-center gap-1 border-b border-line">
-        {LEVELS.map(([name], i) => (
-          <button key={name} onClick={() => setLvl(i)} className={`border-b-2 px-4 py-3 text-xs font-semibold transition-colors sm:text-sm ${lvl === i ? "border-primary text-fg" : "border-transparent text-subtle hover:text-fg"}`}>{name}</button>
-        ))}
-      </div>
-      <div className="mt-5 grid items-center gap-6 rounded-lg border border-line bg-card p-6 sm:grid-cols-[auto_1fr_1fr]">
-        <div className="text-center">
-          <svg viewBox="0 0 120 150" className="mx-auto h-24"><polygon points="60,8 108,56 60,142 12,56" fill="#00ff86" opacity={0.5 + lvl * 0.12} /><polygon points="60,8 108,56 60,56" fill="#9cf7c9" opacity={0.6 + lvl * 0.1} /></svg>
-          <div className="mt-2 text-sm font-extrabold">{LEVELS[lvl][0]}</div>
-        </div>
-        <div><div className="text-[12px] font-semibold text-dim">Gereken Hacim</div><div className="mt-1 text-2xl font-extrabold">{LEVELS[lvl][1]}</div>
-          <div className="mt-3 text-[12px] font-semibold text-dim">Ayrıcalıklar</div>
-          <div className="mt-1 space-y-1 text-sm font-semibold text-muted"><div className="flex items-center gap-2"><I n="check" className="size-4 text-win" />Anlık Komisyon</div><div className="flex items-center gap-2"><I n="check" className="size-4 text-win" />Özel Sohbet Odası</div></div>
-        </div>
-        <div><div className="text-[12px] font-semibold text-dim">Seviye Atlama Bonusu</div><div className="mt-1 text-2xl font-extrabold text-primary">{LEVELS[lvl][2]}</div>
-          <div className="mt-3 text-[12px] font-semibold text-dim">Kilidi açmak için yüksel</div>
-          <div className="mt-1 space-y-1 text-sm font-semibold text-subtle">{["Doğum günü bonusu", "Öncelikli çekim", "Kişisel VIP asistanı"].map((t) => <div key={t} className="flex items-center gap-2"><I n="lock" className="size-4" />{t}</div>)}</div>
-        </div>
-      </div>
-      <h2 className="mt-10 text-center text-2xl font-extrabold">Nasıl Yükselirsin?</h2>
-      <div className="mt-5 grid gap-4 sm:grid-cols-3">
-        {[["trophy", "Oyna, hacim biriktir", "Tahminlerde ve sporda oynadığın her işlemin tutarı VIP hacmine anında yansır."], ["crown", "Seviyeni yükselt", "Hacmin hedefe ulaştığında bir sonraki seviyeye otomatik geçersin, başvuru gerekmez."], ["gift", "Ödüllerini topla", "Her yeni seviyede seviye atlama bonusun hesabına otomatik yatar, ayrıcalıkların artar."]].map(([ic, t, d], i) => (
-          <div key={t} className="rounded-lg border border-line bg-card p-6">
-            <span className="grid size-14 place-items-center rounded-full bg-elevated text-primary"><I n={ic} className="size-6" /></span>
-            <div className="mt-4 text-[12px] font-semibold text-primary">Adım {["I", "II", "III"][i]}</div>
-            <div className="mt-1 text-base font-extrabold">{t}</div>
-            <p className="mt-1.5 text-sm font-medium text-subtle">{d}</p>
-          </div>
-        ))}
-      </div>
-      <h2 className="mt-10 text-center text-xl font-extrabold">Sıkça Sorulan Sorular</h2>
-      <div className="mx-auto mt-4 max-w-2xl border-l-2 border-primary/50">
-        {FAQ.map(([q, a], i) => (
-          <div key={q} className="border-b border-line">
-            <button onClick={() => setOpen(open === i ? -1 : i)} className="flex w-full cursor-pointer items-center justify-between px-4 py-3.5 text-left text-sm font-bold hover:text-primary">{q}<I n={open === i ? "up" : "down"} className="size-4 text-subtle" /></button>
-            {open === i && <p className="animate-slip-item px-4 pb-4 text-sm font-medium text-muted">{a}</p>}
-          </div>
-        ))}
-      </div>
+          <div className="mt-3 space-y-2">{msg && <div className="rounded-[10px] bg-primary/10 px-3 py-2.5 text-sm font-bold text-primary">{msg}</div>}<ErrBox e={err} /></div>
+
+          {st && (
+            <section className="mt-6">
+              <div className="flex items-center gap-2 text-[14px] font-bold">
+                <p className="flex-1">İlerlemen <span className="text-subtle">•</span> {nextL ? `%${st.progress.toFixed(2)}` : "Maksimum seviye"}</p>
+                {nextL && <><LevelGem name={nextL.name} size={24} /><p>{nextL.name}</p></>}
+              </div>
+              <div className="mt-3"><Progress value={st.progress} /></div>
+              <div className="mt-2.5 flex justify-between text-[14px] font-medium">
+                <p>Toplam oynanan: {money(st.wagered)}</p>
+                {nextL && <p>{money(nextL.xp)}</p>}
+              </div>
+            </section>
+          )}
+
+          {levels.length > 0 && (
+            <LevelRail levels={levels} cur={cur} progress={st?.progress ?? 0} />
+          )}
+        </>
+      )}
     </div>
+  );
+}
+
+function LevelRail({ levels, cur, progress }: { levels: any[]; cur: number; progress: number }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => { const el = ref.current?.children[Math.max(0, cur)] as HTMLElement | undefined; if (el && ref.current) ref.current.scrollLeft = el.offsetLeft - 12; }, [cur, levels.length]);
+  const by = (d: number) => ref.current?.scrollBy({ left: d * 394, behavior: "smooth" });
+  return (
+    <section className="mt-10">
+      <div className="mb-4 flex items-center gap-3">
+        <h2 className="h-sec flex-1">Seviyeler</h2>
+        <div className="flex"><button onClick={() => by(-1)} aria-label="Önceki" className="arrow-l"><I n="left" className="size-5" /></button><button onClick={() => by(1)} aria-label="Sonraki" className="arrow-r"><I n="right" className="size-5" /></button></div>
+      </div>
+      <div ref={ref} className="no-scrollbar -mx-3 flex snap-x gap-[10px] overflow-x-auto px-3 sm:mx-0 sm:px-0">
+        {levels.map((l, i) => {
+          const done = i <= cur && i !== cur + 1; const isNext = i === cur + 1;
+          return (
+            <div key={l.name} className={`relative flex h-[280px] w-[187px] shrink-0 snap-start flex-col items-center overflow-hidden rounded-2xl bg-card ${isNext ? "border-[3px] border-primary" : ""}`}>
+              <div aria-hidden className="absolute inset-x-0 top-0 h-[188px]" style={{ background: `radial-gradient(70% 60% at 50% 40%, ${tierOf(l.name)[0]}33, transparent 70%)` }} />
+              <p className="relative mt-3.5 text-[14px] font-bold">{l.name}</p>
+              <div className="relative mt-4"><LevelGem name={l.name} dim={!done && !isNext} /></div>
+              <div className="absolute inset-x-0 bottom-0 flex h-[60px] flex-col justify-center rounded-t-xl bg-[rgba(6,9,14,.5)] px-3">
+                {isNext ? (
+                  <><p className="text-center text-[14px] font-bold">%{progress.toFixed(2)}</p><div className="mt-1.5"><Progress value={progress} /></div></>
+                ) : (
+                  <button disabled className="flex h-9 w-full items-center justify-center gap-2 rounded-[10px] bg-card text-[14px] font-bold text-[#45515c]">
+                    <I n={done ? "check" : "lock"} className="size-5" />{done ? "Ulaşıldı" : "Kilitli"}
+                  </button>
+                )}
+              </div>
+              {l.reward && <span className="absolute right-2 top-2 rounded-md bg-primary/15 px-1.5 text-[10px] font-bold text-primary">{l.reward}</span>}
+            </div>
+          );
+        })}
+      </div>
+    </section>
   );
 }

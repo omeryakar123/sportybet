@@ -18,7 +18,7 @@ import { PaymentRequests, Transactions, PaymentSystems } from "./pages/Finance";
 import { SportsbookReport, FinancialReport, BonusReport } from "./pages/Reports";
 import { Users, AuditLogs, Profile } from "./pages/Users";
 import Sites from "./pages/Sites";
-import { CmsBanners, CmsPromotions, CmsCss, CmsPages, CmsSettings, CmsHome } from "./pages/Cms";
+import { CmsBanners, CmsPromotions, CmsCss, CmsPages, CmsSettings, CmsHome, CmsVip } from "./pages/Cms";
 import { PredictionList, PredictionDetail, PredictionPositions, PredictionCategories, PredictionSettings } from "./pages/Predictions";
 import System from "./pages/System";
 
@@ -57,6 +57,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         <Route path="audit-logs" element={<AuditLogs />} />
         <Route path="profile" element={<Profile />} />
         <Route path="cms/home" element={<CmsHome />} />
+        <Route path="cms/vip" element={<CmsVip />} />
         <Route path="cms/banners" element={<CmsBanners />} />
         <Route path="cms/promotions" element={<CmsPromotions />} />
         <Route path="cms/pages" element={<CmsPages />} />

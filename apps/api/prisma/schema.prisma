@@ -570,9 +570,14 @@ model CmsPromotion {
   siteId     Int      @default(1)
   title      String
   slug       String
-  category   String   @default("TUMU")
+  category   String   @default("TUMU") // SPOR, TAHMIN, OZEL (sekme + renkli etiket)
+  tag        String?  // kartın üstündeki renkli etiket metni (boşsa kategori adı)
+  excerpt    String?  // kısa açıklama (öne çıkan kartta)
+  featured   Boolean  @default(false) // listenin en üstündeki büyük kart
   imageUrl   String?
   contentHtml String
+  howToHtml  String?  // "Nasıl Katılırım" akordeonu
+  termsHtml  String?  // "Şartlar ve Koşullar" akordeonu
   platform   String   @default("web,mobile")
   showFor    String   @default("ALL") // ALL, GUEST, LOGGED_IN
   language   String   @default("tr")

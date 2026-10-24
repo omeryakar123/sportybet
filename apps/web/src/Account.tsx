@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
+import { Link, Outlet } from "react-router-dom";
 import { api } from "./api";
 import { AVATAR_PRESETS, Avatar, Btn, Empty, ErrBox, Field, I, Spinner, TX_TR, dt, inp, money, useStore } from "./lib";
 import { MyPositions } from "./predictions";
+import { GTable, PageTitle, StatCard, Status, Tabs } from "./g";
 
 const NAV = [
   ["/hesap", "user", "Hesap", true],
@@ -14,77 +15,76 @@ const NAV = [
 ] as const;
 
 export function AccountLayout() {
-  const { me, logout, setAuthOpen } = useStore();
-  const nav = useNavigate();
+  const { me, setAuthOpen } = useStore();
   if (!me) return (
     <div className="grid min-h-[50vh] place-items-center">
-      <div className="text-center"><p className="mb-4 font-semibold text-muted">Hesabını görmek için giriş yap.</p><Btn onClick={() => setAuthOpen(true)}>Giriş yap</Btn></div>
+      <div className="text-center"><p className="mb-4 text-[14px] font-medium text-subtle">Hesabını görmek için giriş yap.</p><Btn onClick={() => setAuthOpen(true)}>Giriş yap</Btn></div>
     </div>
   );
-  return (
-    <div className="animate-sports-fade grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[230px_minmax(0,1fr)] lg:gap-6">
-      <aside className="h-fit min-w-0 lg:sticky lg:top-4">
-        <nav className="no-scrollbar -mx-4 flex gap-1 overflow-x-auto border-l-0 px-4 lg:mx-0 lg:flex-col lg:border-l lg:border-line lg:px-0">
-          {NAV.map(([to, icon, label, end]) => (
-            <NavLink key={to} to={to} end={end as boolean} className={({ isActive }) =>
-              `flex shrink-0 items-center gap-3 whitespace-nowrap rounded-lg px-4 py-2.5 text-sm font-bold transition-colors lg:-ml-px lg:rounded-none lg:border-l-2 ${isActive ? "bg-card text-fg lg:border-primary lg:bg-transparent" : "text-subtle hover:text-fg lg:border-transparent"}`}>
-              <I n={icon} className="size-[18px]" />{label}
-            </NavLink>
-          ))}
-          <button onClick={() => { logout(); nav("/"); }} className="flex shrink-0 items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-bold text-loss hover:bg-card lg:mt-3 lg:-ml-px lg:rounded-none lg:border-l-2 lg:border-transparent">
-            <I n="x" className="size-[18px]" />Çıkış Yap
-          </button>
-        </nav>
-      </aside>
-      <div className="min-w-0 rounded-xl border border-line bg-panel-deep/60 p-3 sm:p-4 lg:p-6"><Outlet /></div>
-    </div>
-  );
+  // gamdom: hesap sayfalarında yan menü yok — gezinme sağ üstteki kullanıcı menüsünden
+  return <div className="animate-sports-fade mx-auto max-w-[1000px] min-w-0"><Outlet /></div>;
 }
 
-const H = ({ children, right }: { children: React.ReactNode; right?: React.ReactNode }) => (
-  <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><h1 className="text-xl font-extrabold">{children}</h1>{right}</div>
-);
-const Seg = ({ tabs, value, onChange }: { tabs: [string, string][]; value: string; onChange: (v: string) => void }) => (
-  <div className="flex rounded-full bg-field p-1">
-    {tabs.map(([v, l]) => <button key={v} onClick={() => onChange(v)} className={`chip border-transparent ${value === v ? "chip-on" : "bg-transparent"}`}>{l}</button>)}
-  </div>
-);
+const H = ({ children, right }: { children: React.ReactNode; right?: React.ReactNode }) => <PageTitle right={right}>{children}</PageTitle>;
+const Seg = ({ tabs, value, onChange }: { tabs: [string, string][]; value: string; onChange: (v: string) => void }) => <Tabs tabs={tabs} value={value} onChange={onChange} />;
+const Note = ({ ok, children }: { ok?: boolean; children: React.ReactNode }) => <div className={`rounded-[10px] px-3 py-2.5 text-[14px] font-bold ${ok ? "bg-primary/10 text-primary" : "bg-loss/10 text-loss"}`}>{children}</div>;
 
-// ---------- Hesap (profil) ----------
+// ---------- Profil (gamdom /profile) ----------
 export function Profile() {
-  const { me, refreshMe, balance } = useStore();
-  const [f, setF] = useState<any>(null);
+  const { me, refreshMe } = useStore();
+  const [f, setF] = useState<any>(null); const [st, setSt] = useState<any>(null);
   const [msg, setMsg] = useState(""); const [err, setErr] = useState("");
   useEffect(() => { if (me) setF({ firstName: me.firstName ?? "", lastName: me.lastName ?? "", email: me.email ?? "", phone: me.phone ?? "", birthDate: me.birthDate?.slice(0, 10) ?? "", city: me.city ?? "" }); }, [me?.id]);
+  useEffect(() => { api("/api/me/stats").then(setSt).catch(() => {}); }, []);
   if (!f) return <Spinner />;
-  async function save() {
+  async function save(keys: string[]) {
     setErr(""); setMsg("");
-    try { await api("/api/me", { method: "PATCH", json: Object.fromEntries(Object.entries(f).filter(([, v]) => v !== "")) }); setMsg("Bilgilerin kaydedildi ✓"); refreshMe(); } catch (x: any) { setErr(x.message); }
+    try { await api("/api/me", { method: "PATCH", json: Object.fromEntries(keys.map((k) => [k, f[k]]).filter(([, v]) => v !== "")) }); setMsg("Kaydedildi ✓"); refreshMe(); } catch (x: any) { setErr(x.message); }
   }
+  const row = (k: string, label: string, ph: string, type = "text") => (
+    <div key={k}>
+      <label className="mb-2 block text-[12px] font-medium text-subtle">{label}</label>
+      <div className="flex gap-5">
+        <input className="input flex-1" type={type} placeholder={ph} value={f[k]} onChange={(e) => setF({ ...f, [k]: e.target.value })} />
+        <button onClick={() => save([k])} disabled={f[k] === ((me as any)[k] ?? "")} className="btn w-[68px] bg-card text-white disabled:text-[#45515c]">Kaydet</button>
+      </div>
+    </div>
+  );
   return (
     <>
-      <H>Hesap</H>
+      <H>Profil</H>
       <AvatarPicker />
-      <div className="mb-6 grid gap-3 sm:grid-cols-3">
-        {[["Ana Para", balance("MAIN"), "wallet"], ["Bonus", balance("BONUS"), "gift"], ["Oynadığın Cüzdan", me.activeWallet === "BONUS" ? "Bonus" : "Ana Para", "check"]].map(([l, v, ic]: any) => (
-          <div key={l} className="flex items-center gap-3 rounded-lg border border-line bg-card px-4 py-3.5">
-            <span className="grid size-10 place-items-center rounded-lg bg-primary/15 text-primary"><I n={ic} className="size-5" /></span>
-            <span><span className="block text-xs font-bold text-subtle">{l}</span><span className="text-[15px] font-extrabold">{typeof v === "number" ? money(v) : v}</span></span>
+      <div className="mt-4 grid gap-4 md:grid-cols-2">
+        <div>
+          <label className="mb-2 block text-[12px] font-medium text-subtle">Kullanıcı adın</label>
+          <input className="input bg-card" value={me.username} disabled />
+        </div>
+        {row("email", "E-posta adresi", "E-posta gir", "email")}
+        {row("firstName", "Ad", "Adını gir")}
+        {row("lastName", "Soyad", "Soyadını gir")}
+        {row("phone", "Telefon", "Telefon gir")}
+        {row("birthDate", "Doğum tarihi", "", "date")}
+        {row("city", "Şehir", "Şehir gir")}
+      </div>
+      <div className="mt-3 space-y-2">{msg && <Note ok>{msg}</Note>}<ErrBox e={err} /></div>
+
+      <h2 className="h-sec mt-10 mb-4">Doğrulama</h2>
+      <div className="grid gap-2 md:grid-cols-3">
+        {[["Seviye 1", "E-posta ve telefon", !!(me.email && me.phone)], ["Seviye 2", "Kimlik doğrulama", !!me.isVerified], ["Seviye 3", "Adres doğrulama", false]].map(([t, d, ok]: any, i) => (
+          <div key={t} className="flex h-[82px] items-center rounded-[15px] bg-card px-5">
+            <div className="flex-1"><p className="text-[18px] font-medium">{t}</p><p className="text-[14px] font-medium text-subtle">{ok ? "Tamamlandı" : i === 0 || (i === 1 && me.email) ? d : "Kilitli"}</p></div>
+            <span className={`grid size-8 place-items-center rounded-full ${ok ? "bg-primary text-primary-fg" : "bg-elevated text-subtle"}`}><I n={ok ? "check" : "lock"} className="size-4" /></span>
           </div>
         ))}
       </div>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Kullanıcı adı"><input className={inp} value={me.username} disabled /></Field>
-        <Field label="Üyelik tarihi"><input className={inp} value={new Date(me.createdAt).toLocaleDateString("tr-TR")} disabled /></Field>
-        <Field label="Ad"><input className={inp} value={f.firstName} onChange={(e) => setF({ ...f, firstName: e.target.value })} /></Field>
-        <Field label="Soyad"><input className={inp} value={f.lastName} onChange={(e) => setF({ ...f, lastName: e.target.value })} /></Field>
-        <Field label="E-posta"><input className={inp} type="email" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} /></Field>
-        <Field label="Telefon"><input className={inp} value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} /></Field>
-        <Field label="Doğum tarihi"><input className={inp} type="date" value={f.birthDate} onChange={(e) => setF({ ...f, birthDate: e.target.value })} /></Field>
-        <Field label="Şehir"><input className={inp} value={f.city} onChange={(e) => setF({ ...f, city: e.target.value })} /></Field>
+
+      <h2 className="h-sec mt-10 mb-4">İstatistikler</h2>
+      <div className="grid gap-2 md:grid-cols-2">
+        <StatCard value={(st?.bets ?? 0).toLocaleString("tr-TR")} label="Oynanan Bahis" icon={<img src="/img/ic-ball.svg" alt="" className="size-14" />} />
+        <StatCard value={money(st?.wagered ?? 0)} label="Toplam Oynanan" icon={<img src="/img/ic-chart.svg" alt="" className="size-14" />} />
+        <StatCard value={(st?.wins ?? 0).toLocaleString("tr-TR")} label="Kazanan Kupon" icon={<img src="/img/ic-trophy.svg" alt="" className="size-14" />} />
+        <StatCard value={money(st?.biggestWin ?? 0)} label="En Büyük Kazanç" icon={<img src="/img/ic-flame.svg" alt="" className="size-14" />} />
       </div>
-      <div className="mt-4 space-y-2">{msg && <div className="rounded-md border border-win/30 bg-win/10 px-3 py-2.5 text-sm font-bold text-win">{msg}</div>}<ErrBox e={err} /></div>
-      <Btn className="mt-4" onClick={save}>Kaydet</Btn>
     </>
   );
 }
@@ -116,37 +116,36 @@ function AvatarPicker() {
     img.src = url;
   }
   return (
-    <div className="mb-6 rounded-xl border border-line bg-card p-4">
-      <div className="flex flex-wrap items-center gap-4">
-        <div className="relative">
-          <Avatar src={me.avatar} name={me.username} className="size-20 ring-4 ring-primary/30" />
-          <button onClick={() => fileRef.current?.click()} className="absolute -right-1 -bottom-1 grid size-8 place-items-center rounded-full bg-primary text-primary-fg shadow-lg hover:bg-primary-hover" aria-label="Fotoğraf yükle"><I n="camera" className="size-4" /></button>
+    <>
+      <p className="mb-2 text-[12px] font-medium text-subtle">Avatar</p>
+      <div className="rounded-[10px] bg-card p-4">
+        <div className="flex items-start gap-2.5">
+          <Avatar src={me.avatar} name={me.username} className="size-16 !rounded-lg" />
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap gap-2">
+              <button onClick={() => fileRef.current?.click()} disabled={busy} className="btn btn-primary h-9 rounded-lg px-4">Yükle</button>
+              <button onClick={() => setOpen(!open)} className="btn h-9 rounded-lg bg-card-2 px-4 text-white">Hazır avatar</button>
+              {me.avatar && <button onClick={() => save(null)} disabled={busy} className="btn h-9 rounded-lg bg-transparent px-3 text-subtle hover:text-fg">Kaldır</button>}
+            </div>
+            <p className="mt-2.5 text-[10px] font-medium leading-4 text-subtle">Desteklenen dosyalar: PNG, JPG, WEBP, GIF. Resim 256×256 kare olarak kırpılır.</p>
+          </div>
+          <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden" onChange={(e) => { onFile(e.target.files?.[0]); e.target.value = ""; }} />
         </div>
-        <div className="min-w-0 flex-1">
-          <div className="text-lg font-extrabold">{me.username}</div>
-          <div className="text-sm text-subtle">Profil fotoğrafın sitede ve kuponlarında görünür.</div>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Btn kind="soft" onClick={() => setOpen(!open)}>Avatar seç</Btn>
-          <Btn onClick={() => fileRef.current?.click()} disabled={busy}>Fotoğraf yükle</Btn>
-          {me.avatar && <Btn kind="ghost" onClick={() => save(null)} disabled={busy}>Kaldır</Btn>}
-        </div>
-        <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden" onChange={(e) => { onFile(e.target.files?.[0]); e.target.value = ""; }} />
+        {open && (
+          <div className="mt-4 grid grid-cols-6 gap-2 sm:grid-cols-12">
+            {AVATAR_PRESETS.map((_, i) => {
+              const k = `av:${i + 1}`;
+              return <button key={k} disabled={busy} onClick={() => save(k)} className={`overflow-hidden rounded-lg transition-transform hover:scale-105 ${me.avatar === k ? "ring-2 ring-primary" : ""}`}><Avatar src={k} className="size-12 !rounded-lg" /></button>;
+            })}
+          </div>
+        )}
+        <label className="mt-4 flex cursor-pointer items-center justify-between gap-3 border-t border-white/[.05] pt-3">
+          <span><span className="block text-[14px] font-bold">İstatistiklerimi gizle</span><span className="block text-[12px] font-medium text-subtle">Diğer oyuncular profilinde bahis sayını ve net kârını göremez.</span></span>
+          <input type="checkbox" className="size-5 accent-[#00ff86]" checked={!!me.hideStats} disabled={busy} onChange={async (e) => { setBusy(true); try { await api("/api/me", { method: "PATCH", json: { hideStats: e.target.checked } }); await refreshMe(); } catch (x: any) { setErr(x.message); } setBusy(false); }} />
+        </label>
+        {err && <div className="mt-3"><ErrBox e={err} /></div>}
       </div>
-      {open && (
-        <div className="mt-4 grid grid-cols-6 gap-3 sm:grid-cols-12">
-          {AVATAR_PRESETS.map((_, i) => {
-            const k = `av:${i + 1}`;
-            return <button key={k} disabled={busy} onClick={() => save(k)} className={`rounded-full transition-transform hover:scale-110 ${me.avatar === k ? "ring-2 ring-primary ring-offset-2 ring-offset-card" : ""}`}><Avatar src={k} className="size-12" /></button>;
-          })}
-        </div>
-      )}
-      <label className="mt-4 flex cursor-pointer items-center justify-between gap-3 border-t border-line pt-3">
-        <span><span className="block text-sm font-bold">İstatistiklerimi gizle</span><span className="block text-[12px] text-subtle">Diğer oyuncular profilinde bahis sayını, yatırdığın tutarı ve net kârını göremez.</span></span>
-        <input type="checkbox" className="size-5 accent-[#00ff86]" checked={!!me.hideStats} disabled={busy} onChange={async (e) => { setBusy(true); try { await api("/api/me", { method: "PATCH", json: { hideStats: e.target.checked } }); await refreshMe(); } catch (x: any) { setErr(x.message); } setBusy(false); }} />
-      </label>
-      {err && <div className="mt-3"><ErrBox e={err} /></div>}
-    </div>
+    </>
   );
 }
 
@@ -163,7 +162,7 @@ export function MyPredictions() {
       {!rows ? <Spinner /> : rows.length === 0 ? <Empty text={tab === "open" ? "Açık tahminin yok. Hadi bir gündem seç!" : "Sonuçlanan tahminin yok."} /> : (
         <div className="space-y-2">
           {rows.map((p) => (
-            <div key={p.id} className="rounded-lg border border-line bg-card p-3.5">
+            <div key={p.id} className="rounded-2xl bg-card p-3.5">
               <div className="flex items-start justify-between gap-3">
                 <Link to={`/tahminler/${p.market.slug}`} className="line-clamp-2 text-sm font-bold hover:underline">{p.market.question}</Link>
                 <span className={`shrink-0 rounded-sm px-2 py-0.5 text-[12px] font-extrabold ${p.status === "OPEN" ? "bg-odds/15 text-odds" : p.status === "WON" ? "bg-win/15 text-win" : p.status === "LOST" ? "bg-loss/15 text-loss" : "bg-elevated text-muted"}`}>
@@ -188,35 +187,34 @@ export function MyPredictions() {
   );
 }
 
-// ---------- İşlemler ----------
+// ---------- İşlemler (gamdom /transactions) ----------
 export function Transactions() {
   const [rows, setRows] = useState<any[] | null>(null);
-  const [type, setType] = useState("");
+  const [type, setType] = useState("DEPOSIT");
   useEffect(() => { setRows(null); api(`/api/me/transactions?take=100${type ? `&type=${type}` : ""}`).then(setRows).catch(() => setRows([])); }, [type]);
-  const GROUPS: [string, string][] = [["", "Tümü"], ["DEPOSIT", "Yatırımlar"], ["WITHDRAWAL,WITHDRAWAL_REFUND", "Çekimler"], ["BET_STAKE,BET_WIN,BET_REFUND", "Spor"], ["PREDICTION_BUY,PREDICTION_SELL,PREDICTION_WIN,PREDICTION_REFUND", "Tahmin"], ["BONUS_GRANT,BONUS_CONVERT,BONUS_EXPIRE,BONUS_CANCEL", "Bonus"]];
+  const GROUPS: [string, string][] = [["DEPOSIT", "Yatırımlar"], ["WITHDRAWAL,WITHDRAWAL_REFUND", "Çekimler"], ["TIP_SEND,TIP_RECEIVE,RAIN_SEND,RAIN_RECEIVE,RAIN_REFUND", "Bahşiş & Yağmur"], ["BET_STAKE,BET_WIN,BET_REFUND", "Spor"], ["PREDICTION_BUY,PREDICTION_SELL,PREDICTION_WIN,PREDICTION_REFUND", "Tahmin"], ["BONUS_GRANT,BONUS_CONVERT,BONUS_EXPIRE,BONUS_CANCEL", "Bonus"], ["", "Tümü"]];
+  const exportCsv = () => {
+    if (!rows?.length) return;
+    const csv = ["Tür;Tutar;Bakiye;Tarih;Not", ...rows.map((t) => [TX_TR[t.type] ?? t.type, t.amount, t.balanceAfter, new Date(t.createdAt).toLocaleString("tr-TR"), (t.note ?? t.paymentSystem ?? "").replace(/;/g, ",")].join(";"))].join("\n");
+    const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob(["\ufeff" + csv], { type: "text/csv" })); a.download = "islemler.csv"; a.click();
+  };
   return (
     <>
       <H>İşlemler</H>
-      <div className="no-scrollbar -mx-1 mb-4 flex gap-2 overflow-x-auto px-1">
-        {GROUPS.map(([v, l]) => <button key={v} onClick={() => setType(v)} className={`chip ${type === v ? "chip-on" : "bg-card text-subtle hover:text-fg"}`}>{l}</button>)}
+      <Seg tabs={GROUPS} value={type} onChange={setType} />
+      <button onClick={exportCsv} className="btn mt-4 bg-card text-white">Dışa aktar</button>
+      <div className="mt-3">
+        {!rows ? <Spinner /> : (
+          <GTable head={["İşlem", "Tutar", "Bakiye", "Tarih", "Durum"]} align={["l", "l", "l", "l", "r"]} empty="İşlem bulunamadı."
+            rows={rows.map((t) => [
+              <span className="flex items-center gap-2"><span className="truncate">{TX_TR[t.type] ?? t.type}</span>{t.wallet?.type === "BONUS" && <span className="rounded-md bg-caution/15 px-1.5 text-[10px] font-bold text-caution">Bonus</span>}</span>,
+              <span className="flex items-center gap-2"><span className="grid size-5 place-items-center rounded-full bg-[#4fd35a] text-[10px] font-bold text-white">₺</span><span className={Number(t.amount) >= 0 ? "text-primary" : "text-white"}>{Number(t.amount) >= 0 ? "+" : ""}{money(t.amount)}</span></span>,
+              money(t.balanceAfter),
+              <span className="whitespace-nowrap">{new Date(t.createdAt).toLocaleString("tr-TR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}</span>,
+              <Status tone="ok">Tamamlandı</Status>,
+            ])} />
+        )}
       </div>
-      {!rows ? <Spinner /> : rows.length === 0 ? <Empty text="İşlem bulunamadı." /> : (
-        <div className="overflow-hidden rounded-lg border border-line">
-          {rows.map((t) => (
-            <div key={t.id} className="flex items-center gap-3 border-b border-line bg-row px-4 py-3 last:border-0">
-              <span className={`grid size-9 shrink-0 place-items-center rounded-lg ${Number(t.amount) >= 0 ? "bg-win/10 text-win" : "bg-loss/10 text-loss"}`}><I n={Number(t.amount) >= 0 ? "arrowdown" : "arrowup"} className="size-4" /></span>
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-bold">{TX_TR[t.type] ?? t.type}{t.wallet?.type === "BONUS" && <span className="ml-2 rounded-sm bg-primary/15 px-1.5 text-[10px] font-extrabold text-primary">Bonus</span>}</div>
-                <div className="truncate text-xs font-medium text-subtle">{dt(t.createdAt)}{t.note ? ` · ${t.note}` : t.paymentSystem ? ` · ${t.paymentSystem}` : ""}</div>
-              </div>
-              <div className="text-right">
-                <div className={`text-sm font-extrabold ${Number(t.amount) >= 0 ? "text-win" : "text-fg"}`}>{Number(t.amount) >= 0 ? "+" : ""}{money(t.amount)}</div>
-                <div className="text-[11px] font-semibold text-dim">Bakiye {money(t.balanceAfter)}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
     </>
   );
 }
@@ -240,8 +238,8 @@ export function MyCoupons() {
           {rows.map((b) => {
             const [lbl, cls] = BET_TR[b.state] ?? [b.state, "bg-elevated text-muted"];
             return (
-              <div key={b.id} className="overflow-hidden rounded-lg border border-line bg-card">
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line px-4 py-2.5 text-sm">
+              <div key={b.id} className="overflow-hidden rounded-2xl bg-card">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-white/[.05] px-4 py-2.5 text-sm">
                   <span className={`rounded-sm px-2 py-0.5 text-[12px] font-extrabold ${cls}`}>{lbl}</span>
                   <span className="font-bold">{b.type === "MULTIPLE" ? "Kombine" : "Tekli"}</span>
                   {b.couponId && <span className="flex items-center gap-1 text-xs font-semibold text-dim">ID: {b.couponId}<button onClick={() => navigator.clipboard?.writeText(b.couponId)} className="text-dim hover:text-fg"><I n="copy" className="size-3" /></button></span>}
@@ -261,7 +259,7 @@ export function MyCoupons() {
                   ))}
                   {(b.selections ?? []).length === 0 && <div className="py-2 text-xs font-medium text-subtle">Kupon detayı yükleniyor…</div>}
                 </div>
-                <div className="flex flex-wrap gap-x-6 gap-y-1 bg-panel-deep/60 px-4 py-2.5 text-[13px] font-semibold text-subtle">
+                <div className="flex flex-wrap gap-x-6 gap-y-1 bg-card-2 px-4 py-2.5 text-[13px] font-semibold text-subtle">
                   <span>Tutar <b className="text-fg">{money(b.stake)}</b></span>
                   <span>Oran <b className="text-fg">{Number(b.totalOdds).toFixed(2)}</b></span>
                   <span className="ml-auto">{b.state === "ACTIVE" || b.state === "PENDING" ? <>Olası kazanç <b className="text-win">{money(b.potentialWin)}</b></> : <>Sonuç <b className={Number(b.winAmount) > 0 ? "text-win" : "text-loss"}>{money(b.winAmount)}</b></>}</span>
@@ -295,7 +293,7 @@ export function MyBonuses() {
   return (
     <>
       <H>Bonuslarım</H>
-      <div className="mb-5 rounded-lg border border-line bg-card p-4">
+      <div className="mb-5 rounded-2xl bg-card p-4">
         <div className="mb-2 text-sm font-extrabold">Promosyon kodun mu var?</div>
         <div className="flex gap-2">
           <input aria-label="Promosyon kodu" className={inp + " uppercase"} placeholder="Kodu gir" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} />
@@ -308,7 +306,7 @@ export function MyBonuses() {
           {mine.map((b) => {
             const [lbl, cls] = BS[b.state] ?? [b.state, "bg-elevated text-muted"];
             return (
-              <div key={b.id} className="rounded-lg border border-line bg-card p-4">
+              <div key={b.id} className="rounded-2xl bg-card p-4">
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-sm font-extrabold">{b.bonus.name}</span>
                   <span className={`rounded-sm px-2 py-0.5 text-[12px] font-extrabold ${cls}`}>{lbl}</span>
@@ -336,7 +334,7 @@ export function MyBonuses() {
           <h2 className="mb-3 text-base font-extrabold">Alabileceğin Bonuslar</h2>
           <div className="grid gap-3 sm:grid-cols-2">
             {avail.map((b) => (
-              <div key={b.id} className="flex flex-col rounded-lg border border-line bg-card p-4">
+              <div key={b.id} className="flex flex-col rounded-2xl bg-card p-4">
                 <div className="flex items-start gap-3">
                   <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-primary/15 text-primary"><I n="gift" className="size-5" /></span>
                   <div>

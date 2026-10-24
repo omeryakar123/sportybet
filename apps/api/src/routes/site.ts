@@ -110,6 +110,30 @@ export async function siteRoutes(app: FastifyInstance) {
     return { id: r.id.toString(), state: r.state };
   });
 
+  // ---- İstatistik + VIP seviyesi (gamdom Rewards / Profile) ----
+  app.get("/me/stats", async (req) => {
+    const id = pid(req);
+    const p = await db.player.findUniqueOrThrow({ where: { id }, select: { siteId: true, createdAt: true } });
+    const [sb, sbWon, pr, best] = await Promise.all([
+      db.bet.aggregate({ where: { playerId: id, state: { not: "CANCELLED" as any } }, _sum: { stake: true }, _count: true }),
+      db.bet.aggregate({ where: { playerId: id, winAmount: { gt: 0 } }, _sum: { winAmount: true }, _count: true }),
+      db.predictionPosition.aggregate({ where: { playerId: id }, _sum: { stake: true, payout: true }, _count: true }),
+      db.bet.findFirst({ where: { playerId: id, winAmount: { gt: 0 } }, orderBy: { winAmount: "desc" }, select: { winAmount: true } }),
+    ]);
+    const wagered = Number(sb._sum.stake ?? 0) + Number(pr._sum.stake ?? 0);
+    const cfg = (await db.cmsSetting.findUnique({ where: { siteId_key: { siteId: p.siteId, key: "vip_levels" } } }))?.value as any;
+    const levels: { name: string; xp: number; reward?: string; image?: string; color?: string }[] = Array.isArray(cfg?.levels) && cfg.levels.length ? cfg.levels : VIP_DEFAULT;
+    let cur = -1; levels.forEach((l, i) => { if (wagered >= Number(l.xp)) cur = i; });
+    const next = levels[cur + 1];
+    const base = cur >= 0 ? Number(levels[cur].xp) : 0;
+    const progress = next ? Math.max(0, Math.min(100, ((wagered - base) / (Number(next.xp) - base)) * 100)) : 100;
+    return {
+      wagered, bets: sb._count + pr._count, wins: sbWon._count, totalWon: Number(sbWon._sum.winAmount ?? 0) + Number(pr._sum.payout ?? 0),
+      biggestWin: Number(best?.winAmount ?? 0), memberSince: p.createdAt,
+      levels, level: cur, nextLevel: next ? cur + 1 : null, progress: Math.round(progress * 100) / 100,
+    };
+  });
+
   // ---- Bonuslar ----
   app.get("/bonuses/available", async (req) => {
     const now = new Date();
@@ -139,3 +163,11 @@ export async function siteRoutes(app: FastifyInstance) {
     return { ok: true, playerBonusId: pb.id, amount: pb.amount };
   });
 }
+
+/** Varsayılan VIP seviyeleri (CMS › vip_levels ile değiştirilir). xp = toplam oynanan tutar (₺) */
+const VIP_DEFAULT = [
+  ["Bronz 1", 0], ["Bronz 2", 2_500], ["Bronz 3", 10_000], ["Gümüş 1", 25_000], ["Gümüş 2", 50_000], ["Gümüş 3", 100_000],
+  ["Altın 1", 200_000], ["Altın 2", 350_000], ["Altın 3", 500_000], ["Zümrüt 1", 750_000], ["Zümrüt 2", 1_000_000], ["Zümrüt 3", 1_500_000],
+  ["Safir 1", 2_000_000], ["Safir 2", 3_000_000], ["Safir 3", 4_000_000], ["Yakut 1", 5_000_000], ["Yakut 2", 7_500_000], ["Yakut 3", 10_000_000],
+  ["Elmas 1", 15_000_000], ["Elmas 2", 20_000_000], ["Elmas 3", 30_000_000], ["Opal 1", 50_000_000], ["Opal 2", 75_000_000], ["Opal 3", 100_000_000],
+].map(([name, xp]) => ({ name: name as string, xp: xp as number }));

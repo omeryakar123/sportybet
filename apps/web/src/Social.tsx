@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "./api";
 import { Avatar, ErrBox, FlagTR, I, IconTile, money, useStore } from "./lib";
+import { Sheet, StatCard } from "./g";
 
 /* ============================================================
  * SOHBET — 3 sn'de bir yeni mesajlar (after=id), yağmur kartı, susturma bildirimi.
@@ -89,33 +90,36 @@ export function ChatPanel({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="flex h-full flex-col bg-panel-deep">
-      <div className="flex h-[var(--header-h)] shrink-0 items-center gap-2 border-b border-line/60 px-3">
-        <span className="flex h-9 items-center gap-2 rounded-lg bg-card px-3 text-sm font-bold"><FlagTR />Türkçe</span>
-        <span className="ml-auto flex items-center gap-1.5 text-[13px] font-bold text-soft"><span className="live-dot size-2 rounded-full bg-primary" />{st?.online ?? 0}</span>
-        <button onClick={onClose} className="grid size-8 place-items-center rounded-full bg-card text-subtle hover:text-fg" aria-label="Sohbeti kapat"><I n="x" className="size-4" /></button>
+      <div className="flex h-[70px] shrink-0 items-center gap-3 px-[13px]">
+        <span className="flex h-11 items-center gap-2.5 rounded-[10px] bg-panel px-[17px] text-[14px] font-medium"><FlagTR className="h-[14px] w-5 rounded-sm" />Türkçe</span>
+        <span className="ml-auto flex items-center gap-1.5 text-[14px] font-medium text-subtle"><I n="user" className="size-[18px]" />{(st?.online ?? 0).toLocaleString("tr-TR")}</span>
+        <button onClick={onClose} className="grid size-8 place-items-center text-subtle hover:text-fg" aria-label="Sohbeti kapat"><I n="x" className="size-6" /></button>
       </div>
       {st?.rain && <div className="pt-2"><RainCard rain={st.rain} onJoin={join} busy={busy} /></div>}
-      <div ref={box} onScroll={(e) => { const el = e.currentTarget; stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60; }} className="sb-scroll min-h-0 flex-1 space-y-1 overflow-y-auto px-2 py-2" role="log" aria-label="Sohbet mesajları" aria-live="polite">
+      <div ref={box} onScroll={(e) => { const el = e.currentTarget; stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60; }} className="sb-scroll min-h-0 flex-1 space-y-2 overflow-y-auto px-3 pb-2" role="log" aria-label="Sohbet mesajları" aria-live="polite">
         {msgs.length === 0 && <div className="px-4 py-10 text-center text-[13px] text-subtle">Henüz mesaj yok. İlk yazan sen ol!</div>}
         {msgs.map((m) => m.kind === "SYSTEM" ? (
           <div key={m.id} className="mx-2 rounded-lg bg-card/60 px-3 py-2 text-center text-[12px] font-semibold text-soft">{m.text}</div>
         ) : m.kind === "RAIN" || m.kind === "TIP" ? (
           <div key={m.id} className="mx-2 flex items-center gap-2 rounded-lg border border-primary/25 bg-primary/10 px-3 py-2 text-[12px] font-bold text-primary"><I n={m.kind === "RAIN" ? "rain" : "tip"} className="size-4 shrink-0" /><span className="min-w-0 flex-1">{m.text}</span><span className="text-[10px] text-subtle">{hhmm(m.at)}</span></div>
         ) : (
-          <div key={m.id} className={`group flex gap-2.5 rounded-lg px-2 py-1.5 hover:bg-card/50 ${m.user?.id === me?.id ? "bg-card/40" : ""}`}>
-            <button onClick={() => m.user && openProfile(m.user.id)} className="shrink-0 pt-0.5"><Avatar src={m.user?.avatar} name={m.user?.name ?? "?"} className="size-8" /></button>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <button onClick={() => m.user && openProfile(m.user.id)} className="truncate text-[13px] font-extrabold text-primary hover:underline">{m.user?.name ?? "—"}</button>
-                <span className="text-[10px] font-semibold text-dim">{hhmm(m.at)}</span>
-                {me && m.user && m.user.id !== me.id && <button onClick={() => { setTipTo(m.user!.name); setWalletOpen("tip"); }} className="ml-auto hidden text-subtle hover:text-primary group-hover:block" title="Bahşiş gönder" aria-label="Bahşiş gönder"><I n="tip" className="size-4" /></button>}
+          /* gamdom mesaj satırı: solda 46px avatar+saat sütunu, sağda isim + mesaj; ikisi de #080d13 */
+          <div key={m.id} className={`group flex gap-px rounded-[10px] border border-transparent ${m.meta?.pending ? "opacity-60" : ""}`}>
+            <div className="flex w-[46px] shrink-0 flex-col items-center gap-[5px] rounded-l-[10px] bg-page pt-2.5 pb-2">
+              <button onClick={() => m.user && openProfile(m.user.id)} aria-label={`${m.user?.name ?? ""} profili`}><Avatar src={m.user?.avatar} name={m.user?.name ?? "?"} className="size-6 !rounded-md" /></button>
+              <span className="text-[10px] font-medium text-[#45515c]">{hhmm(m.at)}</span>
+            </div>
+            <div className="min-w-0 flex-1 rounded-r-[10px] bg-page px-2.5 pt-2.5 pb-2.5">
+              <div className="flex h-6 items-center gap-[5px]">
+                <button onClick={() => m.user && openProfile(m.user.id)} className={`truncate text-[14px] font-medium hover:underline ${m.user?.id === me?.id ? "text-primary" : "text-[#cce0e1]"}`}>{m.user?.name ?? "—"}</button>
+                {me && m.user && m.user.id !== me.id && <button onClick={() => { setTipTo(m.user!.name); setWalletOpen("tip"); }} className="ml-auto grid size-6 place-items-center rounded bg-[#0c1117] text-subtle opacity-0 transition-opacity hover:text-primary group-hover:opacity-100 focus:opacity-100" title="Bahşiş gönder" aria-label="Bahşiş gönder"><I n="tip" className="size-4" /></button>}
               </div>
-              <div className={`break-words text-[13px] font-medium leading-snug text-muted ${m.meta?.pending ? "opacity-60" : ""}`}>{m.text}</div>
+              <p className="mt-1.5 break-words text-[13px] font-medium leading-4 text-white">{m.text}</p>
             </div>
           </div>
         ))}
       </div>
-      <div className="shrink-0 border-t border-line/60 p-3">
+      <div className="shrink-0 px-3 pt-2 pb-3">
         {err && <div className="mb-2 rounded-md bg-loss/10 px-3 py-2 text-[12px] font-semibold text-loss">{err}</div>}
         {muted ? (
           <div className="rounded-lg bg-caution/10 px-3 py-3 text-center text-[13px] font-semibold text-caution">{muted.banned ? "Sohbet kullanımın kapatıldı." : `Susturuldun — ${new Date(muted.mutedUntil!).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}'e kadar yazamazsın.`}</div>
@@ -129,14 +133,15 @@ export function ChatPanel({ onClose }: { onClose: () => void }) {
             </div>
           </div>
         ) : (
-          <div className="flex gap-2">
+          /* gamdom yazı kutusu: tek parça grup — metin (r10 sol) + yağmur + gönder (r10 sağ, yeşil ikon) */
+          <div className="flex h-11 gap-px overflow-hidden rounded-[10px]">
             <input aria-label="Sohbet mesajı" value={text} maxLength={st?.limits?.maxLen ?? 200} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && sendMsg()} onFocus={() => !me && setAuthOpen(true)}
-              placeholder={me ? "Bir şeyler yaz…" : "Yazmak için giriş yap"} className="input min-w-0 flex-1 text-sm" />
-            {st?.limits?.rainEnabled && <button onClick={() => (me ? setRainOpen(true) : setAuthOpen(true))} title="Yağmur başlat" aria-label="Yağmur başlat" className="grid size-11 shrink-0 place-items-center rounded-lg bg-card text-accent hover:bg-surface-hover"><I n="rain" className="size-5" /></button>}
-            <button disabled={busy || !text.trim()} onClick={sendMsg} className="grid size-11 shrink-0 place-items-center rounded-lg bg-card text-primary hover:bg-surface-hover disabled:opacity-40" aria-label="Gönder"><I n="send" className="size-5" /></button>
+              placeholder={me ? "Yazmaya başla…" : "Yazmak için giriş yap"} className="min-w-0 flex-1 bg-card px-4 text-[14px] font-medium text-white outline-none placeholder:text-subtle" />
+            {st?.limits?.rainEnabled && <button onClick={() => (me ? setRainOpen(true) : setAuthOpen(true))} title="Yağmur başlat" aria-label="Yağmur başlat" className="grid w-11 shrink-0 place-items-center bg-card text-subtle hover:text-accent"><I n="rain" className="size-5" /></button>}
+            <button disabled={busy || !text.trim()} onClick={sendMsg} className="grid w-11 shrink-0 place-items-center bg-card text-primary disabled:text-subtle" aria-label="Gönder"><I n="send" className="size-5" /></button>
           </div>
         )}
-        <div className="mt-2 text-center text-[10px] font-semibold text-dim">Küfür, dilenme, link/reklam otomatik engellenir ve susturma ile sonuçlanır.</div>
+
       </div>
     </div>
   );
@@ -148,41 +153,32 @@ export function ChatPanel({ onClose }: { onClose: () => void }) {
 export function ProfileModal() {
   const { profileId, openProfile, me, setWalletOpen, setTipTo } = useStore();
   const [p, setP] = useState<any>(null); const [err, setErr] = useState("");
-  useEffect(() => { if (!profileId) return; const k = (e: KeyboardEvent) => e.key === "Escape" && openProfile(null); window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k); }, [profileId]);
   useEffect(() => { if (!profileId) return; setP(null); setErr(""); api(`/api/profile/${profileId}`).then(setP).catch((e) => setErr(e.message)); }, [profileId]);
   if (!profileId) return null;
   const net = p?.stats?.net ?? 0;
   return (
-    <div className="fixed inset-0 z-[70] grid place-items-center bg-black/70 p-4 backdrop-blur-sm" onMouseDown={(e) => e.target === e.currentTarget && openProfile(null)}>
-      <div role="dialog" aria-modal="true" aria-label="Oyuncu profili" className="animate-slip-reveal w-full max-w-[560px] overflow-hidden rounded-2xl border border-line bg-panel shadow-[0_30px_80px_rgba(0,0,0,.6)]">
-        <div className="relative bg-[radial-gradient(120%_140%_at_50%_-20%,rgba(0,255,134,.35),transparent_60%)] px-5 pt-4 pb-5">
-          <div className="mb-3 text-center text-[15px] font-extrabold">Profil</div>
-          <button onClick={() => openProfile(null)} aria-label="Kapat" className="absolute right-4 top-4 grid size-8 place-items-center rounded-full bg-black/30 text-muted hover:text-fg"><I n="x" className="size-4" /></button>
-          {!p ? <div className="py-8 text-center text-sm text-subtle">{err ? "Profil bulunamadı" : "Yükleniyor…"}</div> : (
-            <div className="flex items-center gap-4 rounded-xl bg-black/25 p-4">
-              <Avatar src={p.avatar} name={p.name} className="size-16 ring-2 ring-primary/50" />
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 truncate text-lg font-extrabold">{p.name}{p.verified && <span title="Doğrulanmış" className="grid size-5 place-items-center rounded-full bg-primary text-primary-fg"><I n="check" className="size-3" /></span>}</div>
-                <div className="text-[13px] font-semibold text-subtle">Üyelik: {new Date(p.joinedAt).toLocaleDateString("tr-TR", { month: "long", year: "numeric" })}</div>
-              </div>
-              {me && me.id !== p.id && <button onClick={() => { setTipTo(p.name); openProfile(null); setWalletOpen("tip"); }} className="btn btn-primary btn-sm"><I n="tip" className="size-4" />Bahşiş gönder</button>}
+    <Sheet open onClose={() => openProfile(null)} title="Profil">
+      {!p ? <div className="py-10 text-center text-sm text-subtle">{err ? "Profil bulunamadı" : "Yükleniyor…"}</div> : (
+        <>
+          <div className="flex items-center gap-3 rounded-[10px] bg-card p-4">
+            <Avatar src={p.avatar} name={p.name} className="size-16 !rounded-lg" />
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 truncate text-[16px] font-bold">{p.name}{p.verified && <span title="Doğrulanmış" className="grid size-4 place-items-center rounded-full bg-primary text-primary-fg"><I n="check" className="size-2.5" /></span>}</div>
+              <div className="mt-0.5 text-[12px] font-medium text-subtle">Üyelik: {new Date(p.joinedAt).toLocaleDateString("tr-TR", { month: "long", year: "numeric" })}</div>
+            </div>
+            {me && me.id !== p.id && <button onClick={() => { setTipTo(p.name); openProfile(null); setWalletOpen("tip"); }} className="btn btn-primary btn-sm rounded-lg">Bahşiş</button>}
+          </div>
+          <p className="h-sec mt-6 mb-3">İstatistikler</p>
+          {p.hidden ? <div className="flex items-center justify-center gap-2 rounded-[15px] bg-card px-4 py-7 text-[14px] font-medium text-subtle"><I n="lock" className="size-4" />Bu oyuncu istatistiklerini gizli tutuyor.</div> : (
+            <div className="grid gap-2">
+              <StatCard value={p.stats.bets.toLocaleString("tr-TR")} label="Oynanan Bahis" icon={<img src="/img/ic-ball.svg" alt="" className="size-14" />} />
+              <StatCard value={money(p.stats.wagered)} label="Toplam Oynanan" icon={<img src="/img/ic-chart.svg" alt="" className="size-14" />} />
+              <StatCard value={<span className={net >= 0 ? "text-primary" : "text-loss"}>{net < 0 ? "-" : ""}{money(Math.abs(net))}</span>} label="Net Kâr" icon={<img src="/img/ic-trophy.svg" alt="" className="size-14" />} />
             </div>
           )}
-        </div>
-        {p && (
-          <div className="px-5 pb-5">
-            <div className="mb-2 text-[15px] font-extrabold">İstatistikler</div>
-            {p.hidden ? <div className="flex items-center justify-center gap-2 rounded-xl bg-card px-4 py-6 text-sm text-subtle"><I n="lock" className="size-4" />Bu oyuncu istatistiklerini gizli tutuyor.</div> : (
-              <div className="grid grid-cols-2 gap-2">
-                <div className="rounded-xl bg-card p-4"><div className="text-xl font-extrabold tabular-nums">{p.stats.bets.toLocaleString("tr-TR")}</div><div className="text-[12px] font-semibold text-subtle">Oynanan Bahis</div></div>
-                <div className="rounded-xl bg-card p-4"><div className="text-xl font-extrabold tabular-nums">{money(p.stats.wagered)}</div><div className="text-[12px] font-semibold text-subtle">Toplam Yatırılan</div></div>
-                <div className="col-span-2 rounded-xl bg-card p-4"><div className={`text-xl font-extrabold tabular-nums ${net >= 0 ? "text-win" : "text-loss"}`}>{net < 0 ? "-" : ""}{money(Math.abs(net))}</div><div className="text-[12px] font-semibold text-subtle">Net Kâr</div></div>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
+        </>
+      )}
+    </Sheet>
   );
 }
 
@@ -190,16 +186,15 @@ export function ProfileModal() {
  * CÜZDAN MENÜSÜ — Para Yatır · Para Çek · Promo Kodu · Bahşiş Gönder
  * ============================================================ */
 export function WalletModal() {
-  const { walletOpen, setWalletOpen, me, balance, refreshMe, tipTo, setTipTo } = useStore();
+  const { walletOpen, setWalletOpen, me, balance, refreshMe, tipTo, setTipTo, setWallet } = useStore();
   const nav = useNavigate();
   const [code, setCode] = useState(""); const [amt, setAmt] = useState(""); const [user, setUser] = useState("");
-  const [err, setErr] = useState(""); const [ok, setOk] = useState(""); const [busy, setBusy] = useState(false);
-  useEffect(() => { setErr(""); setOk(""); if (walletOpen === "tip") setUser(tipTo); }, [walletOpen]);
-  useEffect(() => { if (!walletOpen) return; const k = (e: KeyboardEvent) => { if (e.key === "Escape") { setWalletOpen(false); setTipTo(""); } }; window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k); }, [walletOpen]);
+  const [err, setErr] = useState(""); const [ok, setOk] = useState(""); const [busy, setBusy] = useState(false); const [pick, setPick] = useState(false);
+  useEffect(() => { setErr(""); setOk(""); setPick(false); if (walletOpen === "tip") setUser(tipTo); }, [walletOpen]);
   if (!walletOpen || !me) return null;
   const close = () => { setWalletOpen(false); setTipTo(""); };
   const go = (to: string) => { close(); nav(to); };
-  const back = <button onClick={() => setWalletOpen("menu")} aria-label="Geri" className="grid size-8 place-items-center rounded-full text-subtle hover:text-fg"><I n="left" className="size-4" /></button>;
+  const back = <button onClick={() => setWalletOpen("menu")} aria-label="Geri" className="-ml-1 grid size-7 place-items-center rounded-lg text-subtle hover:text-fg"><I n="left" className="size-5" /></button>;
   async function redeem() {
     setBusy(true); setErr(""); setOk("");
     try { const r: any = await api("/api/promo/redeem", { method: "POST", json: { code: code.trim() } }); setOk(`Kod kullanıldı! ${money(r.amount)} bonus hesabına yüklendi.`); setCode(""); refreshMe(); } catch (e: any) { setErr(e.message); }
@@ -211,58 +206,65 @@ export function WalletModal() {
     catch (e: any) { setErr(e.message === "TIP_MIN" ? `Bahşiş en az ${money(e.detail?.min)}` : e.message === "TIP_DAILY_LIMIT" ? `Günlük bahşiş limiti ${money(e.detail?.max)}` : e.message); }
     setBusy(false);
   }
-  const Row = ({ ic, tone, t, s, onClick }: { ic: string; tone?: "green" | "amber" | "cyan" | "red" | "slate"; t: string; s: string; onClick: () => void }) => (
-    <button onClick={onClick} className="flex w-full items-center gap-3 border-b border-line/60 px-4 py-3.5 text-left last:border-0 hover:bg-card">
-      <IconTile n={ic} tone={tone} />
-      <span className="min-w-0 flex-1"><span className="block text-[15px] font-extrabold">{t}</span><span className="block text-[12px] font-semibold text-subtle">{s}</span></span>
-      <I n="right" className="size-4 text-subtle" />
-    </button>
-  );
+  const active = me.activeWallet === "BONUS" ? "BONUS" : "MAIN";
+  /** gamdom cüzdan satırı: 51px, #0f151b, 24px renkli ikon + 16/700 + ok */
+  const ROWS: [string, string, string, () => void][] = [
+    ["deposit", "#00ff86", "Para Yatır", () => go("/para-yatir")],
+    ["withdraw", "#279aff", "Para Çek", () => go("/para-cek")],
+    ["promo", "#ffd900", "Kod Kullan", () => setWalletOpen("promo")],
+    ["tip", "#ff7ab6", "Bahşiş Gönder", () => setWalletOpen("tip")],
+    ["history", "#818e9d", "İşlem Geçmişi", () => go("/hesap/islemler")],
+  ];
+  const title = walletOpen === "menu" ? "Cüzdan" : walletOpen === "promo" ? "Kod Kullan" : "Bahşiş Gönder";
   return (
-    <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/70 backdrop-blur-sm sm:items-center sm:p-4" onMouseDown={(e) => e.target === e.currentTarget && close()}>
-      <div role="dialog" aria-modal="true" aria-label="Cüzdan" className="animate-slip-reveal flex max-h-[92dvh] w-full max-w-[440px] flex-col overflow-hidden rounded-t-2xl border border-line bg-panel-deep shadow-[0_30px_80px_rgba(0,0,0,.6)] sm:rounded-2xl">
-        <div className="flex h-14 shrink-0 items-center gap-2 px-3">
-          {walletOpen !== "menu" ? back : <span className="size-8" />}
-          <span className="flex-1 text-center text-[16px] font-extrabold">{walletOpen === "menu" ? "Cüzdan" : walletOpen === "promo" ? "Promo Kodu" : "Bahşiş Gönder"}</span>
-          <button onClick={close} aria-label="Kapat" className="grid size-8 place-items-center rounded-full bg-card text-subtle hover:text-fg"><I n="x" className="size-4" /></button>
-        </div>
-        <div className="sb-scroll overflow-y-auto px-3 pb-4">
-          {walletOpen === "menu" && (
-            <>
-              <div className="mb-3 grid grid-cols-2 gap-2">
-                <div className="rounded-xl bg-card p-3"><div className="text-[12px] font-semibold text-subtle">Ana para</div><div className="num text-[22px] font-bold">{money(balance("MAIN"))}</div></div>
-                <div className="rounded-xl bg-card p-3"><div className="text-[12px] font-semibold text-subtle">Bonus</div><div className="num text-[22px] font-bold text-caution">{money(balance("BONUS"))}</div></div>
-              </div>
-              <div className="overflow-hidden rounded-xl bg-panel">
-                <Row ic="deposit" tone="green" t="Para Yatır" s="Kripto ve diğer yöntemler" onClick={() => go("/para-yatir")} />
-                <Row ic="withdraw" tone="cyan" t="Para Çek" s="Kazancını hesabına aktar" onClick={() => go("/para-cek")} />
-                <Row ic="promo" tone="amber" t="Promo Kodu" s="Kodu gir, bonusu al" onClick={() => setWalletOpen("promo")} />
-                <Row ic="tip" tone="green" t="Bahşiş Gönder" s="Başka bir oyuncuya bakiye gönder" onClick={() => setWalletOpen("tip")} />
-                <Row ic="history" tone="slate" t="İşlem Geçmişi" s="Tüm hareketlerin" onClick={() => go("/hesap/islemler")} />
-              </div>
-            </>
-          )}
-          {walletOpen === "promo" && (
-            <div className="space-y-3 pt-1">
-              <label className="block"><span className="mb-1.5 block text-[13px] font-semibold text-soft">Promo veya hediye kodu</span>
-                <input value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="Kodu gir" className="input input-lg font-bold" /></label>
-              <ErrBox e={err} />{ok && <div className="rounded-md bg-win/10 px-3 py-2.5 text-sm font-bold text-win">{ok}</div>}
-              <button disabled={busy || code.trim().length < 3} onClick={redeem} className="btn btn-primary btn-lg w-full">Kodu kullan</button>
-            </div>
-          )}
-          {walletOpen === "tip" && (
-            <div className="space-y-3 pt-1">
-              <label className="block"><span className="mb-1.5 block text-[13px] font-semibold text-soft">Tutar</span>
-                <span className="flex h-12 items-center gap-2 rounded-lg border border-line-strong bg-field px-3 focus-within:border-primary"><span className="grid size-6 place-items-center rounded bg-primary text-[13px] font-extrabold text-primary-fg">₺</span><input aria-label="Bahşiş tutarı" value={amt} onChange={(e) => setAmt(e.target.value.replace(/[^0-9.,]/g, ""))} inputMode="decimal" placeholder="0,00" className="w-full bg-transparent font-bold outline-none" /></span></label>
-              <label className="block"><span className="mb-1.5 block text-[13px] font-semibold text-primary">Kullanıcı adı</span>
-                <input value={user} onChange={(e) => setUser(e.target.value)} placeholder="Kullanıcı adını gir" className="input input-lg" /></label>
-              <div className="flex items-center gap-2 rounded-lg bg-caution/10 px-3 py-2.5 text-[13px] font-semibold text-caution"><I n="shield" className="size-4 shrink-0" />Bahşişler iade edilmez. Ana Para bakiyenden düşülür.</div>
-              <ErrBox e={err} />{ok && <div className="rounded-md bg-win/10 px-3 py-2.5 text-sm font-bold text-win">{ok}</div>}
-              <button disabled={busy || !user.trim() || !(Number(amt.replace(",", ".")) > 0)} onClick={tip} className="btn btn-primary btn-lg w-full">Bahşiş gönder</button>
+    <Sheet open onClose={close} title={<span className="flex items-center gap-2">{walletOpen !== "menu" && back}{title}</span>}
+      head={walletOpen === "menu" ? (
+        <div className="relative">
+          <button onClick={() => setPick(!pick)} className="flex h-[31px] items-center gap-1.5 rounded-[10px] bg-card-2 px-2 text-[13px] font-bold">
+            <span className={`grid size-5 place-items-center rounded-full text-[11px] ${active === "BONUS" ? "bg-caution text-[#2a1d00]" : "bg-[#4fd35a] text-white"}`}>₺</span>
+            <span className="num">{money(balance(active as any))}</span><I n="down" className="size-4 text-subtle" />
+          </button>
+          {pick && (
+            <div className="absolute left-0 top-[calc(100%+6px)] z-10 w-[230px] rounded-xl bg-card-2 p-1.5 shadow-[0_18px_50px_rgba(0,0,0,.5)]">
+              {(["MAIN", "BONUS"] as const).map((w) => (
+                <button key={w} onClick={async () => { await setWallet(w); setPick(false); }} className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-[14px] font-bold hover:bg-elevated ${active === w ? "text-primary" : "text-fg"}`}>
+                  {w === "MAIN" ? "Ana Para" : "Bonus"}<span className="num">{money(balance(w))}</span>
+                </button>
+              ))}
             </div>
           )}
         </div>
-      </div>
-    </div>
+      ) : null}>
+      {walletOpen === "menu" && (
+        <div className="flex flex-col gap-0.5 overflow-hidden rounded-2xl">
+          {ROWS.map(([ic, c, t, fn]) => (
+            <button key={t} onClick={fn} className="flex h-[51px] w-full items-center gap-[14px] bg-panel px-4 text-left transition-colors hover:bg-card">
+              <span className="grid size-6 place-items-center rounded-md" style={{ color: c }}><I n={ic} className="size-[22px]" /></span>
+              <span className="flex-1 text-[16px] font-bold text-white">{t}</span>
+              <I n="right" className="size-5 text-subtle" />
+            </button>
+          ))}
+        </div>
+      )}
+      {walletOpen === "promo" && (
+        <div className="space-y-3 pt-1">
+          <label className="block"><span className="mb-2 block text-[12px] font-medium text-subtle">Promosyon veya hediye kodu</span>
+            <input value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="Kodu gir" className="input font-bold" /></label>
+          <ErrBox e={err} />{ok && <div className="rounded-[10px] bg-primary/10 px-3 py-2.5 text-sm font-bold text-primary">{ok}</div>}
+          <button disabled={busy || code.trim().length < 3} onClick={redeem} className="btn btn-primary w-full">Kodu kullan</button>
+        </div>
+      )}
+      {walletOpen === "tip" && (
+        <div className="space-y-3 pt-1">
+          <label className="block"><span className="mb-2 block text-[12px] font-medium text-subtle">Tutar</span>
+            <span className="flex h-11 items-center gap-2 rounded-[10px] border border-transparent bg-field px-3 focus-within:border-primary/60"><span className="grid size-5 place-items-center rounded-full bg-[#4fd35a] text-[11px] font-bold text-white">₺</span><input aria-label="Bahşiş tutarı" value={amt} onChange={(e) => setAmt(e.target.value.replace(/[^0-9.,]/g, ""))} inputMode="decimal" placeholder="0,00" className="w-full bg-transparent text-[14px] font-bold outline-none" /></span></label>
+          <label className="block"><span className="mb-2 block text-[12px] font-medium text-subtle">Kullanıcı adı</span>
+            <input value={user} onChange={(e) => setUser(e.target.value)} placeholder="Kullanıcı adını gir" className="input" /></label>
+          <p className="flex items-center gap-2 text-[14px] font-bold text-subtle"><I n="shield" className="size-6 shrink-0" />Bahşişler iade edilmez, Ana Para'dan düşülür.</p>
+          <ErrBox e={err} />{ok && <div className="rounded-[10px] bg-primary/10 px-3 py-2.5 text-sm font-bold text-primary">{ok}</div>}
+          <button disabled={busy || !user.trim() || !(Number(amt.replace(",", ".")) > 0)} onClick={tip} className="btn btn-primary w-full">Bahşiş gönder</button>
+        </div>
+      )}
+    </Sheet>
   );
 }

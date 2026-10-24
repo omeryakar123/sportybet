@@ -14,7 +14,7 @@ function SystemPicker({ systems, value, onChange }: { systems: any[]; value: any
     <div className="grid gap-2 sm:grid-cols-2">
       {systems.map((s) => (
         <button key={s.name} onClick={() => onChange(s)}
-          className={`flex cursor-pointer items-center gap-3 rounded-lg border p-3.5 text-left transition-colors ${value?.name === s.name ? "border-primary bg-primary/10" : "border-line bg-card hover:bg-surface-hover"}`}>
+          className={`flex cursor-pointer items-center gap-3 rounded-[10px] border-2 p-3.5 text-left transition-colors ${value?.name === s.name ? "border-primary bg-card" : "border-transparent bg-card hover:bg-card-2"}`}>
           {s.logoUrl ? <img src={s.logoUrl} alt="" className="h-8 w-12 rounded object-contain" /> : <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-elevated text-primary"><I n="wallet" className="size-5" /></span>}
           <span className="min-w-0">
             <span className="block truncate text-sm font-extrabold">{s.displayName}</span>
@@ -89,14 +89,14 @@ export function Deposit() {
   }
   return (
     <div className="animate-sports-fade mx-auto max-w-2xl">
-      <h1 className="flex items-center gap-2.5 text-2xl font-extrabold"><I n="arrowdown" className="size-6 text-win" />Para Yatır</h1>
+      <h1 className="h-sec">Para Yatır</h1>
       <p className="mt-1 text-sm font-medium text-subtle">Yöntemi seç, tutarı gir; talebin dakikalar içinde onaylanır.</p>
       <BannerSlot group="deposit-top" className="mt-4" />
       <div className="mt-5 space-y-5">
         <SystemPicker systems={systems} value={sys} onChange={(s) => { setSys(s); setTxid(""); }} />
-        {sys?.instructions && <div className="rounded-md border border-odds/30 bg-odds/10 px-3 py-2.5 text-sm font-semibold text-muted">{sys.instructions}</div>}
+        {sys?.instructions && <div className="rounded-[10px] bg-odds/10 px-3 py-2.5 text-sm font-semibold text-muted">{sys.instructions}</div>}
         {crypto && (
-          <div className="rounded-lg border border-line bg-card p-4">
+          <div className="rounded-2xl bg-card p-4">
             <div className="flex items-center justify-between">
               <span className="text-[13px] font-semibold text-soft">Yatırım adresi {crypto.network && <span className="ml-1 rounded-sm bg-elevated px-1.5 py-0.5 text-[11px] font-extrabold text-primary">{crypto.network}</span>}</span>
               <button onClick={copyAddr} className="cursor-pointer text-xs font-bold text-primary hover:underline">{copied ? "Kopyalandı ✓" : "Adresi kopyala"}</button>
@@ -173,7 +173,7 @@ export function Withdraw() {
   }
   return (
     <div className="animate-sports-fade mx-auto max-w-2xl">
-      <h1 className="flex items-center gap-2.5 text-2xl font-extrabold"><I n="arrowup" className="size-6 text-loss" />Para Çek</h1>
+      <h1 className="h-sec">Para Çek</h1>
       <p className="mt-1 text-sm font-medium text-subtle">Çekilebilir bakiyen: <b className="text-fg">{money(balance("MAIN"))}</b> (Ana Para cüzdanı)</p>
       {activeBonus && (
         <div className="mt-4 rounded-md border border-caution/40 bg-caution/10 px-3 py-2.5 text-sm font-semibold text-caution">

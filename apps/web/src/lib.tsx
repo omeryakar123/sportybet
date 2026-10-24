@@ -33,6 +33,7 @@ const PATHS: Record<string, React.ReactNode> = {
   bell: <><path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6" /><path d="M10 19a2 2 0 0 0 4 0" /></>,
   gift: <><rect x="3" y="8" width="18" height="5" rx="1" /><path d="M5 13v8h14v-8" /><path d="M12 8v13" /><path d="M12 8s-4.5.2-5.5-2C5.8 4.4 7.5 3 9 3.5 11 4.2 12 8 12 8Zm0 0s4.5.2 5.5-2c.7-1.6-1-3-2.5-2.5C13 4.2 12 8 12 8Z" /></>,
   wallet: <><rect x="3" y="6" width="18" height="14" rx="2" /><path d="M3 10h18" /><circle cx="16.5" cy="15" r="1" fill="currentColor" stroke="none" /></>,
+  logout: <><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3" /><path d="M10 17l-5-5 5-5" /><path d="M5 12h11" /></>,
   user: <><circle cx="12" cy="8" r="4" /><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6" /></>,
   ball: <><circle cx="12" cy="12" r="9" /><path d="M12 7.5 16 10.5l-1.5 4.5h-5L8 10.5Z" /><path d="M12 3v4.5M16 10.5l4.3-1.4M14.5 15l2.6 3.7M9.5 15l-2.6 3.7M8 10.5 3.7 9.1" /></>,
   vote: <><path d="m9 11.5 2 2 4-4.5" /><path d="M5 7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v11H5V7Z" /><path d="M22 18H2" /></>,

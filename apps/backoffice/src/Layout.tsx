@@ -49,6 +49,7 @@ export const NAV: Group[] = [
     { to: "/cms/home", label: "Anasayfa Düzeni" },
     { to: "/cms/banners", label: "Bannerlar" },
     { to: "/cms/promotions", label: "Promosyonlar" },
+    { to: "/cms/vip", label: "Ödül Seviyeleri" },
     { to: "/cms/pages", label: "Sayfalar" },
     { to: "/cms/settings", label: "Site Ayarları (Logo, SEO, Menü)" },
     { to: "/cms/css", label: "Web / Mobil CSS" },

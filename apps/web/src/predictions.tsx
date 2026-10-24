@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api } from "./api";
-import { Avatar, Btn, RankBadge, Empty, ErrBox, I, Spinner, inp, money, money0, pct, timeLeft, useStore } from "./lib";
+import { Avatar, Btn, RankBadge, Empty, ErrBox, I, Spinner, inp, money, money0, pct, timeLeft, useStore, scrollMain } from "./lib";
 import { BannerSlot } from "./CmsSlot";
+import { Pager, Tabs, PageTitle } from "./g";
 
 const PLACE = (q: string) => {
   const hues = [[28, 60], [210, 55], [150, 45], [330, 45], [260, 50]];
@@ -101,52 +102,45 @@ export function PredictionsPage() {
     const q = new URLSearchParams({ page: String(page), limit: "24", sort, ...(cat ? { category: cat } : {}), ...(search ? { search } : {}), ...(saved ? { saved: "true" } : {}) });
     api(`/api/predictions?${q}`).then(setData).catch(() => setData({ data: [], pagination: { totalPages: 1 } }));
   }, [cat, page, search, sort, saved]);
-  const current = predCats.find((c) => c.slug === cat);
+  const nav = useNavigate();
+  const [sortOpen, setSortOpen] = useState(false);
+  const SORTS: [string, string][] = [["default", "Öne çıkanlar"], ["volume", "Hacme göre"], ["deadline", "Yaklaşan"], ["new", "Yeni"]];
+  const tab = saved ? "__saved" : cat;
+  const tabs: [string, string][] = [["", "Lobi"], ["__saved", "Kaydettiklerim"], ...predCats.filter((c) => c.activeCount > 0).map((c) => [c.slug, c.name] as [string, string])];
+  const pickRandom = () => { const l = data?.data ?? []; if (l.length) nav(`/tahminler/${l[Math.floor(Math.random() * l.length)].slug}`); };
   return (
     <div className="animate-sports-fade">
-      {/* üst tanıtım şeridi */}
-      <BannerSlot group="predictions-top" className="-mx-4 mb-5 px-4" />
-
-      {/* kategori sekmeleri */}
-      <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
-        <CatChip active={!cat} onClick={() => setSp({})} icon="grid" label="Tümü" count={total} />
-        {predCats.filter((c) => c.activeCount > 0).map((c) => (
-          <CatChip key={c.id} active={cat === c.slug} onClick={() => setSp({ kategori: c.slug })} icon="hash" label={c.name} count={c.activeCount} />
-        ))}
-      </div>
-
-      <div className="mt-5 flex flex-wrap items-center gap-3">
-        <div>
-          <h1 className="text-2xl font-extrabold">{current?.name ?? "Tümü"}</h1>
-          <div className="text-sm font-medium text-subtle">{data?.pagination?.total ?? "…"} tahmin</div>
-        </div>
-        <div className="ml-auto flex items-center gap-2">
-          <label className="flex h-[42px] w-[220px] items-center gap-2 rounded-[5px] border border-line-strong bg-field px-3 transition-colors focus-within:border-primary">
-            <I n="search" className="size-4 shrink-0 text-subtle" />
-            <input className="w-full bg-transparent text-sm font-medium outline-none placeholder:text-subtle" placeholder="Bu listede ara" value={search} onChange={(e) => setSearch(e.target.value)} />
-          </label>
-          <select value={sort} onChange={(e) => setSort(e.target.value)} className="h-[42px] rounded-[5px] border border-line-strong bg-field px-3 text-sm font-semibold outline-none">
-            <option value="default">Öne çıkanlar</option><option value="volume">Hacme göre</option><option value="deadline">Yaklaşan</option><option value="new">Yeni</option>
-          </select>
-          <button onClick={() => setSaved(!saved)} aria-label="Kaydettiklerim" className={`grid size-[42px] place-items-center rounded-[5px] border transition-colors ${saved ? "border-primary bg-primary/10 text-primary" : "border-line-strong bg-field text-muted hover:text-fg"}`}>
-            <svg viewBox="0 0 24 24" className="size-4" fill={saved ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2"><path d="M6 3h12v18l-6-4.5L6 21Z" /></svg>
+      {/* gamdom casino lobisi düzeni: üst banner şeridi → sekmeler → arama → sıralama + rastgele */}
+      <BannerSlot group="predictions-top" className="mb-4" />
+      <Tabs tabs={tabs} value={tab} onChange={(v) => { if (v === "__saved") { setSaved(true); setSp({}); } else { setSaved(false); setSp(v ? { kategori: v } : {}); } }} />
+      <label className="mt-4 flex h-11 items-center gap-1.5 rounded-[10px] border border-transparent bg-card px-3 focus-within:border-primary/50">
+        <I n="search" className="size-5 shrink-0 text-subtle" />
+        <input className="w-full bg-transparent text-[14px] font-medium outline-none placeholder:text-subtle" placeholder={`${total} tahmin içinde ara`} value={search} onChange={(e) => setSearch(e.target.value)} />
+      </label>
+      <div className="mt-2 flex gap-2">
+        <div className="relative flex-1 sm:flex-none">
+          <button onClick={() => setSortOpen(!sortOpen)} className="flex h-11 w-full items-center gap-1.5 rounded-[10px] bg-card-2 px-[17px] text-[14px] font-bold sm:w-auto">
+            <span className="text-subtle">Sıralama :</span><span className="text-fg">{SORTS.find(([k]) => k === sort)?.[1]}</span><I n="down" className="ml-auto size-4 text-subtle sm:ml-3" />
           </button>
-        </div>
-      </div>
-
-      {data?.site?.notice && <div className="mt-4 rounded-md border border-caution/40 bg-caution/10 px-3 py-2.5 text-sm font-semibold text-caution">{data.site.notice}</div>}
-      {!data ? <Spinner /> : data.data.length === 0 ? <div className="mt-6"><Empty text={saved ? "Henüz tahmin kaydetmedin." : "Bu kategoride açık tahmin yok."} /></div> : (
-        <>
-          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {data.data.map((m: any) => <MarketCard key={m.id} m={m} />)}
-          </div>
-          {data.pagination.totalPages > 1 && (
-            <div className="mt-8 flex items-center justify-center gap-2">
-              <Btn kind="soft" disabled={page <= 1} onClick={() => setPage(page - 1)}>Önceki</Btn>
-              <span className="px-2 text-sm font-bold text-subtle">{page} / {data.pagination.totalPages}</span>
-              <Btn kind="soft" disabled={page >= data.pagination.totalPages} onClick={() => setPage(page + 1)}>Sonraki</Btn>
+          {sortOpen && (
+            <div className="absolute left-0 top-[calc(100%+6px)] z-20 w-full min-w-[200px] rounded-xl bg-card-2 p-1.5 shadow-[0_18px_50px_rgba(0,0,0,.5)]">
+              {SORTS.map(([k, l]) => <button key={k} onClick={() => { setSort(k); setSortOpen(false); }} className={`block w-full rounded-lg px-3 py-2.5 text-left text-[14px] font-bold hover:bg-elevated ${sort === k ? "text-primary" : "text-fg"}`}>{l}</button>)}
             </div>
           )}
+        </div>
+        <div className="flex">
+          <button onClick={pickRandom} className="h-11 rounded-l-lg bg-card px-4 text-[14px] font-bold text-white hover:bg-card-2">Rastgele Seç</button>
+          <button onClick={pickRandom} aria-label="Rastgele tahmin" className="ml-0.5 grid h-11 w-14 place-items-center rounded-r-lg bg-card text-white hover:bg-card-2"><I n="grid" className="size-5" /></button>
+        </div>
+      </div>
+
+      {data?.site?.notice && <div className="mt-4 rounded-[10px] bg-caution/10 px-3 py-2.5 text-[14px] font-bold text-caution">{data.site.notice}</div>}
+      {!data ? <Spinner /> : data.data.length === 0 ? <div className="mt-6"><Empty text={saved ? "Henüz tahmin kaydetmedin." : "Bu kategoride açık tahmin yok."} /></div> : (
+        <>
+          <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {data.data.map((m: any) => <MarketCard key={m.id} m={m} />)}
+          </div>
+          <Pager page={page} pages={data.pagination.totalPages ?? 1} onChange={(n) => { setPage(n); scrollMain(0); }} />
         </>
       )}
     </div>
@@ -365,41 +359,59 @@ export function MyPositions({ positions, markets, onChange }: { positions: any[]
 
 // ---------------- Liderlik ----------------
 export function Leaderboard() {
-  const { openProfile } = useStore();
-  const [days, setDays] = useState(7);
+  const { openProfile, me } = useStore();
+  const [days, setDays] = useState("7");
   const [rows, setRows] = useState<any[] | null>(null);
   useEffect(() => { setRows(null); api(`/api/predictions/leaderboard?days=${days}`).then((r) => setRows(r.data)).catch(() => setRows([])); }, [days]);
+  const top = rows?.slice(0, 3) ?? []; const rest = rows?.slice(3) ?? [];
+  const mine = rows?.find((r) => me && r.playerId === me.id);
+  const coin = <span className="grid size-5 shrink-0 place-items-center rounded-lg bg-[#0ee07b] text-[13px] font-medium text-white">₺</span>;
+  const Podium = ({ r, big }: { r: any; big?: boolean }) => (
+    <button onClick={() => r.playerId && openProfile(r.playerId)} className={`relative flex flex-1 flex-col items-center rounded-2xl bg-card px-2 pb-4 text-center ${big ? "pt-6 sm:-mt-6" : "pt-5"}`}>
+      <span className="absolute -top-3"><RankBadge n={r.rank} /></span>
+      <Avatar src={r.avatar} name={r.username} className={`${big ? "size-16" : "size-12"} !rounded-lg`} />
+      <p className="mt-2 w-full truncate text-[14px] font-bold">{r.username}</p>
+      <p className="mt-3 text-[12px] font-bold uppercase text-subtle">Net kazanç</p>
+      <p className={`text-[14px] font-bold ${r.profit >= 0 ? "text-primary" : "text-loss"}`}>{money(r.profit)}</p>
+      <p className="mt-2 text-[12px] font-bold uppercase text-subtle">İsabet</p>
+      <p className="flex items-center gap-1.5 text-[14px] font-bold">%{r.positions ? Math.round((r.wins / r.positions) * 100) : 0}</p>
+    </button>
+  );
+  const Row = ({ r, you }: { r: any; you?: boolean }) => (
+    <div className={`flex h-[52px] items-center gap-3 rounded-[10px] px-3.5 ${you ? "bg-card-2 ring-1 ring-primary/40" : "bg-card"}`}>
+      <span className="grid h-[27px] min-w-[29px] place-items-center rounded-lg border-2 border-[#45515c] px-1.5 text-[14px] font-bold">{r.rank ?? "-"}</span>
+      <button onClick={() => r.playerId && openProfile(r.playerId)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
+        <Avatar src={r.avatar} name={r.username} className="size-6 !rounded-md" />
+        <span className={`truncate text-[14px] font-medium ${you ? "text-primary" : "text-white"}`}>{r.username}</span>
+        {you && <span className="rounded-md bg-primary/15 px-1.5 text-[10px] font-bold text-primary">SEN</span>}
+      </button>
+      <span className="hidden text-[13px] font-medium text-subtle sm:block">{r.positions} tahmin</span>
+      <span className="flex w-[120px] items-center justify-end gap-1.5">{coin}<span className={`text-[14px] font-medium tabular-nums ${r.profit >= 0 ? "text-white" : "text-loss"}`}>{money(r.profit)}</span></span>
+    </div>
+  );
   return (
-    <div className="animate-sports-fade mx-auto max-w-3xl">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="flex items-center gap-2.5 text-2xl font-extrabold"><I n="trophy" className="size-6 text-caution" />Liderlik Tablosu</h1>
-        <div className="flex rounded-lg bg-field p-1">
-          {[[7, "Bu Hafta"], [30, "Bu Ay"], [365, "Tüm Zamanlar"]].map(([v, l]) => (
-            <button key={v} onClick={() => setDays(v as number)} className={`h-9 rounded-md px-4 text-sm font-bold transition-colors ${days === v ? "bg-elevated text-primary" : "text-subtle hover:text-fg"}`}>{l}</button>
-          ))}
-        </div>
-      </div>
-      <p className="mt-1 text-sm font-medium text-subtle">Sonuçlanan tahminlerdeki net kazanca göre sıralanır.</p>
+    <div className="animate-sports-fade mx-auto max-w-[900px]">
+      <PageTitle>Liderlik Tablosu</PageTitle>
+      <Tabs tabs={[["7", "Bu Hafta"], ["30", "Bu Ay"], ["365", "Tüm Zamanlar"]]} value={days} onChange={setDays} />
+      <p className="mt-3 text-[14px] font-medium text-subtle">Sonuçlanan tahminlerdeki net kazanca göre sıralanır.</p>
       {!rows ? <Spinner /> : rows.length === 0 ? <div className="mt-6"><Empty text="Bu dönemde sonuçlanan tahmin yok." /></div> : (
-        <div className="mt-5 overflow-hidden rounded-lg border border-line">
-          <table className="w-full text-sm">
-            <thead><tr className="bg-card text-left text-[12px] font-semibold text-dim">
-              <th className="px-4 py-3">#</th><th className="px-4 py-3">Oyuncu</th><th className="px-4 py-3 text-right">Net Kazanç</th><th className="hidden px-4 py-3 text-right sm:table-cell">Hacim</th><th className="hidden px-4 py-3 text-right sm:table-cell">Tahmin</th><th className="px-4 py-3 text-right">İsabet</th>
-            </tr></thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr key={r.rank} className="border-t border-line bg-row font-semibold hover:bg-surface-hover">
-                  <td className="px-4 py-3"><RankBadge n={r.rank} /></td>
-                  <td className="px-4 py-3 font-bold"><button onClick={() => r.playerId && openProfile(r.playerId)} className="flex items-center gap-2.5 hover:text-primary"><Avatar src={r.avatar} name={r.username} className="size-8" /><span className="truncate">{r.username}</span></button></td>
-                  <td className={`px-4 py-3 text-right font-extrabold ${r.profit >= 0 ? "text-win" : "text-loss"}`}>{money(r.profit)}</td>
-                  <td className="hidden px-4 py-3 text-right text-muted sm:table-cell">{money(r.volume)}</td>
-                  <td className="hidden px-4 py-3 text-right text-muted sm:table-cell">{r.positions}</td>
-                  <td className="px-4 py-3 text-right text-muted">%{r.positions ? Math.round((r.wins / r.positions) * 100) : 0}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <>
+          <div className="mt-8 flex items-end gap-2 sm:gap-3">
+            {top[1] && <Podium r={top[1]} />}{top[0] && <Podium r={top[0]} big />}{top[2] && <Podium r={top[2]} />}
+          </div>
+          {rest.length > 0 && (
+            <>
+              <div className="mt-6 flex px-3.5 text-[12px] font-bold uppercase text-subtle"><span className="w-[41px]">Sıra</span><span className="flex-1">Oyuncu</span><span className="w-[120px] text-right">Net kazanç</span></div>
+              <div className="mt-2 space-y-2">{rest.map((r) => <Row key={r.rank} r={r} you={!!me && r.playerId === me.id} />)}</div>
+            </>
+          )}
+          {me && !mine && (
+            <div className="sticky bottom-2 mt-4">
+              <Row r={{ rank: null, username: me.username, avatar: me.avatar, profit: 0, positions: 0 }} you />
+              <p className="mt-2 text-center text-[13px] font-medium text-subtle">Şu an tabloda değilsin — tahminlerin sonuçlandıkça burada görünürsün.</p>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

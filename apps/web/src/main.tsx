@@ -9,7 +9,7 @@ import Sport from "./Sport";
 import { PredictionsPage, PredictionDetail, Leaderboard } from "./predictions";
 import { AccountLayout, Profile, MyPredictions, Transactions, MyCoupons, MyBonuses, Security } from "./Account";
 import { Deposit, Withdraw } from "./Wallet";
-import { Promotions, PromotionDetail, StaticPage, Vip } from "./Misc";
+import { Promotions, PromotionDetail, StaticPage, Rewards } from "./Misc";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <BrowserRouter>
@@ -25,7 +25,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           <Route path="promosyonlar" element={<Promotions />} />
           <Route path="promosyonlar/:slug" element={<PromotionDetail />} />
           <Route path="page/:slug" element={<StaticPage />} />
-          <Route path="vip" element={<Vip />} />
+          <Route path="oduller" element={<Rewards />} />
+          <Route path="vip" element={<Navigate to="/oduller" replace />} />
           <Route path="para-yatir" element={<Deposit />} />
           <Route path="para-cek" element={<Withdraw />} />
           <Route path="hesap" element={<AccountLayout />}>

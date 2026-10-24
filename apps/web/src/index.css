@@ -105,3 +105,11 @@ body { @apply bg-page font-sans text-fg antialiased; }
 .lift { transition: transform .2s ease; } .lift:hover { transform: translateY(-4px); }
 .seo-text { @apply text-[14px] text-subtle; }
 .seo-text h2, .seo-text h3 { @apply mt-5 mb-2 text-[16px] font-bold text-white; }
+/* gamdom modal girişi: scale(.98) translateY(8px) → yerine */
+@keyframes sheet-in { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: none; } }
+.animate-sheet { animation: sheet-in .2s cubic-bezier(.22,1,.36,1); }
+.promo-text { @apply text-[14px] font-medium text-subtle; }
+.promo-text h2, .promo-text h3 { @apply mt-4 mb-3 text-[24px] font-bold leading-tight text-white; }
+.promo-text strong, .promo-text b { @apply font-bold text-subtle; }
+@keyframes menu-in { from { transform: translateX(-100%); } to { transform: none; } }
+.animate-menu-in { animation: menu-in .22s cubic-bezier(.22,1,.36,1); }

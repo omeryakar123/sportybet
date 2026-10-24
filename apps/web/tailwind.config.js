@@ -16,7 +16,7 @@ export default {
       },
       colors: {
         // gamdom.com getComputedStyle ölçümleri
-        page: "#080d13", "panel-deep": "#06090e", rail: "#0f151b", field: "#131a22", panel: "#0f151b", header: "#080d13", row: "#0f1d28",
+        page: "#080d13", "panel-deep": "#06090e", rail: "#0f151b", field: "#19212a", panel: "#0f151b", header: "#080d13", row: "#0f1d28",
         card: "#131a22", "card-2": "#19212a", "card-blue": "#0f1d28", "surface-hover": "#19212a", elevated: "#252f3a", "elevated-hover": "#2e3945",
         line: "#19212a", "line-strong": "#252f3a",
         fg: "#f9f9f9", muted: "#bfc3c7", soft: "#a2adb9", subtle: "#818e9d", dim: "#818e9d",
