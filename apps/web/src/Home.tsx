@@ -6,6 +6,26 @@ import { MarketCard } from "./predictions";
 
 /* ---------- özgün dekoratif çizimler ---------- */
 
+/** Anasayfadan kupona ekle: spor sayfasının kuponuyla aynı kayıt (sb_picks) */
+function addPick(ev: any, code: string, nav: (to: string) => void) {
+  const m1 = (ev.markets ?? []).find((m: any) => m.key === "1x2");
+  const sel = m1?.selections.find((x: any) => x.code === code);
+  if (!sel) { nav(`/spor/mac/${ev.id}`); return; }
+  let picks: any[] = []; try { picks = JSON.parse(localStorage.getItem("sb_picks") || "[]"); } catch {}
+  picks = picks.filter((p) => p.evId !== ev.id);
+  picks.push({ selId: sel.id, evId: ev.id, match: `${ev.home} - ${ev.away}`, market: m1.name, pick: sel.name, odds: sel.odds });
+  try { localStorage.setItem("sb_picks", JSON.stringify(picks)); } catch {}
+  nav("/spor?kupon=1");
+}
+const OddPick = ({ ev, l, c, nav, big }: { ev: any; l: string; c: string; nav: (to: string) => void; big?: boolean }) => {
+  const o = (ev.markets ?? []).find((m: any) => m.key === "1x2")?.selections.find((x: any) => x.code === c)?.odds;
+  return (
+    <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); addPick(ev, c, nav); }} title="Kupona ekle" className={`odd ${big ? "h-11" : ""}`}>
+      <span className="l">{l}</span><span className={`o ${big ? "text-[17px]" : ""}`}>{o?.toFixed(2) ?? "-"}</span>
+    </button>
+  );
+};
+
 function useNow() { const [n, setN] = useState(Date.now()); useEffect(() => { const t = setInterval(() => setN(Date.now()), 1000); return () => clearInterval(t); }, []); return n; }
 function Countdown({ to }: { to: string }) {
   const now = useNow(); const ms = Math.max(0, new Date(to).getTime() - now);
@@ -23,6 +43,7 @@ function BigLogo({ src, name }: { src?: string; name: string }) {
 
 function Hero({ ev }: { ev?: any }) {
   const { me, setAuthOpen, settings } = useStore();
+  const nav = useNavigate();
   const [promos, setPromos] = useState<any[]>([]); const [i, setI] = useState(0);
   useEffect(() => { api("/api/cms/promotions").then((r) => setPromos((Array.isArray(r) ? r : []).filter((p: any) => !p.endsAt || new Date(p.endsAt) > new Date()).slice(0, 6))).catch(() => {}); }, []);
   useEffect(() => { if (promos.length < 2) return; const t = setInterval(() => setI((x) => (x + 1) % promos.length), 7000); return () => clearInterval(t); }, [promos.length]);
@@ -61,7 +82,7 @@ function Hero({ ev }: { ev?: any }) {
                 </div>
                 <div className="flex min-w-0 flex-col items-center gap-2 text-center"><BigLogo src={ev.awayLogo} name={ev.away} /><span className="w-full truncate text-[14px] font-bold">{ev.away}</span></div>
               </div>
-              {m1 && <div className="mt-4 grid grid-cols-3 gap-2">{[["1", "HOME"], ["X", "DRAW"], ["2", "AWAY"]].map(([l, c]) => <span key={c} className="odd h-11"><span className="l">{l}</span><span className="o text-[17px]">{o(c)?.toFixed(2) ?? "-"}</span></span>)}</div>}
+              {m1 && <div className="mt-4 grid grid-cols-3 gap-2">{[["1", "HOME"], ["X", "DRAW"], ["2", "AWAY"]].map(([l, c]) => <OddPick key={c} ev={ev} l={l} c={c} nav={nav} big />)}</div>}
             </Link>
           )}
         </div>
@@ -100,7 +121,7 @@ function Rail({ title, icon, to, children }: { title: string; icon: React.ReactN
         <span className="grid size-8 place-items-center rounded-full bg-primary/15 text-primary">{icon}</span>
         <h2 className="title min-w-0 truncate text-[22px] sm:text-[26px]">{title}</h2>
         <Link to={to} className="ml-1 shrink-0 text-[13px] font-bold text-subtle hover:text-primary">Tümü</Link>
-        <div className="ml-auto flex gap-1.5">
+        <div className="ml-auto hidden gap-1.5 sm:flex">
           <button onClick={() => by(-1)} aria-label="Önceki" className="grid size-9 place-items-center rounded-lg bg-panel text-muted hover:text-fg"><I n="left" className="size-4" /></button>
           <button onClick={() => by(1)} aria-label="Sonraki" className="grid size-9 place-items-center rounded-lg bg-panel text-muted hover:text-fg"><I n="right" className="size-4" /></button>
         </div>
@@ -146,32 +167,32 @@ export default function Home() {
       <Hero ev={featured[0]} />
 
       {/* kategori kartları — her biri kendi canlı verisini gösterir */}
-      <section className="mt-4 grid gap-3 sm:grid-cols-3">
-        <Link to="/spor" className="group surface flex h-[112px] items-center gap-4 rounded-2xl px-5 transition-[box-shadow] hover:ring-1 hover:ring-primary/40">
-          <div className="min-w-0 flex-1"><div className="title text-[30px]">Spor</div><div className="mt-1 text-[13px] font-semibold text-subtle">{total.ev} maç bültende</div></div>
-          <div className="flex -space-x-2.5">
-            {leagues.slice(0, 4).map((l) => <span key={l.id} className="grid size-11 place-items-center rounded-full bg-[#0f1923] ring-2 ring-[#15212e]">{l.logo ? <img src={l.logo} alt="" className="size-7 object-contain" /> : <I n="ball" className="size-5 text-soft" />}</span>)}
+      <section className="mt-3 grid grid-cols-3 gap-2 sm:mt-4 sm:gap-3">
+        <Link to="/spor" className="group surface flex h-[84px] flex-col items-start justify-center gap-0.5 rounded-2xl px-3 sm:h-[112px] sm:flex-row sm:items-center sm:gap-4 sm:px-5 transition-[box-shadow] hover:ring-1 hover:ring-primary/40">
+          <div className="min-w-0 flex-1"><div className="title text-[20px] sm:text-[30px]">Spor</div><div className="mt-1 truncate text-[11px] font-semibold text-subtle sm:text-[13px]">{total.ev} maç bültende</div></div>
+          <div className="hidden -space-x-2.5 sm:flex">
+            {leagues.slice(0, 4).map((l) => <span key={l.id} className="grid size-11 place-items-center rounded-full bg-[#e8eef5] ring-2 ring-[#15212e]">{l.logo ? <img src={l.logo} alt="" className="size-7 object-contain" /> : <I n="ball" className="size-5 text-soft" />}</span>)}
           </div>
-          <I n="right" className="size-5 text-subtle transition-transform group-hover:translate-x-0.5" />
+          <I n="right" className="hidden size-5 text-subtle transition-transform group-hover:translate-x-0.5 sm:block" />
         </Link>
-        <Link to="/spor" className="group surface flex h-[112px] items-center gap-4 rounded-2xl px-5 transition-[box-shadow] hover:ring-1 hover:ring-live/50">
-          <div className="min-w-0 flex-1"><div className="title text-[30px]">Canlı</div><div className="mt-1 text-[13px] font-semibold text-subtle">{live.length ? "maç şu an oynanıyor" : "şu an canlı maç yok"}</div></div>
-          <div className="flex items-center gap-2"><span className={`size-2.5 rounded-full bg-live ${live.length ? "live-dot" : "opacity-40"}`} /><span className="num text-[52px] font-bold leading-none">{live.length}</span></div>
-          <I n="right" className="size-5 text-subtle transition-transform group-hover:translate-x-0.5" />
+        <Link to="/spor" className="group surface flex h-[84px] flex-col items-start justify-center gap-0.5 rounded-2xl px-3 sm:h-[112px] sm:flex-row sm:items-center sm:gap-4 sm:px-5 transition-[box-shadow] hover:ring-1 hover:ring-live/50">
+          <div className="min-w-0 flex-1"><div className="title text-[20px] sm:text-[30px]">Canlı</div><div className="mt-1 truncate text-[11px] font-semibold text-subtle sm:text-[13px]">{live.length ? `${live.length} maç oynanıyor` : "şu an canlı maç yok"}</div></div>
+          <div className="hidden items-center gap-2 sm:flex"><span className={`size-2.5 rounded-full bg-live ${live.length ? "live-dot" : "opacity-40"}`} /><span className="num text-[52px] font-bold leading-none">{live.length}</span></div>
+          <I n="right" className="hidden size-5 text-subtle transition-transform group-hover:translate-x-0.5 sm:block" />
         </Link>
-        <Link to="/tahminler" className="group surface flex h-[112px] items-center gap-4 rounded-2xl px-5 transition-[box-shadow] hover:ring-1 hover:ring-accent/50">
+        <Link to="/tahminler" className="group surface flex h-[84px] flex-col items-start justify-center gap-0.5 rounded-2xl px-3 sm:h-[112px] sm:flex-row sm:items-center sm:gap-4 sm:px-5 transition-[box-shadow] hover:ring-1 hover:ring-accent/50">
           <div className="min-w-0 flex-1">
-            <div className="title text-[30px]">Tahminler</div>
-            <div className="mt-1 text-[13px] font-semibold text-subtle">{total.pred || markets.length} açık piyasa</div>
+            <div className="title text-[20px] sm:text-[30px]">Tahminler</div>
+            <div className="mt-1 truncate text-[11px] font-semibold text-subtle sm:text-[13px]">{total.pred || markets.length} açık piyasa</div>
           </div>
           {markets[0]?.outcomes?.length >= 2 && (() => { const y = Math.round(markets[0].outcomes[0].probability ?? 50); return (
-            <div className="w-28 shrink-0" title={markets[0].question}>
+            <div className="hidden w-28 shrink-0 sm:block" title={markets[0].question}>
               <div className="flex justify-between text-[11px] font-bold"><span className="text-win">{markets[0].outcomes[0].name} %{y}</span><span className="text-loss">%{100 - y}</span></div>
               <div className="mt-1 flex h-2 overflow-hidden rounded-full bg-loss/70"><div className="bg-win" style={{ width: `${y}%` }} /></div>
               <div className="mt-1 truncate text-[11px] text-dim">{markets[0].question}</div>
             </div>
           ); })()}
-          <I n="right" className="size-5 text-subtle transition-transform group-hover:translate-x-0.5" />
+          <I n="right" className="hidden size-5 text-subtle transition-transform group-hover:translate-x-0.5 sm:block" />
         </Link>
       </section>
 

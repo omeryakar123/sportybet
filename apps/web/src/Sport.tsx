@@ -71,7 +71,7 @@ function TeamLogo({ src, name, size = "size-4" }: { src?: string; name: string; 
 
 // ======================================================================
 export default function Sport() {
-  const { me, setAuthOpen, balance, refreshMe, chatOpen } = useStore();
+  const { me, setAuthOpen, balance, refreshMe, chatOpen, setWalletOpen } = useStore();
   const { id: evParam } = useParams();
   const nav = useNavigate();
   const [det, setDet] = useState<Ev | null>(null);
@@ -95,7 +95,7 @@ export default function Sport() {
   const [mode, setMode] = useState<"single" | "combo">("combo");
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<{ t: string; kind?: "ok" | "warn" } | null>(null);
-  const [slipOpen, setSlipOpen] = useState(false);
+  const [slipOpen, setSlipOpen] = useState(() => { try { return new URLSearchParams(window.location.search).get("kupon") === "1"; } catch { return false; } });
   const [quick, setQuick] = useState(false);
   const [limits, setLimits] = useState<{ minStake: number; maxStake: number; maxWin: number; maxSelections: number; liveEnabled?: boolean; liveDelaySec?: number; liveMaxStake?: number } | null>(null);
   const [acceptHigher, setAcceptHigher] = useState(() => { try { return localStorage.getItem("sb_accept") !== "none"; } catch { return true; } });
@@ -229,6 +229,8 @@ export default function Sport() {
   const potWin = effMode === "combo" ? Math.min(st * totalOdds, limits?.maxWin ?? Infinity) : picks.reduce((a, p) => a + st * p.odds, 0);
   const cost = effMode === "combo" ? st : st * picks.length;
   const activeWallet = me?.activeWallet === "BONUS" ? "BONUS" : "MAIN";
+  const suspendedPicks = picks.filter((p) => p.suspended);
+  const shortBy = me ? Math.max(0, Math.round((cost - balance(activeWallet)) * 100) / 100) : 0;
   async function place() {
     if (limits && st < limits.minStake) { setErr(`Asgari bahis ${money(limits.minStake)}`); return; }
     if (limits && st > limits.maxStake) { setErr(`Azami bahis ${money(limits.maxStake)}`); return; }
@@ -310,10 +312,22 @@ export default function Sport() {
             <div className="mt-2"><ErrBox e={err} /></div>
             <div className="mt-2 flex gap-2">
               <button onClick={() => setPicks([])} className="grid h-[52px] w-11 shrink-0 place-items-center rounded-lg bg-card text-subtle hover:text-loss" aria-label="Kuponu temizle"><I n="trash" className="size-5" /></button>
-              <button onClick={place} disabled={busy || !st} className="flex h-[52px] flex-1 flex-col items-center justify-center rounded-lg bg-primary text-primary-fg transition-colors hover:bg-primary-hover disabled:opacity-50">
-                <span className="text-[15px] font-extrabold leading-tight">{busy ? (waitSec > 0 ? `Canlı bahis onaylanıyor… ${waitSec}` : "Gönderiliyor…") : me ? `Bahis Yap · ${money(cost)}` : "Giriş Yap ve Oyna"}</span>
-                <span className="text-[12px] font-bold opacity-75">Olası kazanç {money(potWin)}</span>
-              </button>
+              {suspendedPicks.length > 0 ? (
+                <button onClick={() => setPicks((ps) => ps.filter((p) => !p.suspended))} className="flex h-[52px] flex-1 flex-col items-center justify-center rounded-lg bg-caution text-[#2a1d00] transition-colors hover:brightness-105">
+                  <span className="text-[15px] font-extrabold leading-tight">Askıdaki {suspendedPicks.length} seçimi kaldır</span>
+                  <span className="text-[12px] font-bold opacity-75">Askıdaki seçimlerle kupon oynanamaz</span>
+                </button>
+              ) : me && shortBy > 0 ? (
+                <button onClick={() => setWalletOpen("menu")} className="flex h-[52px] flex-1 flex-col items-center justify-center rounded-lg bg-white/[.08] text-fg ring-1 ring-primary/50 transition-colors hover:bg-white/[.12]">
+                  <span className="text-[15px] font-extrabold leading-tight">Para yatır</span>
+                  <span className="text-[12px] font-bold text-subtle">Bu kupon için {money(shortBy)} eksik</span>
+                </button>
+              ) : (
+                <button onClick={place} disabled={busy || !st} className="flex h-[52px] flex-1 flex-col items-center justify-center rounded-lg bg-primary text-primary-fg shadow-pick transition-colors hover:bg-primary-hover disabled:opacity-50">
+                  <span className="text-[15px] font-extrabold leading-tight">{busy ? (waitSec > 0 ? `Canlı bahis onaylanıyor… ${waitSec}` : "Gönderiliyor…") : me ? `Bahis yap · ${money(cost)}` : "Giriş yap ve oyna"}</span>
+                  <span className="text-[12px] font-bold opacity-75">Olası kazanç <span className="num text-[14px]">{money(potWin)}</span></span>
+                </button>
+              )}
             </div>
           </div>
         </>
@@ -419,7 +433,17 @@ export default function Sport() {
           <span className="rounded bg-card px-1.5 text-[11px] font-bold text-soft">{evs.length}</span>
           <span className={`ml-auto grid size-6 place-items-center rounded-full ${c ? "bg-card text-subtle" : "bg-primary/15 text-primary"}`}><I n={c ? "plus" : "minus"} className="size-3.5" /></span>
         </button>
-        {!c && <>{colHead()}{evs.map((ev) => row({ key: ev.id, ev: ev, isLive: isLive }))}</>}
+        {!c && (isLive && !limits?.liveEnabled ? (
+          <div className="divide-y divide-line/70">{evs.map((ev) => (
+            <button key={ev.id} onClick={() => goMatch(ev.id)} className="flex w-full items-center gap-2 px-3 py-2.5 text-left hover:bg-card/40">
+              <span className="w-12 shrink-0"><span className="rounded bg-live px-1.5 py-px text-[10px] font-extrabold text-white">{ev.minute ? `${ev.minute}'` : "CANLI"}</span></span>
+              <span className="flex min-w-0 flex-1 items-center justify-end gap-2"><span className="truncate text-right text-[14px] font-bold">{ev.home}</span><TeamLogo src={ev.homeLogo} name={ev.home} size="size-6" /></span>
+              <span className="num grid h-7 min-w-[52px] shrink-0 place-items-center rounded-md bg-card px-1.5 text-[16px] font-bold text-primary">{ev.score?.h ?? 0} - {ev.score?.a ?? 0}</span>
+              <span className="flex min-w-0 flex-1 items-center gap-2"><TeamLogo src={ev.awayLogo} name={ev.away} size="size-6" /><span className="truncate text-[14px] font-bold">{ev.away}</span></span>
+              <I n="right" className="size-4 shrink-0 text-subtle" />
+            </button>
+          ))}</div>
+        ) : <>{colHead()}{evs.map((ev) => row({ key: ev.id, ev: ev, isLive: isLive }))}</>)}
       </div>
     );
   };
@@ -459,19 +483,19 @@ export default function Sport() {
       </div>
 
       {/* ARAMA + LİG FİLTRESİ */}
-      <div className="mb-5 flex flex-col gap-2 sm:flex-row">
+      <div className="mb-5 flex gap-2">
         <label className="flex h-11 flex-1 items-center gap-2 rounded-lg border border-line bg-panel px-3 focus-within:border-primary/70">
           <I n="search" className="size-4 text-subtle" />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Takım veya lig ara" className="w-full bg-transparent text-sm font-medium outline-none placeholder:text-subtle" />
           {q && <button onClick={() => setQ("")} className="text-subtle hover:text-fg"><I n="x" className="size-4" /></button>}
         </label>
-        <div ref={lgRef} className="relative sm:w-72">
+        <div ref={lgRef} className="relative shrink-0 sm:w-72">
           <button onClick={() => setLgOpen(!lgOpen)} className={`flex h-11 w-full items-center gap-2 rounded-lg border bg-panel px-3 text-left text-sm font-bold transition-colors ${lgOpen ? "border-primary/70" : "border-line hover:border-line-strong"}`}>
-            {(() => { const l = leagues.find((x) => x.id === lg); return l ? <>{l.logo ? <img src={l.logo} alt="" className="size-5 object-contain" /> : <SportIcon k="football" className="size-5 text-subtle" />}<span className="min-w-0 flex-1 truncate">{l.name}</span><span className="rounded bg-card px-1.5 text-[11px] text-soft">{l.count}</span></> : <><SportIcon k="football" className="size-5 text-primary" /><span className="flex-1">Tüm ligler</span><span className="rounded bg-card px-1.5 text-[11px] text-soft">{leagues.reduce((a, x) => a + x.count, 0)}</span></>; })()}
+            {(() => { const l = leagues.find((x) => x.id === lg); return l ? <>{l.logo ? <img src={l.logo} alt="" className="size-5 object-contain" /> : <SportIcon k="football" className="size-5 text-subtle" />}<span className="hidden min-w-0 flex-1 truncate sm:block">{l.name}</span><span className="hidden rounded bg-card px-1.5 text-[11px] text-soft sm:inline">{l.count}</span></> : <><SportIcon k="football" className="size-5 text-primary" /><span className="hidden flex-1 sm:block">Tüm ligler</span><span className="hidden rounded bg-card px-1.5 text-[11px] text-soft sm:inline">{leagues.reduce((a, x) => a + x.count, 0)}</span></>; })()}
             <I n={lgOpen ? "up" : "down"} className="size-4 text-subtle" />
           </button>
           {lgOpen && (
-            <div className="animate-slip-item absolute right-0 left-0 top-[calc(100%+6px)] z-40 overflow-hidden rounded-xl border border-line bg-panel shadow-[0_18px_50px_rgba(0,0,0,.55)]">
+            <div className="animate-slip-item absolute right-0 top-[calc(100%+6px)] z-40 w-[min(320px,calc(100vw-24px))] sm:left-0 sm:w-auto overflow-hidden rounded-xl border border-line bg-panel shadow-[0_18px_50px_rgba(0,0,0,.55)]">
               <div className="border-b border-line p-2"><label className="flex h-9 items-center gap-2 rounded-lg bg-field px-2.5"><I n="search" className="size-4 text-subtle" /><input autoFocus value={lgQ} onChange={(e) => setLgQ(e.target.value)} placeholder="Lig ara" className="w-full bg-transparent text-sm font-medium outline-none placeholder:text-subtle" /></label></div>
               <div className="sb-scroll max-h-72 overflow-y-auto p-1.5">
                 <button onClick={() => { pickLeague(0); setLgOpen(false); }} className={`flex h-10 w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-sm font-bold ${lg === 0 ? "bg-primary/10 text-primary" : "text-muted hover:bg-card hover:text-fg"}`}><SportIcon k="football" className="size-5" /><span className="flex-1">Tüm ligler</span>{lg === 0 && <I n="check" className="size-4" />}</button>
@@ -578,7 +602,8 @@ export default function Sport() {
 
       </>)}
 
-      {/* YAPIŞKAN KUPON — masaüstü sağ alt, mobil alt menünün üstünde */}
+      {/* YAPIŞKAN KUPON — masaüstü sağ alt, mobil alt menünün üstünde; mobilde açıkken arka plan karartılır */}
+      {slipOpen && <div className="fixed inset-0 z-[39] bg-black/60 backdrop-blur-[2px] lg:hidden" onClick={() => setSlipOpen(false)} aria-hidden />}
       <div className={`fixed inset-x-0 bottom-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom))] z-40 lg:inset-x-auto lg:right-5 lg:bottom-5 lg:w-[370px] ${chatOpen ? "xl:right-[360px]" : ""}`}>
         <div className="overflow-hidden border-t border-line bg-panel shadow-[0_-12px_40px_rgba(0,0,0,.5)] lg:rounded-xl lg:border">
           {SlipBar}

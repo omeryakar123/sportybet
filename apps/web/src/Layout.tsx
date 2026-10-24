@@ -192,11 +192,14 @@ function UserMenu() {
   );
 }
 
-const NavPill = ({ to, icon, label }: { to: string; icon: string; label: string }) => (
-  <NavLink to={to} className={({ isActive }) => `relative inline-flex h-[42px] shrink-0 items-center justify-center gap-2 rounded-lg px-4 text-sm font-bold whitespace-nowrap transition-colors ${isActive ? "text-primary after:absolute after:inset-x-3 after:-bottom-[11px] after:h-[3px] after:rounded-full after:bg-primary" : "text-muted hover:text-fg"}`}>
-    <I n={icon} className="size-4" /><span className="hidden min-[1500px]:inline">{label}</span>
+const NavPill = ({ to, icon, label }: { to: string; icon: string; label: string }) => {
+  const { chatOpen } = useStore();
+  return (
+  <NavLink to={to} title={label} aria-label={label} className={({ isActive }) => `relative inline-flex h-[42px] shrink-0 items-center justify-center gap-2 rounded-lg px-4 text-sm font-bold whitespace-nowrap transition-colors ${isActive ? "text-primary after:absolute after:inset-x-3 after:-bottom-[11px] after:h-[3px] after:rounded-full after:bg-primary" : "text-muted hover:text-fg"}`}>
+    <I n={icon} className="size-4" /><span className={chatOpen ? "hidden 2xl:inline" : "hidden lg:inline"}>{label}</span>
   </NavLink>
-);
+  );
+};
 
 function Header() {
   const { me, setAuthOpen, setSidebarOpen, chatOpen, setChatOpen } = useStore();
@@ -280,7 +283,7 @@ function BottomNav() {
   const cls = (a: boolean) => `flex flex-col items-center justify-center gap-1 text-[11px] font-bold ${a ? "text-primary" : "text-subtle"}`;
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 grid h-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom))] grid-cols-5 border-t border-line/60 bg-header pb-[env(safe-area-inset-bottom)] lg:hidden">
-      <button onClick={() => setSidebarOpen(true)} className={cls(false)}><I n="menu" className="size-5" />Menü</button>
+      <button onClick={() => setSidebarOpen(true)} className={cls(false)}><span className="grid size-7 place-items-center rounded-full"><I n="menu" className="size-5" /></span>Menü</button>
       {items.map(([to, icon, label]) => (
         <NavLink key={to} to={to} onClick={() => setChatOpen(false)} className={({ isActive }) => cls(isActive && !chatOpen)}>
           {({ isActive }) => <><span className={`grid size-7 place-items-center rounded-full ${isActive && !chatOpen ? "bg-primary/15" : ""}`}><I n={icon} className="size-5" /></span>{label}</>}
