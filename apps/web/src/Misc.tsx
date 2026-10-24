@@ -19,10 +19,10 @@ export function Promotions() {
   return (
     <div className="animate-sports-fade">
       <section className="relative overflow-hidden rounded-lg bg-[linear-gradient(160deg,#0f231c,#0f1923_70%)] px-6 py-10 text-center">
-        <div className="absolute top-0 left-1/2 -z-0 h-40 w-[420px] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(31,232,138,0.3),transparent)] blur-2xl" />
+        <div className="absolute top-0 left-1/2 -z-0 h-40 w-[420px] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(0,255,129,0.3),transparent)] blur-2xl" />
         <h1 className="relative text-3xl font-extrabold text-primary">Promosyonlar</h1>
         <p className="relative mt-1 text-sm font-bold text-muted">Fırsatları kaçırma, kazancını büyüt</p>
-        <div className="relative mx-auto mt-6 grid size-24 rotate-[-8deg] animate-float place-items-center rounded-xl bg-primary text-sm font-extrabold tracking-widest text-primary-fg shadow-[0_20px_50px_rgba(31,232,138,.25)]">BONUS</div>
+        <div className="relative mx-auto mt-6 grid size-24 rotate-[-8deg] animate-float place-items-center rounded-xl bg-primary text-sm font-extrabold tracking-widest text-primary-fg shadow-[0_20px_50px_rgba(0,255,129,.25)]">BONUS</div>
       </section>
       <div className="mt-5 flex flex-col gap-3 sm:flex-row">
         <label className="flex h-[46px] flex-1 items-center gap-2 rounded-[5px] border border-line-strong bg-field px-3 focus-within:border-primary">
@@ -97,7 +97,7 @@ export function Vip() {
   const [open, setOpen] = useState(0);
   return (
     <div className="animate-sports-fade">
-      <section className="grid items-center gap-8 overflow-hidden rounded-lg bg-[linear-gradient(115deg,#0b1a17,#10291f_60%,#0f1923)] p-8 lg:grid-cols-2 lg:p-12">
+      <section className="grid items-center gap-8 overflow-hidden rounded-lg bg-[linear-gradient(115deg,#0b1a17,#10291f_60%,#0b0f13)] p-8 lg:grid-cols-2 lg:p-12">
         <div>
           <span className="inline-flex items-center gap-2 rounded-sm bg-black/30 px-2.5 py-1 text-[12px] font-extrabold text-primary"><I n="crown" className="size-3.5" />VIP Kulübü <span className="rounded-sm bg-primary px-1.5 text-primary-fg">Yakında</span></span>
           <h1 className="mt-4 text-3xl leading-tight font-extrabold lg:text-4xl">Oyna, seviyeni yükselt, ayrıcalıkları topla</h1>
@@ -108,8 +108,8 @@ export function Vip() {
           </div>
         </div>
         <div className="relative hidden h-[260px] place-items-center lg:grid">
-          <div className="absolute top-0 h-40 w-72 rounded-full bg-[radial-gradient(closest-side,rgba(31,232,138,.35),transparent)] blur-2xl" />
-          <svg viewBox="0 0 120 150" className="relative h-56 animate-float"><polygon points="60,8 108,56 60,142 12,56" fill="#1fe88a" /><polygon points="60,8 108,56 60,56" fill="#9cf7c9" /><polygon points="12,56 60,56 60,142" fill="#1fb57a" /><rect x="20" y="140" width="80" height="8" rx="4" fill="#1a2734" /></svg>
+          <div className="absolute top-0 h-40 w-72 rounded-full bg-[radial-gradient(closest-side,rgba(0,255,129,.35),transparent)] blur-2xl" />
+          <svg viewBox="0 0 120 150" className="relative h-56 animate-float"><polygon points="60,8 108,56 60,142 12,56" fill="#00ff81" /><polygon points="60,8 108,56 60,56" fill="#9cf7c9" /><polygon points="12,56 60,56 60,142" fill="#00c766" /><rect x="20" y="140" width="80" height="8" rx="4" fill="#161c22" /></svg>
           <span className="absolute top-3 rounded-md bg-elevated px-3 py-1 text-xs font-extrabold">Bronz</span>
         </div>
       </section>
@@ -120,7 +120,7 @@ export function Vip() {
       </div>
       <div className="mt-5 grid items-center gap-6 rounded-lg border border-line bg-card p-6 sm:grid-cols-[auto_1fr_1fr]">
         <div className="text-center">
-          <svg viewBox="0 0 120 150" className="mx-auto h-24"><polygon points="60,8 108,56 60,142 12,56" fill="#1fe88a" opacity={0.5 + lvl * 0.12} /><polygon points="60,8 108,56 60,56" fill="#9cf7c9" opacity={0.6 + lvl * 0.1} /></svg>
+          <svg viewBox="0 0 120 150" className="mx-auto h-24"><polygon points="60,8 108,56 60,142 12,56" fill="#00ff81" opacity={0.5 + lvl * 0.12} /><polygon points="60,8 108,56 60,56" fill="#9cf7c9" opacity={0.6 + lvl * 0.1} /></svg>
           <div className="mt-2 text-sm font-extrabold">{LEVELS[lvl][0]}</div>
         </div>
         <div><div className="text-[12px] font-semibold text-dim">Gereken Hacim</div><div className="mt-1 text-2xl font-extrabold">{LEVELS[lvl][1]}</div>

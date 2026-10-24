@@ -340,7 +340,7 @@ export default function Sport() {
           </div>
           <div className="mt-3 border-t border-line px-3 pt-3 pb-3">
             <label className="mb-2 flex cursor-pointer items-center gap-2 text-[12px] font-semibold text-subtle">
-              <input type="checkbox" className="accent-[#1fe88a]" checked={acceptHigher} onChange={(e) => { setAcceptHigher(e.target.checked); try { localStorage.setItem("sb_accept", e.target.checked ? "higher" : "none"); } catch {} }} />
+              <input type="checkbox" className="accent-[#00ff81]" checked={acceptHigher} onChange={(e) => { setAcceptHigher(e.target.checked); try { localStorage.setItem("sb_accept", e.target.checked ? "higher" : "none"); } catch {} }} />
               Yükselen oranları otomatik kabul et
             </label>
             {effMode === "combo" && <div className="mb-2 flex items-center justify-between text-[13px] text-subtle">Toplam oran <b className="num text-[20px] font-bold text-fg">{totalOdds.toFixed(2)}</b></div>}
@@ -664,7 +664,7 @@ export default function Sport() {
       <div className={`fixed inset-x-0 bottom-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom))] z-40 lg:inset-x-auto lg:right-5 lg:bottom-5 lg:w-[370px] ${chatOpen ? "xl:right-[360px]" : ""}`}>
         <div className="overflow-hidden border-t border-line bg-panel shadow-[0_-12px_40px_rgba(0,0,0,.5)] lg:rounded-xl lg:border">
           {SlipBar}
-          {quick && <div className="flex items-center gap-2 bg-[#0b1520] px-3 py-1.5 text-[12px] font-semibold text-primary"><I n="spark" className="size-3.5" />Hızlı bahis açık: orana dokunduğunda {money(st)} ile tekli kupon oynanır.<button onClick={() => setQuick(false)} className="ml-auto font-bold text-subtle hover:text-fg">Kapat</button></div>}
+          {quick && <div className="flex items-center gap-2 bg-[#0b0f13] px-3 py-1.5 text-[12px] font-semibold text-primary"><I n="spark" className="size-3.5" />Hızlı bahis açık: orana dokunduğunda {money(st)} ile tekli kupon oynanır.<button onClick={() => setQuick(false)} className="ml-auto font-bold text-subtle hover:text-fg">Kapat</button></div>}
           {slipOpen && SlipBody}
         </div>
       </div>

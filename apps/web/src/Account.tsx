@@ -143,7 +143,7 @@ function AvatarPicker() {
       )}
       <label className="mt-4 flex cursor-pointer items-center justify-between gap-3 border-t border-line pt-3">
         <span><span className="block text-sm font-bold">İstatistiklerimi gizle</span><span className="block text-[12px] text-subtle">Diğer oyuncular profilinde bahis sayını, yatırdığın tutarı ve net kârını göremez.</span></span>
-        <input type="checkbox" className="size-5 accent-[#1fe88a]" checked={!!me.hideStats} disabled={busy} onChange={async (e) => { setBusy(true); try { await api("/api/me", { method: "PATCH", json: { hideStats: e.target.checked } }); await refreshMe(); } catch (x: any) { setErr(x.message); } setBusy(false); }} />
+        <input type="checkbox" className="size-5 accent-[#00ff81]" checked={!!me.hideStats} disabled={busy} onChange={async (e) => { setBusy(true); try { await api("/api/me", { method: "PATCH", json: { hideStats: e.target.checked } }); await refreshMe(); } catch (x: any) { setErr(x.message); } setBusy(false); }} />
       </label>
       {err && <div className="mt-3"><ErrBox e={err} /></div>}
     </div>

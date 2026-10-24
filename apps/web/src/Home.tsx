@@ -53,12 +53,12 @@ function Hero({ ev }: { ev?: any }) {
     const o = (c: string) => m1?.selections.find((x: any) => x.code === c)?.odds;
     const d = ev ? new Date(ev.startsAt) : null;
     return (
-      <section className="relative isolate overflow-hidden rounded-2xl bg-[#0d1b16] shadow-lift">
+      <section className="relative isolate overflow-hidden rounded-2xl bg-[#0c1411] shadow-lift">
         {/* saha çizgileri — konunun kendi dokusu */}
-        <svg viewBox="0 0 400 220" preserveAspectRatio="xMidYMid slice" className="absolute inset-0 -z-10 size-full opacity-[.16]" fill="none" stroke="#1fe88a" strokeWidth="1.2" aria-hidden>
+        <svg viewBox="0 0 400 220" preserveAspectRatio="xMidYMid slice" className="absolute inset-0 -z-10 size-full opacity-[.16]" fill="none" stroke="#00ff81" strokeWidth="1.2" aria-hidden>
           <rect x="10" y="10" width="380" height="200" /><line x1="200" y1="10" x2="200" y2="210" /><circle cx="200" cy="110" r="34" /><rect x="10" y="60" width="52" height="100" /><rect x="338" y="60" width="52" height="100" />
         </svg>
-        <div className="absolute inset-0 -z-10 bg-[radial-gradient(70%_90%_at_50%_0%,rgba(31,232,138,.18),transparent_70%)]" />
+        <div className="absolute inset-0 -z-10 bg-[radial-gradient(70%_90%_at_50%_0%,rgba(0,255,129,.18),transparent_70%)]" />
         <div className="grid gap-6 px-5 py-7 sm:px-8 lg:grid-cols-[1fr_minmax(0,460px)] lg:items-center lg:py-10">
           <div>
             <h1 className="title text-[38px] sm:text-[50px] lg:text-[58px]">{me ? `Hoş geldin, ${me.username}` : "Maçı oyna, gündemi tahmin et"}</h1>
@@ -69,7 +69,7 @@ function Hero({ ev }: { ev?: any }) {
             </div>
           </div>
           {ev && d && (
-            <Link to={`/spor/mac/${ev.id}`} className="block rounded-2xl bg-[#0b1520]/85 p-4 shadow-float ring-1 ring-white/[.06] backdrop-blur transition-[box-shadow] hover:ring-primary/40 sm:p-5">
+            <Link to={`/spor/mac/${ev.id}`} className="block rounded-2xl bg-[#0b0f13]/85 p-4 shadow-float ring-1 ring-white/[.06] backdrop-blur transition-[box-shadow] hover:ring-primary/40 sm:p-5">
               <div className="flex items-center gap-2 text-[12px] font-semibold text-soft">
                 {ev.leagueLogo ? <img src={ev.leagueLogo} alt="" className="size-4 object-contain" /> : <I n="ball" className="size-4" />}
                 <span className="min-w-0 flex-1 truncate">{ev.league}</span><span>Sıradaki maç</span>
@@ -93,7 +93,7 @@ function Hero({ ev }: { ev?: any }) {
     <section className="relative isolate overflow-hidden rounded-2xl bg-card">
       <Link to={`/promosyonlar/${p.slug}`} className="block">
         <div className="relative aspect-[4/3] w-full sm:aspect-[21/8]">
-          {p.imageUrl ? <img src={p.imageUrl} alt="" className="absolute inset-0 size-full object-cover" /> : <div className="absolute inset-0 bg-[linear-gradient(120deg,#123326,#1fb57a)]" />}
+          {p.imageUrl ? <img src={p.imageUrl} alt="" className="absolute inset-0 size-full object-cover" /> : <div className="absolute inset-0 bg-[linear-gradient(120deg,#123326,#00c766)]" />}
           <div className="absolute inset-0 bg-[linear-gradient(0deg,rgba(11,19,28,.92)_0%,rgba(11,19,28,.35)_45%,transparent_70%)]" />
           {p.endsAt && <div className="absolute inset-x-0 top-4 flex justify-center"><Countdown to={p.endsAt} /></div>}
           <div className="absolute inset-x-0 bottom-0 p-5 text-center sm:p-8">
@@ -171,7 +171,7 @@ export default function Home() {
         <Link to="/spor" className="group surface flex h-[84px] flex-col items-start justify-center gap-0.5 rounded-2xl px-3 sm:h-[112px] sm:flex-row sm:items-center sm:gap-4 sm:px-5 transition-[box-shadow] hover:ring-1 hover:ring-primary/40">
           <div className="min-w-0 flex-1"><div className="title text-[20px] sm:text-[30px]">Spor</div><div className="mt-1 truncate text-[11px] font-semibold text-subtle sm:text-[13px]">{total.ev} maç bültende</div></div>
           <div className="hidden -space-x-2.5 sm:flex">
-            {leagues.slice(0, 4).map((l) => <span key={l.id} className="grid size-11 place-items-center rounded-full bg-[#e8eef5] ring-2 ring-[#15212e]">{l.logo ? <img src={l.logo} alt="" className="size-7 object-contain" /> : <I n="ball" className="size-5 text-soft" />}</span>)}
+            {leagues.slice(0, 4).map((l) => <span key={l.id} className="grid size-11 place-items-center rounded-full bg-[#e8eef5] ring-2 ring-[#0f161c]">{l.logo ? <img src={l.logo} alt="" className="size-7 object-contain" /> : <I n="ball" className="size-5 text-soft" />}</span>)}
           </div>
           <I n="right" className="hidden size-5 text-subtle transition-transform group-hover:translate-x-0.5 sm:block" />
         </Link>

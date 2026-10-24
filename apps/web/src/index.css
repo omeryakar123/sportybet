@@ -3,30 +3,30 @@
 @tailwind utilities;
 
 :root { --header-h: 64px; --sidebar-w: 260px; --bottom-nav-h: 60px; }
-html { scrollbar-color: #2c3e52 #0f1923; }
-body { @apply bg-page font-sans text-fg antialiased; font-feature-settings: "cv11", "ss01"; }
+html { scrollbar-color: #28313a #0b0f13; }
+body { @apply bg-page font-sans text-fg antialiased; }
 /* klavye odağı her yerde görünür */
-:focus-visible { outline: 2px solid #1fe88a; outline-offset: 2px; border-radius: 6px; }
+:focus-visible { outline: 2px solid #00ff81; outline-offset: 2px; border-radius: 6px; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; } }
 /* rakamlar: oran, skor, bakiye — sitenin imza öğesi */
-.num { font-family: "Barlow Semi Condensed", Manrope, sans-serif; font-variant-numeric: tabular-nums; letter-spacing: .01em; }
-.title { font-family: "Barlow Semi Condensed", Manrope, sans-serif; font-weight: 700; letter-spacing: .005em; line-height: 1.05; }
+.num { font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+.title { font-weight: 800; letter-spacing: -.02em; line-height: 1.1; }
 /* yüzeyler: üstte ince ışık çizgisi ile derinlik */
-.surface { background: #15212e; box-shadow: inset 0 1px 0 rgba(255,255,255,.045), 0 1px 2px rgba(0,0,0,.35); }
-.surface-2 { background: #1a2734; box-shadow: inset 0 1px 0 rgba(255,255,255,.05); }
+.surface { background: #0f161c; }
+.surface-2 { background: #161c22; }
 /* oran butonu */
-.odd { @apply relative flex h-10 items-center justify-between gap-1 rounded-[9px] px-2.5 transition-[background-color,box-shadow,transform] duration-150; background: #1c2a38; box-shadow: inset 0 1px 0 rgba(255,255,255,.05), inset 0 0 0 1px rgba(255,255,255,.03); }
-.odd:hover { background: #233548; }
+.odd { @apply relative flex h-10 items-center justify-between gap-1 rounded-[8px] px-2.5 transition-[background-color,box-shadow,transform] duration-150; background: #161c22; }
+.odd:hover { background: #1f262d; }
 .odd:active { transform: translateY(1px); }
-.odd-on { background: #1fe88a !important; color: #062314; box-shadow: inset 0 1px 0 rgba(255,255,255,.35), 0 6px 18px -6px rgba(31,232,138,.65); }
-.odd .o { font-family: "Barlow Semi Condensed", Manrope, sans-serif; font-variant-numeric: tabular-nums; font-weight: 700; font-size: 15px; }
-.odd .l { font-size: 12px; font-weight: 600; color: #93a2b4; }
+.odd-on { background: #00ff81 !important; color: #03140b; box-shadow: 0 0 0 1px rgba(0,255,129,.4), 0 0 18px -4px rgba(0,255,129,.55); }
+.odd .o { font-variant-numeric: tabular-nums; font-weight: 700; font-size: 14px; }
+.odd .l { font-size: 12px; font-weight: 600; color: #8794a2; }
 .odd-on .l { color: rgba(6,35,20,.65); }
 .no-scrollbar { scrollbar-width: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
 ::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-thumb { background: #2a3c50; border-radius: 6px; border: 2px solid #0f1923; }
-::-webkit-scrollbar-track { background: #0f1923; }
+::-webkit-scrollbar-thumb { background: #2a3138; border-radius: 6px; border: 2px solid #0b0f13; }
+::-webkit-scrollbar-track { background: #0b0f13; }
 
 /* CMS promosyon/sayfa içeriği (koyu zemin üstünde) */
 .cms-content { @apply text-[15px] leading-relaxed text-muted; }
@@ -44,12 +44,12 @@ body { @apply bg-page font-sans text-fg antialiased; font-feature-settings: "cv1
 .font-display { font-family: "Saira Condensed", "Manrope", system-ui, sans-serif; font-style: italic; font-weight: 800; letter-spacing: -0.01em; line-height: 0.92; text-transform: uppercase; }
 .ribbon { background-image: repeating-linear-gradient(90deg, transparent 0 10px, rgba(255,255,255,.12) 10px 11px); }
 .sb-scroll::-webkit-scrollbar { height: 6px; width: 6px; }
-.sb-scroll::-webkit-scrollbar-thumb { background: #2a3c50; border-radius: 10px; }
+.sb-scroll::-webkit-scrollbar-thumb { background: #2a3138; border-radius: 10px; }
 
 /* Neon yeşil vurgu yardımcıları */
-.glow-green { box-shadow: 0 0 0 1px rgba(31,232,138,.55), 0 6px 22px -6px rgba(31,232,138,.55); }
-.slip-grad { background-image: linear-gradient(90deg, #1fe88a 0%, #19e3d1 100%); }
-.green-fade { background-image: radial-gradient(120% 140% at 0% 0%, rgba(31,232,138,.16) 0%, transparent 55%); }
+.glow-green { box-shadow: 0 0 0 1px rgba(0,255,129,.55), 0 6px 22px -6px rgba(0,255,129,.55); }
+.slip-grad { background-image: linear-gradient(90deg, #00ff81 0%, #00f0d0 100%); }
+.green-fade { background-image: radial-gradient(120% 140% at 0% 0%, rgba(0,255,129,.16) 0%, transparent 55%); }
 @keyframes pulse-dot { 0%,100% { opacity: 1 } 50% { opacity: .35 } }
 .live-dot { animation: pulse-dot 1.2s ease-in-out infinite; }
 
@@ -63,8 +63,9 @@ body { @apply bg-page font-sans text-fg antialiased; font-feature-settings: "cv1
   .btn { @apply inline-flex shrink-0 cursor-pointer select-none items-center justify-center gap-2 whitespace-nowrap rounded-[10px] px-5 text-sm font-extrabold transition-[background-color,box-shadow,color,transform] duration-150 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-45 disabled:active:translate-y-0; height: 44px; }
   .btn-sm { @apply px-3 text-[13px]; height: 36px; }
   .btn-lg { @apply px-6 text-[15px]; height: 48px; }
-  .btn-primary { @apply bg-primary text-primary-fg hover:bg-primary-hover; box-shadow: inset 0 1px 0 rgba(255,255,255,.35), 0 6px 18px -8px rgba(31,232,138,.7); }
-  .btn-secondary { @apply bg-white/[.07] text-fg hover:bg-white/[.11]; box-shadow: inset 0 1px 0 rgba(255,255,255,.06), inset 0 0 0 1px rgba(255,255,255,.05); }
+  .btn-primary { @apply text-primary-fg; background: linear-gradient(180deg,#3dff9f 0%,#00ff81 45%,#00e070 100%); box-shadow: 0 0 0 1px rgba(0,255,129,.35), 0 0 20px -6px rgba(0,255,129,.6); }
+  .btn-primary:hover { filter: brightness(1.06); }
+  .btn-secondary { @apply bg-card text-fg hover:bg-surface-hover; }
   .btn-ghost { @apply bg-transparent text-muted hover:bg-white/[.06] hover:text-fg; }
   .btn-danger { @apply bg-loss/15 text-loss hover:bg-loss hover:text-white; }
   .btn-icon { @apply px-0; width: 44px; }
@@ -79,8 +80,8 @@ body { @apply bg-page font-sans text-fg antialiased; font-feature-settings: "cv1
   .chip-on { @apply border-primary bg-primary/10 text-primary hover:text-primary; }
 
   /* kapsayıcılar */
-  .card { @apply rounded-2xl; background: #15212e; box-shadow: inset 0 1px 0 rgba(255,255,255,.045), 0 1px 2px rgba(0,0,0,.35); }
-  .card-inset { @apply rounded-xl; background: #1a2734; box-shadow: inset 0 1px 0 rgba(255,255,255,.05); }
+  .card { @apply rounded-xl; background: #0f161c; }
+  .card-inset { @apply rounded-[10px]; background: #161c22; }
 
   /* etiket */
   .tag { @apply inline-flex items-center gap-1 rounded-[6px] px-1.5 py-px text-[11px] font-extrabold; }

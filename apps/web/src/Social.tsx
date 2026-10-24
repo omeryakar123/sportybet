@@ -18,7 +18,7 @@ function RainCard({ rain, onJoin, busy }: { rain: NonNullable<ChatState["rain"]>
   const now = useNow();
   const left = Math.max(0, Math.ceil((new Date(rain.endsAt).getTime() - now) / 1000));
   return (
-    <div className="mx-3 mb-2 overflow-hidden rounded-xl border border-primary/40 bg-[linear-gradient(120deg,rgba(31,232,138,.18),rgba(25,227,209,.08))] p-3">
+    <div className="mx-3 mb-2 overflow-hidden rounded-xl border border-primary/40 bg-[linear-gradient(120deg,rgba(0,255,129,.18),rgba(0,232,255,.08))] p-3">
       <div className="flex items-center gap-3">
         <span className="grid size-10 shrink-0 place-items-center rounded-full bg-primary/20 text-primary"><I n="rain" className="size-5" /></span>
         <div className="min-w-0 flex-1">
@@ -155,7 +155,7 @@ export function ProfileModal() {
   return (
     <div className="fixed inset-0 z-[70] grid place-items-center bg-black/70 p-4 backdrop-blur-sm" onMouseDown={(e) => e.target === e.currentTarget && openProfile(null)}>
       <div role="dialog" aria-modal="true" aria-label="Oyuncu profili" className="animate-slip-reveal w-full max-w-[560px] overflow-hidden rounded-2xl border border-line bg-panel shadow-[0_30px_80px_rgba(0,0,0,.6)]">
-        <div className="relative bg-[radial-gradient(120%_140%_at_50%_-20%,rgba(31,232,138,.35),transparent_60%)] px-5 pt-4 pb-5">
+        <div className="relative bg-[radial-gradient(120%_140%_at_50%_-20%,rgba(0,255,129,.35),transparent_60%)] px-5 pt-4 pb-5">
           <div className="mb-3 text-center text-[15px] font-extrabold">Profil</div>
           <button onClick={() => openProfile(null)} aria-label="Kapat" className="absolute right-4 top-4 grid size-8 place-items-center rounded-full bg-black/30 text-muted hover:text-fg"><I n="x" className="size-4" /></button>
           {!p ? <div className="py-8 text-center text-sm text-subtle">{err ? "Profil bulunamadı" : "Yükleniyor…"}</div> : (

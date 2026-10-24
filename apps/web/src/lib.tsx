@@ -177,18 +177,18 @@ export function ErrBox({ e }: { e?: string }) {
 // ---------- profil fotoğrafı ----------
 // Hazır avatarlar: özgün geometrik tasarımlar ("av:1".."av:12"). Kullanıcı kendi resmini de yükleyebilir (data URL).
 export const AVATAR_PRESETS: { bg: [string, string]; shape: React.ReactNode }[] = [
-  { bg: ["#1fe88a", "#0b8f5a"], shape: <path d="M20 44 32 18l12 26Z" fill="#062314" opacity=".85" /> },
-  { bg: ["#19e3d1", "#1361a8"], shape: <circle cx="32" cy="32" r="12" fill="none" stroke="#04202b" strokeWidth="5" /> },
-  { bg: ["#ffc93c", "#f0742c"], shape: <path d="M32 16l4.5 10 11 1-8.3 7.3 2.6 10.7L32 39.3 22.2 45l2.6-10.7L16.5 27l11-1Z" fill="#3a1c00" opacity=".85" /> },
+  { bg: ["#00ff81", "#0b8f5a"], shape: <path d="M20 44 32 18l12 26Z" fill="#03140b" opacity=".85" /> },
+  { bg: ["#00e8ff", "#1361a8"], shape: <circle cx="32" cy="32" r="12" fill="none" stroke="#04202b" strokeWidth="5" /> },
+  { bg: ["#ffd731", "#f0742c"], shape: <path d="M32 16l4.5 10 11 1-8.3 7.3 2.6 10.7L32 39.3 22.2 45l2.6-10.7L16.5 27l11-1Z" fill="#3a1c00" opacity=".85" /> },
   { bg: ["#ff5f8f", "#9c2bd1"], shape: <path d="M32 46s-13-8-13-17a7 7 0 0 1 13-3.6A7 7 0 0 1 45 29c0 9-13 17-13 17Z" fill="#2b0420" opacity=".8" /> },
   { bg: ["#7c8cff", "#2c2f9e"], shape: <path d="M36 14 22 35h10l-4 15 14-21H32Z" fill="#0e0f3a" opacity=".85" /> },
-  { bg: ["#43e0ff", "#1fe88a"], shape: <><rect x="20" y="20" width="10" height="10" rx="2" fill="#042a25" /><rect x="34" y="20" width="10" height="10" rx="2" fill="#042a25" opacity=".6" /><rect x="20" y="34" width="10" height="10" rx="2" fill="#042a25" opacity=".6" /><rect x="34" y="34" width="10" height="10" rx="2" fill="#042a25" /></> },
+  { bg: ["#43e0ff", "#00ff81"], shape: <><rect x="20" y="20" width="10" height="10" rx="2" fill="#042a25" /><rect x="34" y="20" width="10" height="10" rx="2" fill="#042a25" opacity=".6" /><rect x="20" y="34" width="10" height="10" rx="2" fill="#042a25" opacity=".6" /><rect x="34" y="34" width="10" height="10" rx="2" fill="#042a25" /></> },
   { bg: ["#ff8a3d", "#d1272b"], shape: <path d="M32 14c2 7 10 10 10 19a10 10 0 0 1-20 0c0-4.2 2.3-7 4.6-9 .4 3 2 5 4 5.8C29.6 24.6 30.4 19 32 14Z" fill="#3a0808" opacity=".8" /> },
   { bg: ["#b6ff5c", "#22a35a"], shape: <><circle cx="32" cy="32" r="13" fill="none" stroke="#0d2b07" strokeWidth="4" /><path d="M32 19v26M19 32h26" stroke="#0d2b07" strokeWidth="3" /></> },
-  { bg: ["#e0e7ff", "#7d8ca1"], shape: <path d="M22 40V24l10-6 10 6v16l-10 6Z" fill="none" stroke="#1a2734" strokeWidth="4" strokeLinejoin="round" /> },
-  { bg: ["#ffd84d", "#1fe88a"], shape: <><circle cx="25" cy="29" r="3.2" fill="#123" /><circle cx="39" cy="29" r="3.2" fill="#123" /><path d="M24 38c4.5 5 11.5 5 16 0" stroke="#123" strokeWidth="3.4" fill="none" strokeLinecap="round" /></> },
-  { bg: ["#2b3d53", "#0f1923"], shape: <path d="M32 15 44 22v14c0 6.5-5 11-12 13-7-2-12-6.5-12-13V22Z" fill="#1fe88a" /> },
-  { bg: ["#ff4d5e", "#ffc93c"], shape: <path d="M18 38c6-14 22-14 28 0M24 30l-3-8M40 30l3-8M32 27v-9" stroke="#3a0d00" strokeWidth="3.5" fill="none" strokeLinecap="round" /> },
+  { bg: ["#e0e7ff", "#7d8ca1"], shape: <path d="M22 40V24l10-6 10 6v16l-10 6Z" fill="none" stroke="#161c22" strokeWidth="4" strokeLinejoin="round" /> },
+  { bg: ["#ffd84d", "#00ff81"], shape: <><circle cx="25" cy="29" r="3.2" fill="#123" /><circle cx="39" cy="29" r="3.2" fill="#123" /><path d="M24 38c4.5 5 11.5 5 16 0" stroke="#123" strokeWidth="3.4" fill="none" strokeLinecap="round" /></> },
+  { bg: ["#2b3d53", "#0b0f13"], shape: <path d="M32 15 44 22v14c0 6.5-5 11-12 13-7-2-12-6.5-12-13V22Z" fill="#00ff81" /> },
+  { bg: ["#ff4d5e", "#ffd731"], shape: <path d="M18 38c6-14 22-14 28 0M24 30l-3-8M40 30l3-8M32 27v-9" stroke="#3a0d00" strokeWidth="3.5" fill="none" strokeLinecap="round" /> },
 ];
 export function Avatar({ src, name = "?", className = "size-[30px]" }: { src?: string | null; name?: string; className?: string }) {
   const n = src?.startsWith("av:") ? Number(src.slice(3)) : 0;
