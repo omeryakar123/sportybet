@@ -320,7 +320,7 @@ function AuthModal() {
         </div>
         <div className="mb-5 grid grid-cols-2 rounded-lg bg-field p-1">
           {(["login", "register"] as const).map((m) => (
-            <button key={m} type="button" onClick={() => setMode(m)} className={`h-10 rounded-md text-sm font-bold transition-colors ${mode === m ? "bg-elevated text-fg" : "text-subtle hover:text-fg"}`}>{m === "login" ? "Giriş Yap" : "Kayıt Ol"}</button>
+            <button key={m} type="button" onClick={() => setMode(m)} className={`h-10 rounded-md text-sm font-bold transition-colors ${mode === m ? "bg-elevated text-fg" : "text-subtle hover:text-fg"}`}>{m === "login" ? "Giriş yap" : "Kayıt ol"}</button>
           ))}
         </div>
         <form onSubmit={submit} className="space-y-3">
@@ -331,7 +331,7 @@ function AuthModal() {
           </>}
           <Field label="Şifre"><input className={inp} type="password" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} /></Field>
           <ErrBox e={err} />
-          <Btn className="w-full" disabled={busy || !f.username || f.password.length < 6}>{mode === "login" ? "Giriş Yap" : "Hesap Oluştur"}</Btn>
+          <Btn className="w-full" disabled={busy || !f.username || f.password.length < 6}>{mode === "login" ? "Giriş Yap" : "Hesap oluştur"}</Btn>
           {mode === "register" && <p className="text-center text-xs text-dim">Kayıt olarak 18 yaşından büyük olduğunu ve kullanıcı sözleşmesini kabul ettiğini onaylarsın.</p>}
         </form>
       </div>

@@ -138,7 +138,7 @@ export function Deposit() {
         )}
         <ErrBox e={err} />
         {done && <div className="rounded-md border border-win/30 bg-win/10 px-3 py-2.5 text-sm font-bold text-win">Talebin alındı! Onaylanınca bakiyen anında yüklenecek.</div>}
-        <Btn className="w-full" disabled={busy || !canSubmit} onClick={submit}>Yatırım Talebi Oluştur</Btn>
+        <Btn className="w-full" disabled={busy || !canSubmit} onClick={submit}>Yatırım talebi oluştur</Btn>
       </div>
       <MyRequests type="DEPOSIT" refresh={refresh} onCancelled={() => setRefresh((x) => x + 1)} />
     </div>
@@ -188,7 +188,7 @@ export function Withdraw() {
         ))}
         <ErrBox e={err} />
         {done && <div className="rounded-md border border-win/30 bg-win/10 px-3 py-2.5 text-sm font-bold text-win">Çekim talebin alındı. Tutar bakiyenden ayrıldı; onaylanınca hesabına gönderilecek.</div>}
-        <Btn className="w-full" disabled={busy || !sys || !ok || !!activeBonus} onClick={submit}>Çekim Talebi Oluştur</Btn>
+        <Btn className="w-full" disabled={busy || !sys || !ok || !!activeBonus} onClick={submit}>Çekim talebi oluştur</Btn>
         <p className="text-center text-[11px] font-medium text-dim">Talep anında tutar bakiyenden bloke edilir; reddedilirse anında iade edilir.</p>
       </div>
       <MyRequests type="WITHDRAWAL" refresh={refresh} onCancelled={() => { setRefresh((x) => x + 1); refreshMe(); }} />
@@ -202,7 +202,7 @@ function AuthGate({ title, onAuth }: { title: string; onAuth: () => void }) {
       <div className="text-center">
         <h1 className="text-xl font-extrabold">{title}</h1>
         <p className="mt-2 mb-4 text-sm font-semibold text-muted">Devam etmek için giriş yap.</p>
-        <Btn onClick={onAuth}>Giriş Yap</Btn>
+        <Btn onClick={onAuth}>Giriş yap</Btn>
       </div>
     </div>
   );

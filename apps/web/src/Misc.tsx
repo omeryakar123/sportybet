@@ -31,7 +31,7 @@ export function Promotions() {
         </label>
         <div className="flex gap-2">
           <input className={inp + " w-48 uppercase sm:w-56"} placeholder="Promosyon kodunu gir" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} />
-          <Btn className="!h-[46px] shrink-0" disabled={code.length < 3} onClick={redeem}>Kodu Al</Btn>
+          <Btn className="!h-[46px] shrink-0" disabled={code.length < 3} onClick={redeem}>Kodu al</Btn>
         </div>
       </div>
       <div className="mt-3 space-y-2">{msg && <div className="rounded-md border border-win/30 bg-win/10 px-3 py-2.5 text-sm font-bold text-win">{msg}</div>}<ErrBox e={err} /></div>
@@ -103,8 +103,8 @@ export function Vip() {
           <h1 className="mt-4 text-3xl leading-tight font-extrabold lg:text-4xl">Oyna, seviyeni yükselt, ayrıcalıkları topla</h1>
           <p className="mt-3 max-w-md text-[15px] font-medium text-muted">VIP Kulübü çok yakında açılıyor. Aldığın her tahmin ve kupon şimdiden hacmine sayılıyor; açılışta seviyene yerleşirsin.</p>
           <div className="mt-6 flex gap-3">
-            <Link to="/tahminler" className="btn btn-primary px-6">Tahmin Yap</Link>
-            <a href="#seviyeler" className="btn btn-secondary px-6">Seviyeleri Gör</a>
+            <Link to="/tahminler" className="btn btn-primary px-6">Tahmin yap</Link>
+            <a href="#seviyeler" className="btn btn-secondary px-6">Seviyeleri gör</a>
           </div>
         </div>
         <div className="relative hidden h-[260px] place-items-center lg:grid">

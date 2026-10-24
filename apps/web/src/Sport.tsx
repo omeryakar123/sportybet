@@ -57,10 +57,22 @@ const startsIn = (s: string) => {
   return `${Math.round(h / 24)} gün sonra`;
 };
 const ERR: Record<string, string> = {
-  INSUFFICIENT_BALANCE: "Yetersiz bakiye", ODDS_CHANGED: "Oranlar değişti — yeni oranları kontrol edip tekrar onayla", LIVE_SUSPENDED: "Canlı bahis bu maç için şu an kapalı (oranlar güncelleniyor)",
-  SELECTION_SUSPENDED: "Seçim askıya alındı", LIVE_MAX_STAKE_EXCEEDED: "Canlı bahiste azami tutar aşıldı", EVENT_STARTED: "Maç başladı, oran kapandı", SELECTION_CLOSED: "Seçim kapandı", SELECTION_UNAVAILABLE: "Seçim artık mevcut değil",
-  MAX_STAKE_EXCEEDED: "Azami bahis tutarı aşıldı", MIN_STAKE: "Tutar asgari bahsin altında", SPORT_BLOCKED: "Spor bahsi hesabında kapalı", SAME_EVENT_IN_COMBO: "Kombinede aynı maçtan tek seçim olabilir",
-  TOO_MANY_SELECTIONS: "Çok fazla seçim", SPORTSBOOK_DISABLED: "Spor bahisleri geçici olarak kapalı", INVALID_STAKE: "Geçerli bir tutar girin", UNAUTHORIZED: "Devam etmek için giriş yapın",
+  INSUFFICIENT_BALANCE: "Bakiyen bu kupon için yetmiyor. Tutarı düşür ya da para yatır.",
+  EVENT_STARTED: "Maç başladı, maç öncesi oranlar kapandı. Seçimi kupondan çıkar.",
+  SELECTION_CLOSED: "Bu oran bahse kapandı. Seçimi kupondan çıkar.",
+  SELECTION_UNAVAILABLE: "Bu seçim artık bültende yok. Kupondan çıkarıp yeni oran seç.",
+  SELECTION_SUSPENDED: "Bir seçim askıya alındı. Askıdaki seçimi çıkar ya da oranın açılmasını bekle.",
+  ODDS_CHANGED: "Oranlar değişti. Yeni oranları kontrol edip kuponu tekrar onayla.",
+  LIVE_SUSPENDED: "Canlı oranlar güncelleniyor. Birkaç saniye sonra tekrar dene.",
+  MAX_STAKE_EXCEEDED: "Tutar azami bahsi aşıyor. Daha düşük bir tutar gir.",
+  LIVE_MAX_STAKE_EXCEEDED: "Tutar canlı bahis sınırını aşıyor. Daha düşük bir tutar gir.",
+  MIN_STAKE: "Tutar asgari bahsin altında. Tutarı yükselt.",
+  INVALID_STAKE: "Geçerli bir tutar gir.",
+  SPORT_BLOCKED: "Hesabında spor bahsi kapalı. Destek ekibiyle iletişime geç.",
+  SAME_EVENT_IN_COMBO: "Kombinede aynı maçtan tek seçim olabilir. Birini çıkar ya da Tekli'ye geç.",
+  TOO_MANY_SELECTIONS: "Kombinede çok fazla seçim var. Bazılarını çıkar.",
+  SPORTSBOOK_DISABLED: "Spor bahisleri şu an kapalı. Biraz sonra tekrar dene.",
+  UNAUTHORIZED: "Oturumun kapandı. Devam etmek için giriş yap.",
 };
 
 function TeamLogo({ src, name, size = "size-4" }: { src?: string; name: string; size?: string }) {
@@ -223,7 +235,7 @@ export default function Sport() {
     if (s.suspended) return;
     if (quick) { // hızlı bahis: tek tıkla tekli kupon
       const amt = parseFloat(stake.replace(",", ".")) || 0;
-      if (!amt) { setSlipOpen(true); setErr("Hızlı bahis için önce kuponda tutar belirleyin"); return; }
+      if (!amt) { setSlipOpen(true); setErr("Hızlı bahis için kuponda bir tutar gir."); return; }
       placeNow([s.id], "single", amt, true); return;
     }
     setPlaced(null); setUndo(null);
@@ -243,11 +255,11 @@ export default function Sport() {
   const suspendedPicks = picks.filter((p) => p.suspended);
   const shortBy = me ? Math.max(0, Math.round((cost - balance(activeWallet)) * 100) / 100) : 0;
   async function place() {
-    if (limits && st < limits.minStake) { setErr(`Asgari bahis ${money(limits.minStake)}`); return; }
-    if (limits && st > limits.maxStake) { setErr(`Azami bahis ${money(limits.maxStake)}`); return; }
+    if (limits && st < limits.minStake) { setErr(`Tutar asgari bahsin altında. En az ${money(limits.minStake)} gir.`); return; }
+    if (limits && st > limits.maxStake) { setErr(`Tutar azami bahsi aşıyor. En fazla ${money(limits.maxStake)} gir.`); return; }
     if (me && cost > balance(activeWallet)) { setErr("Yetersiz bakiye"); return; }
-    if (picks.some((p) => p.suspended)) { setErr("Askıdaki seçimleri kupondan çıkar"); return; }
-    if (picks.some((p) => p.live) && limits?.liveMaxStake && st > limits.liveMaxStake) { setErr(`Canlı bahiste azami ${money(limits.liveMaxStake)}`); return; }
+    if (picks.some((p) => p.suspended)) { setErr("Askıdaki seçimlerle kupon oynanamaz. Önce onları çıkar."); return; }
+    if (picks.some((p) => p.live) && limits?.liveMaxStake && st > limits.liveMaxStake) { setErr(`Canlı bahiste en fazla ${money(limits.liveMaxStake)} oynayabilirsin.`); return; }
     const ok = await placeNow(picks.map((p) => p.selId), effMode, st);
     if (ok) { setPicks([]); setSlipOpen(true); }
   }
@@ -633,8 +645,8 @@ export default function Sport() {
         ) : filtered.length === 0 ? (
           <div className="rounded-xl bg-panel p-12 text-center">
             <div className="mx-auto mb-3 grid size-14 place-items-center rounded-full bg-card text-primary"><SportIcon k="football" className="size-7" /></div>
-            <p className="font-bold">{q ? "Eşleşen maç bulunamadı" : "Şu an bahse açık maç yok"}</p>
-            <p className="mt-1 text-sm text-subtle">{err || (q ? "Farklı bir takım veya lig adı deneyin." : "Program kısa süre içinde yüklenecek.")}</p>
+            <p className="font-bold">{q ? "Bu aramayla eşleşen maç yok" : "Şu an bahse açık maç yok"}</p>
+            <p className="mt-1 text-sm text-subtle">{err || (q ? "Takım ya da lig adını farklı yaz veya filtreleri temizle." : "Yeni maçlar bültene eklendiğinde burada görünecek.")}</p>
           </div>
         ) : (
           <>

@@ -318,7 +318,7 @@ export function PredictionDetail() {
                   {done && <div className="rounded-md border border-win/30 bg-win/10 px-3 py-2.5 text-sm font-bold text-win">Bahsin alındı ✓ Doğru bilirsen {money(done.potentialPayout)} kazanırsın.</div>}
                 </div>
                 {me
-                  ? <Btn className="mt-3 w-full" disabled={busy || !Number(amount) || !cur.effectiveBuyEnabled || !out.buyEnabled} onClick={buy}>{cur.effectiveBuyEnabled ? "Tahmini Al" : "Bahse Kapalı"}</Btn>
+                  ? <Btn className="mt-3 w-full" disabled={busy || !Number(amount) || !cur.effectiveBuyEnabled || !out.buyEnabled} onClick={buy}>{cur.effectiveBuyEnabled ? "Tahmini al" : "Bahse Kapalı"}</Btn>
                   : <Btn className="mt-3 w-full" onClick={() => setAuthOpen(true)}>Giriş Yap ve Oyna</Btn>}
                 <p className="mt-2 text-center text-[11px] leading-relaxed text-dim">Bahsin aldığın andaki oranla geçerlidir. Piyasa kapanmadan güncel orandan bozdurabilirsin.</p>
               </>

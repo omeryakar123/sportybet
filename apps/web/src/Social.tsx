@@ -245,7 +245,7 @@ export function WalletModal() {
               <label className="block"><span className="mb-1.5 block text-[13px] font-semibold text-soft">Promo veya hediye kodu</span>
                 <input value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="Kodu gir" className="input input-lg font-bold" /></label>
               <ErrBox e={err} />{ok && <div className="rounded-md bg-win/10 px-3 py-2.5 text-sm font-bold text-win">{ok}</div>}
-              <button disabled={busy || code.trim().length < 3} onClick={redeem} className="btn btn-primary btn-lg w-full">Kodu Kullan</button>
+              <button disabled={busy || code.trim().length < 3} onClick={redeem} className="btn btn-primary btn-lg w-full">Kodu kullan</button>
             </div>
           )}
           {walletOpen === "tip" && (

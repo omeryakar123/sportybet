@@ -18,7 +18,7 @@ export function AccountLayout() {
   const nav = useNavigate();
   if (!me) return (
     <div className="grid min-h-[50vh] place-items-center">
-      <div className="text-center"><p className="mb-4 font-semibold text-muted">Hesabını görmek için giriş yap.</p><Btn onClick={() => setAuthOpen(true)}>Giriş Yap</Btn></div>
+      <div className="text-center"><p className="mb-4 font-semibold text-muted">Hesabını görmek için giriş yap.</p><Btn onClick={() => setAuthOpen(true)}>Giriş yap</Btn></div>
     </div>
   );
   return (
@@ -299,7 +299,7 @@ export function MyBonuses() {
         <div className="mb-2 text-sm font-extrabold">Promosyon kodun mu var?</div>
         <div className="flex gap-2">
           <input className={inp + " uppercase"} placeholder="Kodu gir" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} />
-          <Btn className="!h-[46px]" disabled={code.length < 3} onClick={redeem}>Kodu Kullan</Btn>
+          <Btn className="!h-[46px]" disabled={code.length < 3} onClick={redeem}>Kodu kullan</Btn>
         </div>
       </div>
       <div className="mb-4 space-y-2">{msg && <div className="rounded-md border border-win/30 bg-win/10 px-3 py-2.5 text-sm font-bold text-win">{msg}</div>}<ErrBox e={err} /></div>
@@ -350,7 +350,7 @@ export function MyBonuses() {
                     ? <Link to={`/para-yatir?bonus=${b.id}`} className="btn btn-primary btn-sm">Yatırım yap</Link>
                     : b.requested
                       ? <span className="text-xs font-bold text-caution">Talep beklemede</span>
-                      : <Btn kind="soft" className="!h-9 !px-4 !text-xs" onClick={() => request(b.id)}>Talep Et</Btn>}
+                      : <Btn kind="soft" className="!h-9 !px-4 !text-xs" onClick={() => request(b.id)}>Bonusu talep et</Btn>}
                 </div>
               </div>
             ))}
