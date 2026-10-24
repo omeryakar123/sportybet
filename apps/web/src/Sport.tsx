@@ -71,7 +71,7 @@ function TeamLogo({ src, name, size = "size-4" }: { src?: string; name: string; 
 
 // ======================================================================
 export default function Sport() {
-  const { me, setAuthOpen, balance, refreshMe } = useStore();
+  const { me, setAuthOpen, balance, refreshMe, chatOpen } = useStore();
   const { id: evParam } = useParams();
   const nav = useNavigate();
   const [det, setDet] = useState<Ev | null>(null);
@@ -83,7 +83,12 @@ export default function Sport() {
   const [events, setEvents] = useState<Ev[] | null>(null);
   const [live, setLive] = useState<Ev[]>([]);
   const [lg, setLg] = useState<number>(Number(sp.get("lig")) || 0);
-  const [q, setQ] = useState("");
+  const [q, setQ] = useState(() => { try { return new URLSearchParams(window.location.search).get("ara") ?? ""; } catch { return ""; } });
+  const [when, setWhen] = useState<"all" | "today" | "tomorrow" | "3h">("all");
+  const [sport, setSport] = useState("football");
+  const [lgOpen, setLgOpen] = useState(false); const [lgQ, setLgQ] = useState("");
+  const lgRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { const h = (e: MouseEvent) => { if (!lgRef.current?.contains(e.target as Node)) setLgOpen(false); }; document.addEventListener("mousedown", h); return () => document.removeEventListener("mousedown", h); }, []);
   const [err, setErr] = useState("");
   const [picks, setPicks] = useState<Pick[]>(() => { try { return JSON.parse(localStorage.getItem("sb_picks") || "[]"); } catch { return []; } });
   const [stake, setStake] = useState("100");
@@ -155,8 +160,17 @@ export default function Sport() {
 
   const filtered = useMemo(() => {
     const t = q.trim().toLocaleLowerCase("tr");
-    return (events ?? []).filter((e) => !t || `${e.home} ${e.away} ${e.league}`.toLocaleLowerCase("tr").includes(t));
-  }, [events, q]);
+    const now = new Date(); const sod = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    return (events ?? []).filter((e) => {
+      if (sport !== "football") return false;
+      if (t && !`${e.home} ${e.away} ${e.league}`.toLocaleLowerCase("tr").includes(t)) return false;
+      const ts = new Date(e.startsAt).getTime();
+      if (when === "today" && !(ts >= sod && ts < sod + 864e5)) return false;
+      if (when === "tomorrow" && !(ts >= sod + 864e5 && ts < sod + 2 * 864e5)) return false;
+      if (when === "3h" && !(ts - Date.now() <= 3 * 36e5)) return false;
+      return true;
+    });
+  }, [events, q, when, sport]);
   const featured = useMemo(() => {
     const f = filtered.filter((e) => e.featured);
     return (f.length >= 4 ? f : [...f, ...filtered.filter((e) => !e.featured && mk(e, "1x2"))]).slice(0, 10);
@@ -332,36 +346,43 @@ export default function Sport() {
     const open = openEv === ev.id;
     return (
       <div key={key ?? ev.id} className="border-t border-line/70 first:border-t-0">
-        <div className="grid grid-cols-1 items-center gap-2 px-3 py-2.5 md:grid-cols-[minmax(180px,1fr)_84px_minmax(210px,1.2fr)_minmax(140px,.8fr)_minmax(140px,.8fr)_44px]">
-          <div className="flex min-w-0 items-center gap-2">
-            <div onClick={() => goMatch(ev.id)} role="link" title="Maç detayı ve tüm oranlar" className="min-w-0 flex-1 cursor-pointer space-y-1 hover:[&_span.team]:text-primary">
-              {[[ev.home, ev.homeLogo, ev.score?.h], [ev.away, ev.awayLogo, ev.score?.a]].map(([n, l, g], i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <TeamLogo src={l as string} name={n as string} />
-                  <span className="team truncate text-[13px] font-semibold transition-colors">{n as string}</span>
-                  {isLive && <span className="ml-auto grid h-5 min-w-5 place-items-center rounded bg-card px-1 text-[12px] font-extrabold text-primary tabular-nums">{(g as number) ?? 0}</span>}
-                </div>
-              ))}
+        <div className="grid grid-cols-1 items-center gap-2 px-3 py-2.5 lg:grid-cols-[minmax(260px,1.7fr)_72px_minmax(200px,1.1fr)_minmax(130px,.75fr)_minmax(130px,.75fr)_44px]">
+          <div className="flex min-w-0 flex-col gap-1.5">
+            <div className="flex items-center gap-2 text-[11px] font-semibold text-subtle lg:hidden">
+              {isLive ? <span className="rounded bg-live px-1.5 text-[10px] font-extrabold text-white">CANLI {ev.minute ? `${ev.minute}'` : ""}</span> : <span className="flex items-center gap-1"><I n="clock" className="size-3" />{dayLabel(ev.startsAt)} {hm(ev.startsAt)}</span>}
+              <button onClick={() => goMatch(ev.id)} className="ml-auto flex items-center gap-0.5 font-bold text-soft hover:text-primary">{more > 0 ? `+${more} oran` : "Detay"}<I n="right" className="size-3" /></button>
             </div>
-            <div className="flex items-center gap-2 text-subtle md:hidden">
-              {isLive ? <span className="rounded bg-live px-1.5 text-[10px] font-extrabold text-white">CANLI {ev.minute ? `${ev.minute}'` : ""}</span> : <span className="text-right text-[11px] font-semibold leading-tight">{dayLabel(ev.startsAt)}<br />{hm(ev.startsAt)}</span>}
+            <div onClick={() => goMatch(ev.id)} role="link" title="Maç detayı ve tüm oranlar" className="group/t flex min-w-0 flex-1 cursor-pointer items-center gap-2">
+              <span className="flex min-w-0 flex-1 items-center justify-end gap-2">
+                <span className="truncate text-right text-[14px] font-bold transition-colors group-hover/t:text-primary">{ev.home}</span>
+                <TeamLogo src={ev.homeLogo} name={ev.home} size="size-6" />
+              </span>
+              {isLive || ev.score ? (
+                <span className="grid h-7 min-w-[52px] shrink-0 place-items-center rounded-md bg-card px-1.5 text-[14px] font-extrabold text-primary tabular-nums">{ev.score?.h ?? 0} - {ev.score?.a ?? 0}</span>
+              ) : <span className="w-6 shrink-0 text-center text-[12px] font-bold text-dim">vs</span>}
+              <span className="flex min-w-0 flex-1 items-center gap-2">
+                <TeamLogo src={ev.awayLogo} name={ev.away} size="size-6" />
+                <span className="truncate text-[14px] font-bold transition-colors group-hover/t:text-primary">{ev.away}</span>
+              </span>
             </div>
           </div>
-          <div className="hidden flex-col items-center text-[11px] font-semibold text-subtle md:flex">
+          <div className="hidden flex-col items-center text-[11px] font-semibold text-subtle lg:flex">
             {isLive ? <><span className="rounded bg-live px-1.5 py-px text-[10px] font-extrabold text-white">CANLI</span><span className="mt-1 tabular-nums">{ev.minute ? `${ev.minute}'` : ev.status}</span></>
               : <><span className="flex items-center gap-1"><I n="calendar" className="size-3" />{dayLabel(ev.startsAt)}</span><span className="mt-1 flex items-center gap-1"><I n="clock" className="size-3" />{hm(ev.startsAt)}</span></>}
           </div>
+          <div className="grid grid-cols-[3fr_2fr] gap-1.5 lg:contents">
           <div className="grid grid-cols-3 gap-1.5">
             {odd({ ev: ev, m: m1, code: "HOME", label: "1" })}{odd({ ev: ev, m: m1, code: "DRAW", label: "X" })}{odd({ ev: ev, m: m1, code: "AWAY", label: "2" })}
           </div>
           <div className="grid grid-cols-2 gap-1.5">
-            {odd({ ev: ev, m: ou, code: "OVER", label: "Ü 2.5" })}{odd({ ev: ev, m: ou, code: "UNDER", label: "A 2.5" })}
+            {odd({ ev: ev, m: ou, code: "OVER", label: "Ü" })}{odd({ ev: ev, m: ou, code: "UNDER", label: "A" })}
           </div>
-          <div className="hidden grid-cols-2 gap-1.5 md:grid">
+          </div>
+          <div className="hidden grid-cols-2 gap-1.5 lg:grid">
             {odd({ ev: ev, m: kg, code: "YES", label: "Var" })}{odd({ ev: ev, m: kg, code: "NO", label: "Yok" })}
           </div>
           <button onClick={() => goMatch(ev.id)} disabled={false} title="Tüm oranlar"
-            className={`h-10 rounded-md text-[12px] font-extrabold transition-colors disabled:opacity-40 ${open ? "bg-primary text-primary-fg" : "bg-card text-muted hover:bg-surface-hover hover:text-fg"}`}>
+            className={`hidden h-10 rounded-md lg:block text-[12px] font-extrabold transition-colors disabled:opacity-40 ${open ? "bg-primary text-primary-fg" : "bg-card text-muted hover:bg-surface-hover hover:text-fg"}`}>
             {more > 0 ? `+${more}` : <I n="right" className="mx-auto size-4" />}
           </button>
         </div>
@@ -384,8 +405,8 @@ export default function Sport() {
   );
 
   const colHead = () => (
-    <div className="hidden grid-cols-[minmax(180px,1fr)_84px_minmax(210px,1.2fr)_minmax(140px,.8fr)_minmax(140px,.8fr)_44px] gap-2 px-3 pb-1.5 text-center text-[10px] font-extrabold tracking-wider text-dim uppercase md:grid">
-      <span /><span /><span>Maç Sonucu</span><span>Alt / Üst</span><span>Karşılıklı Gol</span><span />
+    <div className="hidden grid-cols-[minmax(260px,1.7fr)_72px_minmax(200px,1.1fr)_minmax(130px,.75fr)_minmax(130px,.75fr)_44px] gap-2 px-3 pb-1.5 text-center text-[10px] font-extrabold tracking-wider text-dim uppercase lg:grid">
+      <span /><span /><span>Maç Sonucu</span><span>Alt / Üst 2.5</span><span>Karşılıklı Gol</span><span />
     </div>
   );
 
@@ -426,11 +447,12 @@ export default function Sport() {
             const n = s.active ? (events?.length ?? 0) : 0;
             const on = s.active;
             return (
-              <button key={s.key} disabled={!s.active} title={s.active ? s.name : `${s.name} — yakında`}
-                className={`relative flex w-[74px] shrink-0 flex-col items-center gap-1.5 rounded-lg px-1 pt-2 pb-1.5 transition-colors ${on ? "bg-card text-primary" : "text-subtle opacity-60"}`}>
+              <button key={s.key} onClick={() => setSport(s.key)} title={s.active ? s.name : `${s.name} — yakında`}
+                className={`relative flex w-[74px] shrink-0 flex-col items-center gap-1.5 rounded-lg px-1 pt-2 pb-1.5 transition-colors ${sport === s.key ? "bg-card text-primary" : on ? "text-soft hover:bg-card/60 hover:text-fg" : "text-subtle hover:bg-card/60 hover:text-soft"}`}>
                 {n > 0 && <span className="absolute right-1.5 top-1 rounded bg-primary/15 px-1 text-[10px] font-extrabold text-primary">{n}</span>}
                 <SportIcon k={s.key} className="size-7" />
-                <span className={`max-w-full truncate text-[11px] font-semibold ${on ? "text-fg" : ""}`}>{s.name}</span>
+                <span className={`max-w-full truncate text-[11px] font-semibold ${sport === s.key ? "text-fg" : ""}`}>{s.name}</span>
+                {sport === s.key && <span className="absolute inset-x-4 -bottom-0.5 h-[3px] rounded-full bg-primary" />}
               </button>
             );
           })}
@@ -444,14 +466,44 @@ export default function Sport() {
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Takım veya lig ara" className="w-full bg-transparent text-sm font-medium outline-none placeholder:text-subtle" />
           {q && <button onClick={() => setQ("")} className="text-subtle hover:text-fg"><I n="x" className="size-4" /></button>}
         </label>
-        <select value={lg} onChange={(e) => pickLeague(Number(e.target.value))} className="h-11 rounded-lg border border-line bg-panel px-3 text-sm font-semibold outline-none focus:border-primary/70 sm:w-64">
-          <option value={0}>Tüm ligler ({leagues.reduce((a, l) => a + l.count, 0)})</option>
-          {leagues.map((l) => <option key={l.id} value={l.id}>{l.name}{l.country ? ` · ${l.country}` : ""} ({l.count})</option>)}
-        </select>
+        <div ref={lgRef} className="relative sm:w-72">
+          <button onClick={() => setLgOpen(!lgOpen)} className={`flex h-11 w-full items-center gap-2 rounded-lg border bg-panel px-3 text-left text-sm font-bold transition-colors ${lgOpen ? "border-primary/70" : "border-line hover:border-line-strong"}`}>
+            {(() => { const l = leagues.find((x) => x.id === lg); return l ? <>{l.logo ? <img src={l.logo} alt="" className="size-5 object-contain" /> : <SportIcon k="football" className="size-5 text-subtle" />}<span className="min-w-0 flex-1 truncate">{l.name}</span><span className="rounded bg-card px-1.5 text-[11px] text-soft">{l.count}</span></> : <><SportIcon k="football" className="size-5 text-primary" /><span className="flex-1">Tüm ligler</span><span className="rounded bg-card px-1.5 text-[11px] text-soft">{leagues.reduce((a, x) => a + x.count, 0)}</span></>; })()}
+            <I n={lgOpen ? "up" : "down"} className="size-4 text-subtle" />
+          </button>
+          {lgOpen && (
+            <div className="animate-slip-item absolute right-0 left-0 top-[calc(100%+6px)] z-40 overflow-hidden rounded-xl border border-line bg-panel shadow-[0_18px_50px_rgba(0,0,0,.55)]">
+              <div className="border-b border-line p-2"><label className="flex h-9 items-center gap-2 rounded-lg bg-field px-2.5"><I n="search" className="size-4 text-subtle" /><input autoFocus value={lgQ} onChange={(e) => setLgQ(e.target.value)} placeholder="Lig ara" className="w-full bg-transparent text-sm font-medium outline-none placeholder:text-subtle" /></label></div>
+              <div className="sb-scroll max-h-72 overflow-y-auto p-1.5">
+                <button onClick={() => { pickLeague(0); setLgOpen(false); }} className={`flex h-10 w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-sm font-bold ${lg === 0 ? "bg-primary/10 text-primary" : "text-muted hover:bg-card hover:text-fg"}`}><SportIcon k="football" className="size-5" /><span className="flex-1">Tüm ligler</span>{lg === 0 && <I n="check" className="size-4" />}</button>
+                {leagues.filter((l) => !lgQ || `${l.name} ${l.country ?? ""}`.toLocaleLowerCase("tr").includes(lgQ.toLocaleLowerCase("tr"))).map((l) => (
+                  <button key={l.id} onClick={() => { pickLeague(l.id); setLgOpen(false); setLgQ(""); }} className={`flex h-10 w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-sm font-semibold ${lg === l.id ? "bg-primary/10 text-primary" : "text-muted hover:bg-card hover:text-fg"}`}>
+                    {l.logo ? <img src={l.logo} alt="" className="size-5 object-contain" /> : <SportIcon k="football" className="size-5" />}
+                    <span className="min-w-0 flex-1 truncate">{l.name}{l.country ? <span className="ml-1 text-[12px] font-medium text-subtle">· {l.country}</span> : null}</span>
+                    <span className="rounded bg-card px-1.5 text-[11px] font-bold text-soft">{l.count}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
+      <div className="no-scrollbar -mt-3 mb-5 flex gap-2 overflow-x-auto">
+        {([["all", "Tümü"], ["today", "Bugün"], ["tomorrow", "Yarın"], ["3h", "3 saat içinde"]] as const).map(([k, l]) => (
+          <button key={k} onClick={() => setWhen(k)} className={`h-9 shrink-0 rounded-full border px-4 text-[13px] font-bold transition-colors ${when === k ? "border-primary bg-primary/10 text-primary" : "border-line bg-panel text-soft hover:text-fg"}`}>{l}</button>
+        ))}
+        {(when !== "all" || lg > 0 || q) && <button onClick={() => { setWhen("all"); pickLeague(0); setQ(""); }} className="h-9 shrink-0 rounded-full px-3 text-[13px] font-bold text-subtle hover:text-loss">Filtreleri temizle ✕</button>}
+      </div>
+      {sport !== "football" && (
+        <div className="mb-6 rounded-xl bg-panel p-10 text-center">
+          <div className="mx-auto mb-3 grid size-14 place-items-center rounded-full bg-card text-primary"><SportIcon k={sport} className="size-7" /></div>
+          <p className="font-bold">{SPORTS.find((x) => x.key === sport)?.name} yakında</p>
+          <p className="mt-1 text-sm text-subtle">Şimdilik futbol bültenimiz açık. <button onClick={() => setSport("football")} className="font-bold text-primary hover:underline">Futbola dön</button></p>
+        </div>
+      )}
       {/* ÖNE ÇIKANLAR */}
-      {featured.length > 0 && !q && (
+      {featured.length > 0 && !q && when === "all" && lg === 0 && sport === "football" && (
         <section className="mb-7">
           <div className="mb-3 flex items-center gap-2">
             <span className="grid size-7 place-items-center rounded-full bg-primary/15 text-primary"><I n="flame" className="size-4" /></span>
@@ -490,7 +542,7 @@ export default function Sport() {
       )}
 
       {/* CANLI MAÇLAR */}
-      {liveGroups.length > 0 && !q && (
+      {liveGroups.length > 0 && !q && sport === "football" && (
         <section className="mb-7">
           <div className="mb-3 flex items-center gap-2">
             <span className="grid size-7 place-items-center rounded-full bg-live text-white"><I n="play" className="size-3.5" /></span>
@@ -504,7 +556,7 @@ export default function Sport() {
       )}
 
       {/* YAKLAŞAN */}
-      <section>
+      {sport === "football" && <section>
         <div className="mb-3 flex items-center gap-2">
           <span className="grid size-7 place-items-center rounded-full bg-primary/15 text-primary"><I n="calendar" className="size-4" /></span>
           <h2 className="text-lg font-extrabold">{q ? `“${q}” için sonuçlar` : "Yaklaşan Maçlar"}</h2>
@@ -523,12 +575,12 @@ export default function Sport() {
             {grouped.map((g) => leagueBlock({ key: g.lg.id, id: String(g.lg.id), name: g.lg.name, country: g.lg.country, logo: g.lg.logo, evs: g.evs }))}
           </>
         )}
-      </section>
+      </section>}
 
       </>)}
 
       {/* YAPIŞKAN KUPON — masaüstü sağ alt, mobil alt menünün üstünde */}
-      <div className="fixed inset-x-0 bottom-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom))] z-40 lg:inset-x-auto lg:right-5 lg:bottom-5 lg:w-[370px]">
+      <div className={`fixed inset-x-0 bottom-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom))] z-40 lg:inset-x-auto lg:right-5 lg:bottom-5 lg:w-[370px] ${chatOpen ? "xl:right-[360px]" : ""}`}>
         <div className="overflow-hidden border-t border-line bg-panel shadow-[0_-12px_40px_rgba(0,0,0,.5)] lg:rounded-xl lg:border">
           {SlipBar}
           {slipOpen && SlipBody}

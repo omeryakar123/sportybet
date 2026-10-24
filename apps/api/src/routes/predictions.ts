@@ -70,13 +70,13 @@ export async function predictionSiteRoutes(app: FastifyInstance) {
   app.get("/predictions/leaderboard", async (req) => {
     const { days } = z.object({ days: z.coerce.number().min(1).max(365).default(7) }).parse(req.query);
     const rows = await db.$queryRaw<any[]>`
-      SELECT p.username, pp."playerId", SUM(pp.payout) - SUM(pp.stake) AS profit, SUM(pp.stake) AS volume, COUNT(*) AS positions,
+      SELECT p.username, pp."playerId", p.avatar, SUM(pp.payout) - SUM(pp.stake) AS profit, SUM(pp.stake) AS volume, COUNT(*) AS positions,
              COUNT(*) FILTER (WHERE pp.status = 'WON') AS wins
       FROM "PredictionPosition" pp JOIN "Player" p ON p.id = pp."playerId"
       WHERE pp.status IN ('WON','LOST','SOLD') AND pp."closedAt" >= NOW() - (${days}::int * INTERVAL '1 day') AND p."isTest" = false
-      GROUP BY 1,2 ORDER BY profit DESC LIMIT 50`;
+      GROUP BY 1,2,3 ORDER BY profit DESC LIMIT 50`;
     const mask = (u: string) => (u.length <= 3 ? u[0] + "**" : u.slice(0, 2) + "*".repeat(Math.max(1, u.length - 4)) + u.slice(-2));
-    return { success: true, data: rows.map((r, i) => ({ rank: i + 1, username: mask(r.username), profit: Number(r.profit), volume: Number(r.volume), positions: Number(r.positions), wins: Number(r.wins) })) };
+    return { success: true, data: rows.map((r, i) => ({ rank: i + 1, playerId: r.playerId, avatar: r.avatar, username: /@|^\+?\d{9,}$/.test(r.username) ? mask(r.username) : r.username, profit: Number(r.profit), volume: Number(r.volume), positions: Number(r.positions), wins: Number(r.wins) })) };
   });
 
   app.get("/predictions/:slug", async (req) => {

@@ -35,6 +35,7 @@ const G: Record<string, ReactNode> = {
   user: <><circle cx="12" cy="7.5" r="4" /><path d="M4 21c.8-5 4-7.5 8-7.5s7.2 2.5 8 7.5Z" /></>,
   menu: <><rect x="3" y="5" width="18" height="2.4" rx="1.2" /><rect x="3" y="10.8" width="18" height="2.4" rx="1.2" /><rect x="3" y="16.6" width="18" height="2.4" rx="1.2" /></>,
   logout: <><path d="M10 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h5" stroke="currentColor" strokeWidth="2" fill="none" /><path d="M9 12h11M16 8l4 4-4 4" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" /></>,
+  chat: <><path d="M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9l-5 4v-4H5a2 2 0 0 1-2-2Z" /><rect x="7" y="8" width="10" height="1.8" rx=".9" fill="#fff" /><rect x="7" y="11.4" width="6" height="1.8" rx=".9" fill="#fff" /></>,
   globe: <><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="2" /><path d="M3 12h18M12 3c3 3.3 3 14.7 0 18M12 3c-3 3.3-3 14.7 0 18" stroke="currentColor" strokeWidth="1.6" fill="none" /></>,
   cal: <><rect x="3" y="5" width="18" height="16" rx="2" /><rect x="5" y="10" width="14" height="9" fill="#fff" /><rect x="7" y="2.5" width="2" height="4" rx="1" /><rect x="15" y="2.5" width="2" height="4" rx="1" /></>,
 };
@@ -338,6 +339,7 @@ export function useForm<T extends Record<string, any>>(init: T) {
 }
 
 export const TX_TR: Record<string, string> = {
+  TIP_SEND: "Bahşiş (giden)", TIP_RECEIVE: "Bahşiş (gelen)", RAIN_SEND: "Yağmur (başlatılan)", RAIN_RECEIVE: "Yağmur Payı", RAIN_REFUND: "Yağmur İadesi", DEPOSIT_REVERSAL: "Yatırım Geri Alma", WITHDRAWAL_REVERSAL: "Çekim İadesi",
   DEPOSIT: "Yatırım", WITHDRAWAL: "Çekim", BET_STAKE: "Bahis", BET_WIN: "Kazanç",
   PREDICTION_BUY: "Tahmin Alımı", PREDICTION_SELL: "Tahmin Bozdurma", PREDICTION_WIN: "Tahmin Kazancı", PREDICTION_REFUND: "Tahmin İadesi", BET_REFUND: "Bahis İadesi", BONUS_GRANT: "Bonus Verildi",
   BONUS_CONVERT: "Bonus Dönüşümü", BONUS_EXPIRE: "Bonus Süresi Doldu", BONUS_CANCEL: "Bonus İptal", ADJUSTMENT: "Düzeltme",

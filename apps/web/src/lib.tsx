@@ -20,6 +20,8 @@ export const TX_TR: Record<string, string> = {
   DEPOSIT: "Para Yatırma", WITHDRAWAL: "Para Çekme", WITHDRAWAL_REFUND: "Çekim İadesi", BET_STAKE: "Spor Bahsi", BET_WIN: "Bahis Kazancı",
   BET_REFUND: "Bahis İadesi", BONUS_GRANT: "Bonus", BONUS_CONVERT: "Bonus Dönüşümü", BONUS_EXPIRE: "Bonus Süresi Doldu", BONUS_CANCEL: "Bonus İptali",
   ADJUSTMENT: "Düzeltme", CORRECTION_UP: "Düzeltme", CORRECTION_DOWN: "Düzeltme",
+  TIP_SEND: "Bahşiş (gönderilen)", TIP_RECEIVE: "Bahşiş (gelen)", RAIN_SEND: "Sohbet Yağmuru", RAIN_RECEIVE: "Yağmur Payı", RAIN_REFUND: "Yağmur İadesi",
+  DEPOSIT_REVERSAL: "Yatırım Geri Alındı", WITHDRAWAL_REVERSAL: "Çekim İadesi",
   PREDICTION_BUY: "Tahmin", PREDICTION_SELL: "Tahmin Bozdurma", PREDICTION_WIN: "Tahmin Kazancı", PREDICTION_REFUND: "Tahmin İadesi",
 };
 
@@ -82,6 +84,10 @@ type Store = {
   settings: any; menus: any; predCats: any[];
   authOpen: boolean; setAuthOpen: (v: boolean | "register") => void;
   sidebarOpen: boolean; setSidebarOpen: (v: boolean) => void;
+  chatOpen: boolean; setChatOpen: (v: boolean) => void;
+  profileId: number | null; openProfile: (id: number | null) => void;
+  walletOpen: false | "menu" | "promo" | "tip"; setWalletOpen: (v: false | "menu" | "promo" | "tip") => void;
+  tipTo: string; setTipTo: (u: string) => void;
   balance: (t: "MAIN" | "BONUS") => number;
   setWallet: (w: "MAIN" | "BONUS") => Promise<void>;
 };
@@ -95,6 +101,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [predCats, setPredCats] = useState<any[]>([]);
   const [authOpen, setAuthOpen] = useState<any>(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [chatOpen, setChatOpenS] = useState(() => { try { return window.innerWidth >= 1280 && localStorage.getItem("chat_open") !== "0"; } catch { return false; } });
+  const setChatOpen = (v: boolean) => { setChatOpenS(v); try { localStorage.setItem("chat_open", v ? "1" : "0"); } catch {} };
+  const [profileId, openProfile] = useState<number | null>(null);
+  const [walletOpen, setWalletOpen] = useState<false | "menu" | "promo" | "tip">(false);
+  const [tipTo, setTipTo] = useState("");
   const refreshMe = async () => { if (!getToken()) return setMe(null); try { setMe(await api("/api/me")); } catch { setMe(null); } };
   useEffect(() => {
     refreshMe();
@@ -111,7 +122,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const balance = (t: "MAIN" | "BONUS") => Number(me?.wallets?.find((w: any) => w.type === t)?.balance ?? 0);
   const setWallet = async (w: "MAIN" | "BONUS") => { await api("/api/me/wallet", { method: "PUT", json: { wallet: w } }); await refreshMe(); };
   const logout = () => { setToken(null); setMe(null); };
-  return <Ctx.Provider value={{ me, refreshMe, logout, settings, menus, predCats, authOpen, setAuthOpen, sidebarOpen, setSidebarOpen, balance, setWallet }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ me, refreshMe, logout, settings, menus, predCats, authOpen, setAuthOpen, sidebarOpen, setSidebarOpen, chatOpen, setChatOpen, profileId, openProfile, walletOpen, setWalletOpen, tipTo, setTipTo, balance, setWallet }}>{children}</Ctx.Provider>;
 }
 
 // ---------- ortak küçük bileşenler ----------
@@ -144,6 +155,13 @@ export function ErrBox({ e }: { e?: string }) {
     PROMO_NOT_FOUND: "Kod bulunamadı", PROMO_ALREADY_USED: "Bu kodu zaten kullandınız", PROMO_LIMIT_REACHED: "Kodun kullanım limiti doldu",
     ACTIVE_BONUS_EXISTS: "Zaten aktif bir bonusunuz var", ALREADY_REQUESTED: "Bu bonus için bekleyen talebiniz var", TOO_MANY_ATTEMPTS: "Çok fazla hatalı deneme. Destek ile iletişime geçin.",
     WRONG_PASSWORD: "Mevcut şifre hatalı", UNAUTHORIZED: "Devam etmek için giriş yapın", SELL_DISABLED: "Bozdurma şu an kapalı", POSITION_NOT_OPEN: "Bu pozisyon zaten kapandı",
+    CHAT_MUTED: "Sohbette geçici olarak susturuldun", CHAT_BANNED: "Sohbet kullanımın kapatıldı", SLOW_MODE: "Biraz yavaş — birkaç saniye bekle", MESSAGE_TOO_LONG: "Mesaj çok uzun",
+    CHAT_DEPOSIT_REQUIRED: "Sohbete yazmak için en az bir yatırım gerekli", CHAT_ACCOUNT_TOO_NEW: "Hesabın yazmak için çok yeni", CHAT_DISABLED: "Sohbet şu an kapalı", EMPTY_MESSAGE: "Mesaj boş",
+    RAIN_MIN: "Yağmur tutarı minimumun altında", RAIN_MAX: "Yağmur tutarı maksimumun üstünde", RAIN_ALREADY_ACTIVE: "Şu an devam eden bir yağmur var", RAIN_ENDED: "Bu yağmur sona erdi",
+    RAIN_ALREADY_JOINED: "Bu yağmura zaten katıldın", RAIN_OWN: "Kendi yağmuruna katılamazsın", RAIN_FULL: "Yağmur doldu", RAIN_DEPOSIT_REQUIRED: "Yağmura katılmak için en az bir yatırım gerekli",
+    RAIN_ACCOUNT_TOO_NEW: "Yağmura katılmak için hesabın en az 24 saatlik olmalı", RAIN_DISABLED: "Yağmur şu an kapalı", RAIN_NOT_ALLOWED: "Yağmura katılamazsın",
+    TIP_MIN: "Bahşiş minimumun altında", TIP_MAX: "Bahşiş maksimumun üstünde", TIP_SELF: "Kendine bahşiş gönderemezsin", USER_NOT_FOUND: "Kullanıcı bulunamadı", RECIPIENT_UNAVAILABLE: "Bu kullanıcıya gönderilemez",
+    TIP_DEPOSIT_REQUIRED: "Bahşiş göndermek için en az bir yatırım gerekli", TIP_DAILY_LIMIT: "Günlük bahşiş limitine ulaştın", TIP_DISABLED: "Bahşiş şu an kapalı", INVALID_AMOUNT: "Geçersiz tutar",
     PLAYER_EXCLUDED_FROM_BONUSES: "Hesabınız bonus kampanyalarına kapalı", ACCOUNT_BLOCKED: "Hesabınız işleme kapalı", NOT_ENOUGH_DEPOSITS: "Bu kod için yeterli yatırımınız yok",
   };
   return <div className="rounded-md border border-loss/30 bg-loss/10 px-3 py-2.5 text-sm font-semibold text-loss">{TR[e] ?? e}</div>;

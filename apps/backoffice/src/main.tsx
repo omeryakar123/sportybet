@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import "./index.css";
 import { getToken } from "./api";
+import Chat from "./pages/Chat";
 import Layout from "./Layout";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
@@ -50,6 +51,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         <Route path="prediction-categories" element={<PredictionCategories />} />
         <Route path="prediction-settings" element={<PredictionSettings />} />
         <Route path="system" element={<System />} />
+        <Route path="chat" element={<Chat />} />
         <Route path="users" element={<Users />} />
         <Route path="sites" element={<Sites />} />
         <Route path="audit-logs" element={<AuditLogs />} />

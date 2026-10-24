@@ -1,184 +1,247 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { api } from "./api";
-import { I, pct, useStore } from "./lib";
+import { I, useStore } from "./lib";
 import { MarketCard } from "./predictions";
 
-/* Dekoratif orijinal çizimler */
+/* ---------- özgün dekoratif çizimler ---------- */
 const BallArt = ({ className }: { className?: string }) => (
   <svg viewBox="0 0 200 200" aria-hidden className={className}>
-    <defs><radialGradient id="sb-ball" cx="0.38" cy="0.3" r="0.8"><stop offset="0" stopColor="#ffffff" /><stop offset="1" stopColor="#c9d2e3" /></radialGradient></defs>
-    <circle cx="100" cy="100" r="96" fill="url(#sb-ball)" />
-    <polygon points="100,62 136,88 122,130 78,130 64,88" fill="#0f1923" />
-    <g stroke="#0f1923" strokeWidth="5" fill="none"><path d="M100 62V20M136 88l40-12M122 130l26 34M78 130l-26 34M64 88 24 76" /></g>
+    <defs>
+      <radialGradient id="h-ball" cx="0.36" cy="0.3" r="0.85"><stop offset="0" stopColor="#ffffff" /><stop offset=".7" stopColor="#d9e2ef" /><stop offset="1" stopColor="#9fb0c6" /></radialGradient>
+      <radialGradient id="h-glow" cx=".5" cy=".5" r=".5"><stop offset="0" stopColor="#1fe88a" stopOpacity=".55" /><stop offset="1" stopColor="#1fe88a" stopOpacity="0" /></radialGradient>
+    </defs>
+    <circle cx="100" cy="100" r="100" fill="url(#h-glow)" />
+    <circle cx="100" cy="100" r="70" fill="url(#h-ball)" />
+    <polygon points="100,72 126,91 116,121 84,121 74,91" fill="#0f1923" />
+    <g stroke="#0f1923" strokeWidth="4" fill="none" strokeLinecap="round"><path d="M100 72V34M126 91l34-10M116 121l20 30M84 121l-20 30M74 91 40 81" /></g>
   </svg>
 );
-const SlipArt = ({ className }: { className?: string }) => (
+const LiveArt = ({ className }: { className?: string }) => (
   <svg viewBox="0 0 200 200" aria-hidden className={className}>
-    <rect x="20" y="36" width="160" height="150" rx="12" fill="#213141" />
-    <rect x="20" y="36" width="160" height="36" rx="12" fill="#2a3c50" />
-    <rect x="56" y="50" width="88" height="8" rx="4" fill="#9aa8b8" />
-    <rect x="36" y="92" width="74" height="26" rx="6" fill="#1fe88a" /><rect x="110" y="92" width="54" height="26" rx="6" fill="#1a2734" />
-    <rect x="36" y="130" width="46" height="26" rx="6" fill="#1a2734" /><rect x="90" y="130" width="74" height="26" rx="6" fill="#ff4d5e" />
+    <defs><radialGradient id="h-live" cx=".5" cy=".5" r=".5"><stop offset="0" stopColor="#ff3b4f" stopOpacity=".55" /><stop offset="1" stopColor="#ff3b4f" stopOpacity="0" /></radialGradient></defs>
+    <circle cx="100" cy="100" r="100" fill="url(#h-live)" />
+    <rect x="38" y="58" width="124" height="84" rx="14" fill="#1a2734" stroke="#ff3b4f" strokeWidth="5" />
+    <path d="M88 82v36l30-18Z" fill="#ff3b4f" />
+    <circle cx="150" cy="62" r="12" fill="#ff3b4f" /><circle cx="150" cy="62" r="5" fill="#fff" />
   </svg>
 );
-const BasketArt = ({ className }: { className?: string }) => (
+const VoteArt = ({ className }: { className?: string }) => (
   <svg viewBox="0 0 200 200" aria-hidden className={className}>
-    <defs><radialGradient id="sb-bask" cx="0.4" cy="0.3" r="0.8"><stop offset="0" stopColor="#1fe88a" /><stop offset="1" stopColor="#12a366" /></radialGradient></defs>
-    <circle cx="100" cy="100" r="96" fill="url(#sb-bask)" />
-    <g fill="none" stroke="#111d1a" strokeWidth="5"><path d="M4 100h192M100 4v192" /><path d="M30 30c30 30 30 110 0 140M170 30c-30 30-30 110 0 140" /></g>
-  </svg>
-);
-const BoxArt = ({ className }: { className?: string }) => (
-  <svg viewBox="0 0 200 200" aria-hidden className={className}>
-    <rect x="30" y="80" width="140" height="96" rx="10" fill="#bff5da" />
-    <rect x="30" y="80" width="140" height="26" rx="10" fill="#dffbec" />
-    <rect x="86" y="88" width="28" height="10" rx="4" fill="#174a35" />
-    <rect x="76" y="28" width="48" height="40" rx="5" fill="#fff" transform="rotate(-8 100 48)" />
+    <defs><radialGradient id="h-vote" cx=".5" cy=".5" r=".5"><stop offset="0" stopColor="#19e3d1" stopOpacity=".5" /><stop offset="1" stopColor="#19e3d1" stopOpacity="0" /></radialGradient></defs>
+    <circle cx="100" cy="100" r="100" fill="url(#h-vote)" />
+    <rect x="44" y="96" width="112" height="70" rx="10" fill="#bff5da" /><rect x="44" y="96" width="112" height="20" rx="10" fill="#dffbec" />
+    <rect x="86" y="102" width="28" height="8" rx="4" fill="#174a35" />
+    <rect x="70" y="40" width="60" height="58" rx="6" fill="#fff" transform="rotate(-8 100 70)" />
+    <path d="m84 70 10 10 20-22" stroke="#1fb57a" strokeWidth="7" fill="none" strokeLinecap="round" strokeLinejoin="round" transform="rotate(-8 100 70)" />
   </svg>
 );
 
-function CmsBanners() {
-  const [items, setItems] = useState<any[]>([]); const [i, setI] = useState(0);
-  const platform = window.innerWidth < 768 ? "mobile" : "web";
-  useEffect(() => { api(`/api/cms/banners?group=homepage-hero&platform=${platform}`).then(setItems).catch(() => {}); }, []);
-  useEffect(() => { if (items.length < 2) return; const t = setInterval(() => setI((x) => (x + 1) % items.length), 6000); return () => clearInterval(t); }, [items.length]);
-  if (!items.length) return null;
+function useNow() { const [n, setN] = useState(Date.now()); useEffect(() => { const t = setInterval(() => setN(Date.now()), 1000); return () => clearInterval(t); }, []); return n; }
+function Countdown({ to }: { to: string }) {
+  const now = useNow(); const ms = Math.max(0, new Date(to).getTime() - now);
+  if (!ms) return null;
+  const d = Math.floor(ms / 864e5), h = Math.floor(ms / 36e5) % 24, m = Math.floor(ms / 6e4) % 60, s = Math.floor(ms / 1e3) % 60;
+  return <span className="rounded-lg border border-caution/40 bg-black/45 px-3 py-1.5 text-[13px] font-extrabold text-caution backdrop-blur tabular-nums">Bitişe {d > 0 ? `${d}g ` : ""}{h}s {m}d {s}sn</span>;
+}
+
+/* ---------- hero: CMS promosyonları (yoksa karşılama kartı) ---------- */
+function Hero() {
+  const { me, setAuthOpen, settings } = useStore();
+  const [promos, setPromos] = useState<any[]>([]); const [i, setI] = useState(0);
+  useEffect(() => { api("/api/cms/promotions").then((r) => setPromos((Array.isArray(r) ? r : []).filter((p: any) => !p.endsAt || new Date(p.endsAt) > new Date()).slice(0, 6))).catch(() => {}); }, []);
+  useEffect(() => { if (promos.length < 2) return; const t = setInterval(() => setI((x) => (x + 1) % promos.length), 7000); return () => clearInterval(t); }, [promos.length]);
+  const p = promos[i];
+  if (!p) return (
+    <section className="relative isolate overflow-hidden rounded-2xl bg-[linear-gradient(120deg,#0b1a17_0%,#0f2a20_45%,#14402d_100%)] px-6 py-10 sm:px-10 lg:py-14">
+      <BallArt className="absolute -right-10 top-1/2 -z-10 h-[340px] -translate-y-1/2 opacity-90 max-sm:-right-24 max-sm:h-[240px] max-sm:opacity-50" />
+      <div className="max-w-[520px]">
+        <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-primary/15 px-3 py-1 text-[12px] font-extrabold text-primary"><span className="live-dot size-2 rounded-full bg-primary" />Canlı skor · Maç öncesi · Tahminler</div>
+        <h1 className="text-3xl leading-tight font-extrabold sm:text-4xl lg:text-5xl">{me ? <>Hoş geldin,<br /><span className="text-primary">{me.username}</span></> : <>Maçı Oyna,<br /><span className="text-primary">Gündemi Tahmin Et</span></>}</h1>
+        <p className="mt-3 max-w-[420px] text-[15px] font-medium text-muted">{settings.siteName ?? "SportyBet"} ile bültendeki her maça oyna, kazancın maç biter bitmez cüzdanında.</p>
+        <div className="mt-6 flex flex-wrap gap-3">
+          <Link to="/spor" className="inline-flex h-12 items-center gap-2 rounded-xl bg-primary px-6 text-sm font-extrabold text-primary-fg hover:bg-primary-hover"><I n="ball" className="size-4" />Bahis Yap</Link>
+          {!me && <button onClick={() => setAuthOpen("register")} className="inline-flex h-12 items-center rounded-xl bg-white/10 px-6 text-sm font-extrabold backdrop-blur hover:bg-white/15">Hemen Kayıt Ol</button>}
+        </div>
+      </div>
+    </section>
+  );
   return (
-    <section className="relative mt-4 overflow-hidden rounded-lg">
-      {items.map((b, j) => (
-        <a key={b.id} href={b.linkUrl || "#"} className={`${j === i ? "block" : "hidden"} animate-sports-fade`}>
-          <img src={b.imageUrl} alt={b.title} className="w-full object-cover" />
-        </a>
-      ))}
-      {items.length > 1 && (
+    <section className="relative isolate overflow-hidden rounded-2xl bg-card">
+      <Link to={`/promosyonlar/${p.slug}`} className="block">
+        <div className="relative aspect-[4/3] w-full sm:aspect-[21/8]">
+          {p.imageUrl ? <img src={p.imageUrl} alt="" className="absolute inset-0 size-full object-cover" /> : <div className="absolute inset-0 bg-[linear-gradient(120deg,#123326,#1fb57a)]" />}
+          <div className="absolute inset-0 bg-[linear-gradient(0deg,rgba(11,19,28,.92)_0%,rgba(11,19,28,.35)_45%,transparent_70%)]" />
+          {p.endsAt && <div className="absolute inset-x-0 top-4 flex justify-center"><Countdown to={p.endsAt} /></div>}
+          <div className="absolute inset-x-0 bottom-0 p-5 text-center sm:p-8">
+            <h2 className="text-2xl leading-tight font-extrabold drop-shadow sm:text-4xl">{p.title}</h2>
+            <span className="mt-3 inline-flex h-10 items-center rounded-xl bg-primary px-5 text-sm font-extrabold text-primary-fg">Detaylar</span>
+          </div>
+        </div>
+      </Link>
+      {promos.length > 1 && (
         <div className="absolute inset-x-0 bottom-2 flex justify-center gap-1.5">
-          {items.map((_, j) => <button key={j} onClick={() => setI(j)} className={`h-1.5 rounded-full transition-all ${j === i ? "w-5 bg-primary" : "w-1.5 bg-white/40"}`} />)}
+          {promos.map((_, j) => <button key={j} onClick={() => setI(j)} aria-label={`Promosyon ${j + 1}`} className={`h-1.5 rounded-full transition-all ${j === i ? "w-6 bg-primary" : "w-1.5 bg-white/40"}`} />)}
         </div>
       )}
     </section>
   );
 }
 
+/* ---------- yatay kaydırıcı başlığı ---------- */
+function Rail({ title, icon, to, children }: { title: string; icon: React.ReactNode; to: string; children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const by = (d: number) => ref.current?.scrollBy({ left: d * 320, behavior: "smooth" });
+  return (
+    <section className="mt-8">
+      <div className="mb-3 flex items-center gap-2.5">
+        <span className="grid size-8 place-items-center rounded-full bg-primary/15 text-primary">{icon}</span>
+        <h2 className="text-xl font-extrabold">{title}</h2>
+        <Link to={to} className="ml-2 text-[13px] font-bold text-subtle hover:text-primary">Tümü</Link>
+        <div className="ml-auto flex gap-1.5">
+          <button onClick={() => by(-1)} aria-label="Önceki" className="grid size-9 place-items-center rounded-lg bg-panel text-muted hover:text-fg"><I n="left" className="size-4" /></button>
+          <button onClick={() => by(1)} aria-label="Sonraki" className="grid size-9 place-items-center rounded-lg bg-panel text-muted hover:text-fg"><I n="right" className="size-4" /></button>
+        </div>
+      </div>
+      <div ref={ref} className="no-scrollbar -mx-3 flex snap-x snap-mandatory scroll-px-3 gap-3 overflow-x-auto px-3 sm:-mx-4 sm:scroll-px-4 sm:px-4">{children}</div>
+    </section>
+  );
+}
+
+function Logo({ src, name }: { src?: string; name: string }) {
+  const [bad, setBad] = useState(false);
+  if (!src || bad) return <span className="grid size-6 shrink-0 place-items-center rounded-full bg-elevated text-[10px] font-extrabold text-soft">{name.slice(0, 1)}</span>;
+  return <img src={src} alt="" loading="lazy" onError={() => setBad(true)} className="size-6 shrink-0 object-contain" />;
+}
+
+const FAQ: [string, string][] = [
+  ["Nasıl üye olurum?", "Sağ üstteki Kayıt Ol butonuna bas, kullanıcı adı ve şifreni belirle. Hesabın anında açılır."],
+  ["Para yatırma ve çekme ne kadar sürer?", "Talepler finans ekibimiz tarafından sırayla işlenir; onaylanan yatırım bakiyene anında, çekim ise ödeme yöntemine göre kısa sürede hesabına geçer."],
+  ["Kuponum ne zaman sonuçlanır?", "Maç bittiğinde sonuç bültenden otomatik okunur ve kazancın cüzdanına yatar."],
+  ["Bonus cüzdanı nedir?", "Bonuslar ayrı bir cüzdanda tutulur. Çevrim şartı tamamlanınca bonus bakiyen Ana Para'ya aktarılır."],
+  ["Sohbet kuralları neler?", "Küfür, hakaret, dilenme (para/bahşiş isteme), link ve reklam otomatik engellenir; tekrarında susturma uygulanır."],
+  ["Sorumlu oyun", "Bahis yalnızca 18 yaş üstü içindir. Kendine limit koy, kaybını kovalama; ihtiyaç duyarsan destek ekibimizle iletişime geç."],
+];
+
 export default function Home() {
-  const { me, setAuthOpen, settings } = useStore();
+  const { settings } = useStore();
+  const nav = useNavigate();
   const [markets, setMarkets] = useState<any[]>([]);
-  const [sbEvents, setSbEvents] = useState<any[]>([]);
-  const scroller = useRef<HTMLDivElement>(null);
+  const [events, setEvents] = useState<any[]>([]);
+  const [live, setLive] = useState<any[]>([]);
+  const [total, setTotal] = useState<{ ev: number; pred: number }>({ ev: 0, pred: 0 });
+  const [q, setQ] = useState(""); const [open, setOpen] = useState<number | null>(0);
   useEffect(() => {
-    api("/api/predictions?homepage=true&limit=12").then((r) => { const d = r.data?.length ? r.data : null; if (d) setMarkets(d); else api("/api/predictions?limit=12").then((r2) => setMarkets(r2.data ?? [])).catch(() => {}); }).catch(() => {});
-    api("/api/sb/events?limit=6").then((r) => setSbEvents(Array.isArray(r) ? r : [])).catch(() => {});
+    api("/api/predictions?homepage=true&limit=12").then((r) => { const d = r.data?.length ? r.data : null; if (d) setMarkets(d); else api("/api/predictions?limit=12").then((r2) => setMarkets(r2.data ?? [])).catch(() => {}); setTotal((t) => ({ ...t, pred: r.pagination?.total ?? (r.data?.length ?? 0) })); }).catch(() => {});
+    api("/api/sb/events?limit=60").then((r) => { const a = Array.isArray(r) ? r : []; setEvents(a); setTotal((t) => ({ ...t, ev: a.length })); }).catch(() => {});
+    api("/api/sb/live").then((r) => setLive(Array.isArray(r) ? r : [])).catch(() => {});
   }, []);
-  const top = markets[0];
-  const scrollBy = (dir: number) => scroller.current?.scrollBy({ left: dir * 320, behavior: "smooth" });
+  const featured = [...events.filter((e) => e.featured), ...events.filter((e) => !e.featured)].slice(0, 12);
+  const cards = [
+    { to: "/spor", top: `${total.ev}+ Maç`, title: "Spor", Art: BallArt, bg: "from-[#122a22] to-[#0f1923]" },
+    { to: "/spor", top: `${live.length} canlı maç`, title: "Canlı", Art: LiveArt, bg: "from-[#2a1620] to-[#0f1923]" },
+    { to: "/tahminler", top: `${total.pred || markets.length} piyasa`, title: "Tahminler", Art: VoteArt, bg: "from-[#112a2c] to-[#0f1923]" },
+  ];
   return (
     <div className="animate-sports-fade">
-      {/* HERO */}
-      <section className="relative isolate overflow-hidden rounded-lg bg-[linear-gradient(115deg,#0b1a17_0%,#0f231c_45%,#123326_100%)] max-lg:min-h-[400px] lg:h-[337px]">
-        <div className="absolute top-0 left-1/2 -z-10 h-56 w-[520px] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(31,232,138,0.35),transparent)] blur-2xl" />
-        <BallArt className="absolute -bottom-10 -left-8 -z-10 h-[290px] rotate-[-12deg] max-lg:top-2 max-lg:left-[-70px] max-lg:h-[190px] max-lg:opacity-70" />
-        <div className="relative z-10 flex h-full flex-col items-center justify-center px-6 py-10 text-center">
-          <h1 className="max-w-[560px] text-3xl leading-tight font-extrabold lg:text-4xl">{me ? <>Hoş geldin, <span className="text-primary">{me.username}</span></> : <>Maçı Oyna, Gündemi Tahmin Et</>}</h1>
-          <p className="mt-3 max-w-[460px] text-[15px] font-medium text-muted">Canlı bahis, maç öncesi oranlar ve tahmin pazarları tek yerde.</p>
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-            <Link to="/spor?page=live" className="inline-flex h-[46px] items-center gap-2 rounded-lg bg-primary px-6 text-sm font-extrabold text-primary-fg transition-colors hover:bg-primary-hover"><I n="live" className="size-4" />Canlı Bahis</Link>
-            <Link to="/tahminler" className="inline-flex h-[46px] items-center gap-2 rounded-lg bg-elevated px-6 text-sm font-extrabold transition-colors hover:bg-elevated-hover"><I n="vote" className="size-4" />Tahminler</Link>
-            {!me && <button onClick={() => setAuthOpen("register")} className="inline-flex h-[46px] items-center rounded-lg border border-primary/50 px-6 text-sm font-extrabold text-primary transition-colors hover:bg-primary/10">Hemen Kayıt Ol</button>}
-          </div>
-        </div>
-        {/* sağda yüzen mini tahmin kartı */}
-        {top && (
-          <Link to={`/tahminler/${top.slug}`} className="animate-float absolute right-8 top-1/2 hidden w-[220px] -translate-y-1/2 rotate-2 rounded-xl border border-line-strong bg-panel/90 p-3 shadow-[0_24px_60px_rgba(0,0,0,.5)] backdrop-blur lg:block">
-            <div className="line-clamp-2 text-xs font-bold text-muted">{top.question}</div>
-            <div className="mt-2 space-y-1.5">
-              <div className="rounded-md bg-win px-2.5 py-1.5 text-xs font-extrabold text-[#06130c]">{top.outcomes[0]?.name} %{Math.round(top.outcomes[0]?.probability ?? 0)}</div>
-              <div className="w-[86%] rounded-md bg-loss px-2.5 py-1.5 text-xs font-extrabold text-white">{top.outcomes[1]?.name} %{Math.round(top.outcomes[1]?.probability ?? 0)}</div>
-            </div>
-          </Link>
-        )}
-        <div className="absolute bottom-6 left-10 hidden rotate-[-3deg] rounded-lg bg-panel/90 px-3 py-2 shadow-lg backdrop-blur lg:flex lg:items-center lg:gap-2">
-          <span className="text-[10px] font-extrabold tracking-wide text-subtle uppercase">MS 1</span>
-          <span className="text-lg font-extrabold text-fg">2.15</span>
-          <span className="grid size-5 place-items-center rounded-full bg-win text-[#06130c]"><I n="check" className="size-3" /></span>
-        </div>
-      </section>
+      <Hero />
 
-      {/* Spor / Tahminler kartları */}
-      <section className="mt-6 grid grid-cols-2 gap-2 lg:gap-4">
-        {[
-          { to: "/spor", label: "Spor", grad: "linear-gradient(180deg,#1b1a2a 0%,#145c3d 100%)", Art: BasketArt },
-          { to: "/tahminler", label: "Tahminler", grad: "linear-gradient(180deg,#0f1a33 0%,#1d3c78 100%)", Art: BoxArt },
-        ].map(({ to, label, grad, Art }) => (
-          <Link key={to} to={to} className="group overflow-hidden rounded-[3px] bg-card-2 outline-none focus-visible:outline-2 focus-visible:outline-primary">
-            <div className="relative flex h-11 items-end justify-center overflow-hidden lg:h-[118px]" style={{ background: grad }}>
-              <div className="translate-y-[45%] transition-transform duration-300 group-hover:translate-y-[38%]"><Art className="size-20 lg:size-[200px]" /></div>
+      {/* kategori kartları */}
+      <section className="mt-4 grid gap-3 sm:grid-cols-3">
+        {cards.map(({ to, top, title, Art, bg }) => (
+          <Link key={title} to={to} className={`group relative flex h-[104px] items-center overflow-hidden rounded-2xl bg-gradient-to-r ${bg} px-5 ring-1 ring-line/70 transition-shadow hover:ring-primary/50 sm:h-[120px]`}>
+            <div className="relative z-10">
+              <div className="text-[13px] font-bold text-soft">{top}</div>
+              <div className="mt-1 text-2xl font-extrabold">{title}</div>
             </div>
-            <div className="flex h-8 items-center justify-between px-2.5 lg:h-[46px] lg:px-4">
-              <span className="text-xs font-semibold lg:text-[15px]">{label}</span>
-              <I n="right" className="size-4 text-muted transition-transform group-hover:translate-x-0.5" />
-            </div>
+            <Art className="absolute -right-6 top-1/2 h-[150px] -translate-y-1/2 transition-transform duration-300 group-hover:scale-105 sm:h-[170px]" />
           </Link>
         ))}
       </section>
 
-      {/* Arama */}
-      <section className="mt-4 flex gap-2">
-        <Link to="/tahminler" className="flex h-[52px] min-w-0 flex-1 cursor-text items-center gap-3 rounded-[5px] border border-line-strong bg-field px-4 text-left transition-colors hover:border-subtle">
+      {/* arama */}
+      <form onSubmit={(e) => { e.preventDefault(); nav(`/spor${q.trim() ? `?ara=${encodeURIComponent(q.trim())}` : ""}`); }} className="mt-4">
+        <label className="flex h-[52px] items-center gap-3 rounded-xl border border-line bg-panel px-4 focus-within:border-primary/70">
           <I n="search" className="size-5 shrink-0 text-subtle" />
-          <span className="flex-1 truncate text-[15px] font-medium text-subtle">{settings.siteName ?? "SportyBet"}'te Ara</span>
-        </Link>
-      </section>
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={`${total.ev} maç içinde takım veya lig ara`} className="w-full bg-transparent text-[15px] font-medium outline-none placeholder:text-subtle" />
+        </label>
+      </form>
 
-      <CmsBanners />
+      {/* canlı */}
+      {live.length > 0 && (
+        <Rail title="Canlı Maçlar" icon={<span className="live-dot size-2.5 rounded-full bg-live" />} to="/spor">
+          {live.slice(0, 10).map((ev) => (
+            <Link key={ev.id} to={`/spor/mac/${ev.id}`} className="w-[270px] shrink-0 snap-start rounded-xl bg-panel p-3 transition-colors hover:bg-card">
+              <div className="mb-2 flex items-center gap-2 text-[12px] font-semibold text-soft"><span className="rounded bg-live px-1.5 text-[10px] font-extrabold text-white">CANLI</span><span className="min-w-0 flex-1 truncate">{ev.league}</span><span className="tabular-nums">{ev.minute ? `${ev.minute}'` : ""}</span></div>
+              {[[ev.home, ev.homeLogo, ev.score?.h], [ev.away, ev.awayLogo, ev.score?.a]].map(([n, l, g]: any) => (
+                <div key={n} className="flex items-center gap-2 py-0.5"><Logo src={l} name={n} /><span className="min-w-0 flex-1 truncate text-[14px] font-bold">{n}</span><span className="text-[15px] font-extrabold text-primary tabular-nums">{g ?? 0}</span></div>
+              ))}
+            </Link>
+          ))}
+        </Rail>
+      )}
 
-      {/* Tahminlere Göz At */}
+      {/* öne çıkan maçlar */}
+      {featured.length > 0 && (
+        <Rail title="Öne Çıkan Maçlar" icon={<I n="flame" className="size-4" />} to="/spor">
+          {featured.map((ev) => {
+            const m1 = (ev.markets ?? []).find((m: any) => m.key === "1x2");
+            const o = (c: string) => m1?.selections.find((s: any) => s.code === c)?.odds;
+            const d = new Date(ev.startsAt);
+            return (
+              <Link key={ev.id} to={`/spor/mac/${ev.id}`} className="w-[290px] shrink-0 snap-start rounded-xl bg-panel p-3 transition-colors hover:bg-card">
+                <div className="mb-2 flex items-center gap-2 text-[12px] font-semibold text-soft">
+                  {ev.leagueLogo ? <img src={ev.leagueLogo} alt="" className="size-4 object-contain" /> : <I n="ball" className="size-4" />}
+                  <span className="min-w-0 flex-1 truncate">{ev.league}</span>
+                  <span className="text-subtle">{d.toLocaleDateString("tr-TR", { day: "2-digit", month: "short" })} · {d.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}</span>
+                </div>
+                <div className="mb-2.5 flex items-center gap-2 rounded-lg bg-card px-2.5 py-2.5">
+                  <span className="flex min-w-0 flex-1 items-center justify-end gap-2"><span className="truncate text-right text-[13px] font-bold">{ev.home}</span><Logo src={ev.homeLogo} name={ev.home} /></span>
+                  <span className="text-[11px] font-bold text-dim">vs</span>
+                  <span className="flex min-w-0 flex-1 items-center gap-2"><Logo src={ev.awayLogo} name={ev.away} /><span className="truncate text-[13px] font-bold">{ev.away}</span></span>
+                </div>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {[["1", "HOME"], ["X", "DRAW"], ["2", "AWAY"]].map(([l, c]) => (
+                    <span key={c} className="flex h-10 items-center justify-between rounded-md bg-card px-2.5 text-[13px] font-bold"><span className="text-[12px] text-subtle">{l}</span><span className="tabular-nums">{o(c)?.toFixed(2) ?? "-"}</span></span>
+                  ))}
+                </div>
+              </Link>
+            );
+          })}
+        </Rail>
+      )}
+
+      {/* tahminler */}
       {markets.length > 0 && (
-        <section className="mt-8">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="flex items-center gap-2 text-lg font-extrabold"><I n="vote" className="size-5 text-muted" />Tahminlere Göz At</h2>
-            <div className="flex gap-2">
-              <button onClick={() => scrollBy(-1)} aria-label="Önceki" className="grid size-7 cursor-pointer place-items-center rounded-full border border-line-strong bg-card text-muted transition-colors hover:text-fg"><I n="left" className="size-4" /></button>
-              <button onClick={() => scrollBy(1)} aria-label="Sonraki" className="grid size-7 cursor-pointer place-items-center rounded-full border border-line-strong bg-card text-muted transition-colors hover:text-fg"><I n="right" className="size-4" /></button>
-            </div>
-          </div>
-          <div ref={scroller} className="no-scrollbar -mx-4 flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4">
-            {markets.map((m) => <div key={m.id} className="w-[min(303px,80vw)] shrink-0 snap-start"><MarketCard m={m} /></div>)}
-          </div>
-          <div className="mt-4 flex justify-center">
-            <Link to="/tahminler" className="inline-flex h-10 items-center rounded-full border border-line-strong bg-card px-5 text-sm font-bold text-muted transition-colors hover:text-fg">Daha Fazla Gör</Link>
-          </div>
-        </section>
+        <Rail title="Popüler Tahminler" icon={<I n="vote" className="size-4" />} to="/tahminler">
+          {markets.map((m) => <div key={m.id} className="w-[min(303px,82vw)] shrink-0 snap-start"><MarketCard m={m} /></div>)}
+        </Rail>
       )}
 
-      {/* Günün Maçları (kendi sportsbook motorumuz) */}
-      {sbEvents.length > 0 && (
-        <section className="mt-8">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="flex items-center gap-2 text-lg font-extrabold"><I n="ball" className="size-5 text-primary" />Günün Maçları</h2>
-            <Link to="/spor" className="flex items-center gap-1 text-sm font-bold text-subtle hover:text-fg">Tümü <I n="right" className="size-4" /></Link>
+      {/* hakkında + SSS */}
+      <section className="mt-10 grid gap-4 lg:grid-cols-2">
+        <div className="rounded-2xl bg-panel p-5">
+          <h2 className="mb-2 text-lg font-extrabold">{settings.siteName ?? "SportyBet"}: Spor Bahisleri & Tahminler</h2>
+          <p className="text-[14px] leading-relaxed text-subtle">Futbolda maç öncesi oranlar, canlı skorlar ve gündem tahminleri tek hesapta. Kuponun maç bittiği an otomatik sonuçlanır, kazancın beklemeden cüzdanına geçer. Sohbette diğer oyuncularla maçları konuş, yağmur etkinliklerine katıl.</p>
+          <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+            {[[`${total.ev}+`, "Bültendeki maç"], [`${live.length}`, "Şu an canlı"], [`${total.pred || markets.length}`, "Tahmin piyasası"]].map(([v, l]) => (
+              <div key={l} className="rounded-xl bg-card p-3"><div className="text-xl font-extrabold text-primary">{v}</div><div className="text-[12px] font-semibold text-subtle">{l}</div></div>
+            ))}
           </div>
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {sbEvents.map((ev: any) => {
-              const m1 = (ev.markets ?? []).find((m: any) => m.key === "1x2");
-              const o = (code: string) => m1?.selections.find((s: any) => s.code === code)?.odds;
-              return (
-                <Link key={ev.id} to="/spor" className="rounded-lg border border-line bg-card p-3 transition-colors hover:border-primary/50">
-                  <div className="mb-1 text-[11px] font-bold text-subtle">{ev.league} · {new Date(ev.startsAt).toLocaleString("tr-TR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</div>
-                  <div className="truncate text-sm font-bold">{ev.home}</div>
-                  <div className="mb-2 truncate text-sm font-bold">{ev.away}</div>
-                  {m1 && (
-                    <div className="grid grid-cols-3 gap-1.5">
-                      {[["1", "HOME"], ["X", "DRAW"], ["2", "AWAY"]].map(([lab, code]) => (
-                        <span key={code} className="rounded-md bg-field py-1.5 text-center"><span className="block text-[9px] font-extrabold text-dim">{lab}</span><span className="block text-xs font-extrabold">{o(code)?.toFixed(2) ?? "-"}</span></span>
-                      ))}
-                    </div>
-                  )}
-                </Link>
-              );
-            })}
-          </div>
-        </section>
-      )}
+        </div>
+        <div className="rounded-2xl bg-panel p-2">
+          <h2 className="px-3 pt-3 pb-2 text-lg font-extrabold">Sık Sorulan Sorular</h2>
+          {FAQ.map(([qq, a], i) => (
+            <div key={qq} className="border-t border-line/60 first:border-t-0">
+              <button onClick={() => setOpen(open === i ? null : i)} className="flex w-full items-center gap-3 px-3 py-3 text-left text-[14px] font-bold hover:text-primary">
+                <span className="flex-1">{qq}</span>
+                <span className={`grid size-6 place-items-center rounded-full ${open === i ? "bg-primary/15 text-primary" : "bg-card text-subtle"}`}><I n={open === i ? "minus" : "plus"} className="size-3.5" /></span>
+              </button>
+              {open === i && <p className="px-3 pb-3 text-[13px] leading-relaxed text-subtle">{a}</p>}
+            </div>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }

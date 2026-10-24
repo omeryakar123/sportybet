@@ -38,6 +38,7 @@ export const NAV: Group[] = [
     { to: "/prediction-categories", label: "Kategoriler", roles: ["ADMIN", "RISK", "CMS"] },
     { to: "/prediction-settings", label: "Ayarlar / Feed / İçe Aktar", roles: ["ADMIN", "RISK"] },
   ] },
+  { label: "Sohbet", icon: "chat", to: "/chat", roles: ["ADMIN", "SUPPORT", "RISK", "CMS"] },
   { label: "Kullanıcı Yönetimi", icon: "users", roles: ["ADMIN"], items: [
     { to: "/users", label: "Admin Kullanıcıları", roles: [] },
     { to: "/sites", label: "Siteler (Çoklu Site)", roles: ["ADMIN"] },

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { api, setToken } from "./api";
 import { Avatar, Btn, ErrBox, Field, I, inp, money, pct, useStore } from "./lib";
+import { ChatPanel, ProfileModal, WalletModal } from "./Social";
 
 function Logo({ className = "h-9" }: { className?: string }) {
   const { settings } = useStore();
@@ -125,7 +126,7 @@ function Sidebar() {
 
 // ---------------- Header ----------------
 function WalletChip() {
-  const { me, balance, setWallet, refreshMe } = useStore();
+  const { me, balance, setWallet, refreshMe, setWalletOpen } = useStore();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => { const h = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); }; document.addEventListener("mousedown", h); return () => document.removeEventListener("mousedown", h); }, []);
@@ -139,7 +140,7 @@ function WalletChip() {
           {active === "BONUS" && <span className="hidden rounded-sm bg-caution/20 px-1 text-[10px] font-extrabold text-caution uppercase sm:inline">Bonus</span>}
           <I n="down" className="size-3 text-subtle" />
         </button>
-        <Link to="/para-yatir" className="ml-1 grid h-full place-items-center rounded-md bg-primary px-3 text-sm font-extrabold text-primary-fg hover:bg-primary-hover sm:px-4">Cüzdan</Link>
+        <button onClick={() => setWalletOpen("menu")} className="ml-1 grid h-full place-items-center rounded-md bg-primary px-3 text-sm font-extrabold text-primary-fg hover:bg-primary-hover sm:px-4">Cüzdan</button>
       </div>
       {open && (
         <div className="animate-slip-item absolute right-0 top-[calc(100%+8px)] z-50 w-[300px] rounded-xl border border-line bg-panel p-3 shadow-[0_18px_50px_rgba(0,0,0,.5)]">
@@ -198,7 +199,7 @@ const NavPill = ({ to, icon, label }: { to: string; icon: string; label: string 
 );
 
 function Header() {
-  const { me, setAuthOpen, setSidebarOpen } = useStore();
+  const { me, setAuthOpen, setSidebarOpen, chatOpen, setChatOpen } = useStore();
   const nav = useNavigate();
   return (
     <header className="sticky top-0 z-30 h-[var(--header-h)] border-b border-line/60 bg-header">
@@ -213,6 +214,7 @@ function Header() {
         </nav>
         <div className="ml-auto flex items-center gap-2">
           <button onClick={() => nav("/spor")} aria-label="Ara" className="hidden size-[42px] place-items-center rounded-lg text-muted transition-colors hover:bg-card hover:text-fg xl:grid"><I n="search" className="size-[18px]" /></button>
+          <button onClick={() => setChatOpen(!chatOpen)} aria-label="Sohbet" title="Sohbet" className={`hidden size-[42px] place-items-center rounded-lg transition-colors lg:grid ${chatOpen ? "bg-primary/15 text-primary" : "text-muted hover:bg-card hover:text-fg"}`}><I n="chat" className="size-[18px]" /></button>
           {me ? (
             <><WalletChip /><UserMenu /></>
           ) : (
@@ -273,17 +275,18 @@ function Footer() {
 
 // ---------------- Mobil alt menü ----------------
 function BottomNav() {
-  const { setSidebarOpen } = useStore();
-  const items = [["/spor", "ball", "Spor"], ["/tahminler", "vote", "Tahminler"], ["/promosyonlar", "gift", "Ödüller"], ["/hesap/kuponlarim", "ticket", "Kuponlarım"]];
+  const { setSidebarOpen, chatOpen, setChatOpen } = useStore();
+  const items = [["/spor", "ball", "Spor"], ["/tahminler", "vote", "Tahminler"], ["/hesap/kuponlarim", "ticket", "Kuponlarım"]];
   const cls = (a: boolean) => `flex flex-col items-center justify-center gap-1 text-[11px] font-bold ${a ? "text-primary" : "text-subtle"}`;
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 grid h-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom))] grid-cols-5 border-t border-line/60 bg-header pb-[env(safe-area-inset-bottom)] lg:hidden">
       <button onClick={() => setSidebarOpen(true)} className={cls(false)}><I n="menu" className="size-5" />Menü</button>
       {items.map(([to, icon, label]) => (
-        <NavLink key={to} to={to} className={({ isActive }) => cls(isActive)}>
-          {({ isActive }) => <><span className={`grid size-7 place-items-center rounded-full ${isActive ? "bg-primary/15" : ""}`}><I n={icon} className="size-5" /></span>{label}</>}
+        <NavLink key={to} to={to} onClick={() => setChatOpen(false)} className={({ isActive }) => cls(isActive && !chatOpen)}>
+          {({ isActive }) => <><span className={`grid size-7 place-items-center rounded-full ${isActive && !chatOpen ? "bg-primary/15" : ""}`}><I n={icon} className="size-5" /></span>{label}</>}
         </NavLink>
       ))}
+      <button onClick={() => setChatOpen(!chatOpen)} className={cls(chatOpen)}><span className={`grid size-7 place-items-center rounded-full ${chatOpen ? "bg-primary/15" : ""}`}><I n="chat" className="size-5" /></span>Sohbet</button>
     </nav>
   );
 }
@@ -336,10 +339,11 @@ function AuthModal() {
 // ---------------- Düzen ----------------
 export default function Layout() {
   const loc = useLocation();
+  const { chatOpen, setChatOpen } = useStore();
   useEffect(() => { window.scrollTo(0, 0); }, [loc.pathname]);
   const bare = false;
   return (
-    <div className="min-h-dvh lg:pl-[var(--sidebar-w)]">
+    <div className={`min-h-dvh lg:pl-[var(--sidebar-w)] ${chatOpen ? "xl:pr-[340px]" : ""}`}>
       <Sidebar />
       <Header />
       <main className={bare ? "" : `mx-auto px-3 pt-4 pb-24 sm:px-4 lg:pb-10 ${loc.pathname.startsWith("/spor") ? "max-w-[1480px]" : "max-w-[1286px] pt-[22px]"}`}>
@@ -347,6 +351,13 @@ export default function Layout() {
       </main>
       {!loc.pathname.startsWith("/spor") && <Footer />}
       <BottomNav />
+      {chatOpen && (
+        <aside className="fixed inset-x-0 top-0 bottom-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom))] z-[45] border-l border-line/60 lg:bottom-0 lg:left-auto lg:z-30 lg:w-[340px] xl:shadow-none lg:shadow-[-20px_0_50px_rgba(0,0,0,.45)]">
+          <ChatPanel onClose={() => setChatOpen(false)} />
+        </aside>
+      )}
+      <WalletModal />
+      <ProfileModal />
       <AuthModal />
     </div>
   );

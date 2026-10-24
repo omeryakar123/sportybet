@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api } from "./api";
-import { Btn, Empty, ErrBox, I, Spinner, inp, money, money0, pct, timeLeft, useStore } from "./lib";
+import { Avatar, Btn, Empty, ErrBox, I, Spinner, inp, money, money0, pct, timeLeft, useStore } from "./lib";
 
 const PLACE = (q: string) => {
   const hues = [[28, 60], [210, 55], [150, 45], [330, 45], [260, 50]];
@@ -372,6 +372,7 @@ export function MyPositions({ positions, markets, onChange }: { positions: any[]
 
 // ---------------- Liderlik ----------------
 export function Leaderboard() {
+  const { openProfile } = useStore();
   const [days, setDays] = useState(7);
   const [rows, setRows] = useState<any[] | null>(null);
   useEffect(() => { setRows(null); api(`/api/predictions/leaderboard?days=${days}`).then((r) => setRows(r.data)).catch(() => setRows([])); }, [days]);
@@ -397,7 +398,7 @@ export function Leaderboard() {
               {rows.map((r) => (
                 <tr key={r.rank} className="border-t border-line bg-row font-semibold hover:bg-surface-hover">
                   <td className="px-4 py-3 text-base">{medal[r.rank - 1] ?? <span className="text-subtle">{r.rank}</span>}</td>
-                  <td className="px-4 py-3 font-bold">{r.username}</td>
+                  <td className="px-4 py-3 font-bold"><button onClick={() => r.playerId && openProfile(r.playerId)} className="flex items-center gap-2.5 hover:text-primary"><Avatar src={r.avatar} name={r.username} className="size-8" /><span className="truncate">{r.username}</span></button></td>
                   <td className={`px-4 py-3 text-right font-extrabold ${r.profit >= 0 ? "text-win" : "text-loss"}`}>{money(r.profit)}</td>
                   <td className="hidden px-4 py-3 text-right text-muted sm:table-cell">{money(r.volume)}</td>
                   <td className="hidden px-4 py-3 text-right text-muted sm:table-cell">{r.positions}</td>

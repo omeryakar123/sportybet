@@ -6,6 +6,7 @@ import { db } from "../index.js";
 import { grantBonus, cancelBonus } from "../services/bonus.js";
 import { move, ensureWallets } from "../services/wallet.js";
 import { sbAdminRoutes } from "./sb.js";
+import { chatAdminRoutes } from "./chat.js";
 import { allSites, bustSiteCache, seedSiteDefaults } from "../services/sites.js";
 import { processPayment, reversePayment, correctPayment, reopenPayment, BizError } from "../services/payments.js";
 import { dashboard, playerKpis, range, sportsbookDaily, financialReport } from "../services/reports.js";
@@ -20,6 +21,7 @@ type AdminJwt = { adminId: number; role: AdminRole; kind: "admin" };
  */
 const PERMS: Record<string, { read: AdminRole[]; write: AdminRole[] }> = {
   "/admin/users": { read: ["SUPERADMIN"], write: ["SUPERADMIN"] },
+  "/admin/chat": { read: ["ADMIN", "SUPPORT", "RISK", "CMS"], write: ["ADMIN", "SUPPORT", "RISK"] },
   "/admin/sites": { read: ["SUPERADMIN", "ADMIN"], write: ["SUPERADMIN"] },
   "/admin/audit-logs": { read: ["SUPERADMIN", "ADMIN"], write: [] },
   "/admin/payment-requests": { read: ["ADMIN", "FINANCE", "RISK"], write: ["ADMIN", "FINANCE"] },
@@ -483,6 +485,7 @@ export async function adminRoutes(app: FastifyInstance) {
 
   // ---------- Sportsbook (kendi motorumuz — trading) ----------
   await app.register(sbAdminRoutes);
+  await app.register(chatAdminRoutes, { sid, adminId, audit });
   app.get("/wallet-requests", async (req) => {
     const q = z.object({ kind: z.string().optional(), status: z.string().optional(), playerId: z.coerce.number().optional(), take: z.coerce.number().default(200) }).parse(req.query);
     // WalletRequest'in player ilişkisi yok (Betco seamless kalıntısı, artık boş) → site filtresi uygulanmaz

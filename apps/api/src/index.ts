@@ -8,6 +8,8 @@ import { publicRoutes } from "./routes/public.js";
 import { sbSiteRoutes } from "./routes/sb.js";
 import { siteRoutes } from "./routes/site.js";
 import { predictionSiteRoutes } from "./routes/predictions.js";
+import { chatSiteRoutes } from "./routes/chat.js";
+import { settleRains } from "./services/chat.js";
 import { autoClose, syncFeed } from "./services/predictions.js";
 import { syncFixtures, syncOdds, syncResults, syncLive, getConfig as sbConfig, liveMinInterval } from "./services/sb.js";
 import { seedDemo } from "./services/demo.js";
@@ -32,6 +34,7 @@ await app.register(adminRoutes, { prefix: "/admin" });
 await app.register(siteRoutes, { prefix: "/api" }); // oyuncu hesabı, ödemeler, bonuslar
 await app.register(sbSiteRoutes, { prefix: "/api" }); // kendi sportsbook motorumuz (maç listesi, kupon)
 await app.register(predictionSiteRoutes, { prefix: "/api" }); // tahminler
+await app.register(chatSiteRoutes, { prefix: "/api" }); // sohbet, yağmur, bahşiş, herkese açık profil
 
 // İlk açılışta süper admin oluştur
 async function seedAdmin() {
@@ -58,8 +61,15 @@ await seedAdmin();
   await seedSiteDefaults(db, s);
   // Mevcut kripto yönteminde config yoksa varsayılanı yaz (eski kurulumlar için)
   const cu = await db.paymentSystem.findFirst({ where: { siteId: 1, name: "CryptoUSDT" } });
+  // Havale/EFT yalnızca yatırımda kullanılsın (çekim listesinden kaldırıldı) — bir kez uygulanır, admin sonra değiştirebilir
+  const { getSetting, setSetting } = await import("./services/sites.js");
+  if (!(await getSetting(db, "migr_bank_withdraw_off", s.id))) {
+    await db.paymentSystem.updateMany({ where: { name: "BankTransfer", kind: "BOTH" }, data: { kind: "DEPOSIT" } });
+    await setSetting(db, "migr_bank_withdraw_off", { at: new Date().toISOString() }, s.id);
+  }
   if (cu && !cu.config) await db.paymentSystem.update({ where: { id: cu.id }, data: { config: { network: "TRC20", depositAddress: "", requireTxid: true } } });
 }
+setInterval(() => settleRains(db).catch((e) => app.log.error(e, "rain")), 5_000); // süresi dolan sohbet yağmurlarını dağıt
 setInterval(() => expireBonuses(db).catch((e) => app.log.error(e)), 5 * 60_000);
 setInterval(() => autoClose(db).catch((e) => app.log.error(e)), 60_000); // süresi dolan tahmin piyasalarını kapat
 setInterval(() => syncFeed(db).catch((e) => app.log.error(e)), 5 * 60_000); // tahmin feed senkronu (ayarlıysa)

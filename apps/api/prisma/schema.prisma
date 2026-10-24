@@ -37,6 +37,11 @@ enum TxType {
   CORRECTION_DOWN
   DEPOSIT_REVERSAL    // ödenmiş yatırımın geri alınması (hatalı/sahte yatırım)
   WITHDRAWAL_REVERSAL // ödenmiş çekimin iadesi (PSP'de başarısız/geri döndü)
+  TIP_SEND            // oyuncudan oyuncuya bahşiş (gönderen)
+  TIP_RECEIVE         // bahşiş (alan)
+  RAIN_SEND           // sohbet yağmuru başlatan
+  RAIN_RECEIVE        // yağmurdan pay alan
+  RAIN_REFUND         // dağıtılamayan yağmur iadesi
 }
 
 enum PaymentType {
@@ -150,6 +155,10 @@ model Player {
   isTest         Boolean   @default(false)
   avatar         String?   // profil fotoğrafı: hazır avatar anahtarı ("av:3") ya da küçük data URL
   activeWallet   WalletType @default(MAIN) // oyuncunun oynadığı cüzdan (sportsbook + tahmin sadece bunu görür)
+  hideStats      Boolean   @default(false) // herkese açık profilde istatistikleri gizle
+  chatMutedUntil DateTime? // sohbette susturma bitiş zamanı
+  chatBanned     Boolean   @default(false) // sohbetten kalıcı men
+  chatStrikes    Int       @default(0)     // otomatik moderasyon ihlal sayısı
   city           String?
   address        String?
   gender         String?
@@ -700,4 +709,65 @@ model PredictionSave {
   market    PredictionMarket @relation(fields: [marketId], references: [id], onDelete: Cascade)
 
   @@id([playerId, marketId])
+}
+
+
+// ---------- SOHBET ----------
+model ChatMessage {
+  id        Int      @id @default(autoincrement())
+  siteId    Int      @default(1)
+  room      String   @default("tr")
+  playerId  Int?     // null = sistem / admin
+  kind      String   @default("MSG") // MSG | RAIN | TIP | SYSTEM
+  text      String
+  meta      Json?
+  deleted   Boolean  @default(false)
+  deletedBy Int?     // admin id
+  createdAt DateTime @default(now())
+
+  @@index([siteId, room, id])
+  @@index([playerId])
+}
+
+// Otomatik moderasyonun engellediği mesajlar (admin inceleme için)
+model ChatViolation {
+  id        Int      @id @default(autoincrement())
+  siteId    Int      @default(1)
+  playerId  Int
+  text      String
+  reason    String   // PROFANITY | BEGGING | SPAM | LINK | FLOOD
+  action    String   // WARN | MUTE_10M | MUTE_1H | MUTE_24H | BAN
+  createdAt DateTime @default(now())
+
+  @@index([siteId, createdAt])
+  @@index([playerId])
+}
+
+model ChatRain {
+  id           Int       @id @default(autoincrement())
+  siteId       Int       @default(1)
+  room         String    @default("tr")
+  hostPlayerId Int?      // null = kasa (admin etkinliği)
+  hostAdminId  Int?
+  amount       Decimal   @db.Decimal(18, 2)
+  endsAt       DateTime
+  state        String    @default("OPEN") // OPEN | DONE | REFUNDED
+  share        Decimal?  @db.Decimal(18, 2)
+  joinCount    Int       @default(0)
+  messageId    Int?
+  createdAt    DateTime  @default(now())
+  entries      ChatRainEntry[]
+
+  @@index([state, endsAt])
+}
+
+model ChatRainEntry {
+  id        Int      @id @default(autoincrement())
+  rainId    Int
+  playerId  Int
+  amount    Decimal? @db.Decimal(18, 2)
+  createdAt DateTime @default(now())
+  rain      ChatRain @relation(fields: [rainId], references: [id], onDelete: Cascade)
+
+  @@unique([rainId, playerId])
 }

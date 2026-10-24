@@ -37,6 +37,7 @@ export async function siteRoutes(app: FastifyInstance) {
       firstName: z.string().max(60).optional(), lastName: z.string().max(60).optional(), phone: z.string().max(30).optional(),
       email: z.string().email().optional(), birthDate: z.string().optional(), city: z.string().max(60).optional(), address: z.string().max(200).optional(),
       language: z.enum(["tr", "en"]).optional(),
+      hideStats: z.boolean().optional(),
       // Profil fotoğrafı: hazır avatar ("av:1".."av:24") ya da küçük resim (data URL, ≤ ~150 KB, png/jpeg/webp)
       avatar: z.union([
         z.string().regex(/^av:\d{1,2}$/),
