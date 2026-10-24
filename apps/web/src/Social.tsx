@@ -66,10 +66,12 @@ export function ChatPanel({ onClose }: { onClose: () => void }) {
   async function sendMsg() {
     if (!me) { setAuthOpen(true); return; }
     const t = text.trim(); if (!t) return;
-    setBusy(true); setErr("");
-    try { await api("/api/chat", { method: "POST", json: { text: t } }); setText(""); stick.current = true; await poll(); }
-    catch (e: any) { setErr(errText(e)); if (e.message === "MESSAGE_BLOCKED") await poll(); }
-    setBusy(false);
+    // iyimser: mesajı hemen göster; sunucu reddederse geri çek ve metni kutuya geri koy
+    const tmpId = -Date.now();
+    setMsgs((m) => [...m, { id: tmpId, kind: "MSG", text: t, at: new Date().toISOString(), user: { id: me.id, name: me.username, avatar: me.avatar }, meta: { pending: true } }]);
+    setText(""); setErr(""); stick.current = true;
+    try { await api("/api/chat", { method: "POST", json: { text: t } }); setMsgs((m) => m.filter((x) => x.id !== tmpId)); await poll(); }
+    catch (e: any) { setMsgs((m) => m.filter((x) => x.id !== tmpId)); setText(t); setErr(errText(e)); if (e.message === "MESSAGE_BLOCKED") await poll(); }
   }
   async function join() {
     if (!me) { setAuthOpen(true); return; }
@@ -108,7 +110,7 @@ export function ChatPanel({ onClose }: { onClose: () => void }) {
                 <span className="text-[10px] font-semibold text-dim">{hhmm(m.at)}</span>
                 {me && m.user && m.user.id !== me.id && <button onClick={() => { setTipTo(m.user!.name); setWalletOpen("tip"); }} className="ml-auto hidden text-subtle hover:text-primary group-hover:block" title="Bahşiş gönder" aria-label="Bahşiş gönder"><I n="tip" className="size-4" /></button>}
               </div>
-              <div className="break-words text-[13px] font-medium leading-snug text-muted">{m.text}</div>
+              <div className={`break-words text-[13px] font-medium leading-snug text-muted ${m.meta?.pending ? "opacity-60" : ""}`}>{m.text}</div>
             </div>
           </div>
         ))}

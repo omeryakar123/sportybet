@@ -95,6 +95,10 @@ export default function Sport() {
   const [mode, setMode] = useState<"single" | "combo">("combo");
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<{ t: string; kind?: "ok" | "warn" } | null>(null);
+  // kupon alındı durumu (akışın tepe/son anı) ve temizlemeyi geri alma
+  const [placed, setPlaced] = useState<{ couponId?: string; count: number; stake: number; potential: number; picks: Pick[]; warn?: string } | null>(null);
+  const [undo, setUndo] = useState<Pick[] | null>(null);
+  useEffect(() => { if (!undo) return; const t = setTimeout(() => setUndo(null), 7000); return () => clearTimeout(t); }, [undo]);
   const [slipOpen, setSlipOpen] = useState(() => { try { return new URLSearchParams(window.location.search).get("kupon") === "1"; } catch { return false; } });
   const [quick, setQuick] = useState(false);
   const [limits, setLimits] = useState<{ minStake: number; maxStake: number; maxWin: number; maxSelections: number; liveEnabled?: boolean; liveDelaySec?: number; liveMaxStake?: number } | null>(null);
@@ -183,7 +187,7 @@ export default function Sport() {
 
   // ---------- kupon ----------
   const has = (id: number) => picks.some((p) => p.selId === id);
-  async function placeNow(ids: number[], m: "single" | "combo", amount: number) {
+  async function placeNow(ids: number[], m: "single" | "combo", amount: number, quickMode = false) {
     if (!me) { setAuthOpen(true); return false; }
     setBusy(true); setErr("");
     try {
@@ -197,9 +201,15 @@ export default function Sport() {
       finally { if (timer) clearInterval(timer); setWaitSec(0); }
       refreshMe();
       const b = r?.bonus;
-      if (b && b.eligible === false) setToast({ t: `Kupon alındı (${r.couponId}) — bonus kurallarına uymadığı için çevrime sayılmayacak: ${(b.why ?? []).join(", ")}`, kind: "warn" });
-      else setToast({ t: r?.couponId ? `Kupon alındı · ${r.couponId}` : `${r?.bets?.length ?? 1} tekli kupon alındı`, kind: "ok" });
-      setTimeout(() => setToast(null), 4500);
+      const warn = b && b.eligible === false ? `Bonus kurallarına uymadığı için çevrime sayılmayacak: ${(b.why ?? []).join(", ")}` : undefined;
+      if (quickMode) {
+        setToast({ t: warn ? `Kupon alındı — ${warn}` : `Hızlı bahis alındı${r?.couponId ? ` · ${r.couponId}` : ""}`, kind: warn ? "warn" : "ok" });
+        setTimeout(() => setToast(null), 4000);
+      } else {
+        const pk2 = picks.filter((p) => ids.includes(p.selId));
+        const pot = m === "combo" ? Number(r?.potentialWin ?? 0) : (r?.bets ?? []).reduce((a: number, x: any) => a + Number(x.potentialWin ?? 0), 0);
+        setPlaced({ couponId: r?.couponId, count: m === "combo" ? 1 : (r?.bets?.length ?? 1), stake: m === "combo" ? amount : amount * ids.length, potential: pot, picks: pk2, warn });
+      }
       setBusy(false); return true;
     } catch (e: any) {
       // oran değiştiyse kupondaki oranları yenile — oyuncu tekrar onaylar
@@ -214,8 +224,9 @@ export default function Sport() {
     if (quick) { // hızlı bahis: tek tıkla tekli kupon
       const amt = parseFloat(stake.replace(",", ".")) || 0;
       if (!amt) { setSlipOpen(true); setErr("Hızlı bahis için önce kuponda tutar belirleyin"); return; }
-      placeNow([s.id], "single", amt); return;
+      placeNow([s.id], "single", amt, true); return;
     }
+    setPlaced(null); setUndo(null);
     setPicks((p) => {
       if (p.some((x) => x.selId === s.id)) return p.filter((x) => x.selId !== s.id);
       const noEv = p.filter((x) => x.evId !== ev.id);
@@ -238,7 +249,7 @@ export default function Sport() {
     if (picks.some((p) => p.suspended)) { setErr("Askıdaki seçimleri kupondan çıkar"); return; }
     if (picks.some((p) => p.live) && limits?.liveMaxStake && st > limits.liveMaxStake) { setErr(`Canlı bahiste azami ${money(limits.liveMaxStake)}`); return; }
     const ok = await placeNow(picks.map((p) => p.selId), effMode, st);
-    if (ok) { setPicks([]); setSlipOpen(false); }
+    if (ok) { setPicks([]); setSlipOpen(true); }
   }
 
   // ---------- oran butonu ----------
@@ -258,7 +269,31 @@ export default function Sport() {
   // ---------- kupon paneli ----------
   const SlipBody = (
     <div className="flex max-h-[min(78vh,720px)] flex-col">
-      {picks.length === 0 ? (
+      {picks.length === 0 && placed ? (
+        <div className="animate-slip-item px-4 py-5">
+          <div className="flex items-center gap-3">
+            <span className="grid size-11 shrink-0 place-items-center rounded-full bg-primary text-primary-fg shadow-pick"><I n="check" className="size-6" /></span>
+            <div className="min-w-0">
+              <div className="title text-[22px]">Kuponun alındı</div>
+              <div className="text-[13px] font-semibold text-subtle">{placed.count > 1 ? `${placed.count} tekli kupon` : placed.couponId ? `Kupon no ${placed.couponId}` : "Tekli kupon"} · maç bitince otomatik sonuçlanır</div>
+            </div>
+          </div>
+          <div className="card-inset mt-4 grid grid-cols-2 divide-x divide-line p-3 text-center">
+            <div><div className="text-[12px] font-semibold text-subtle">Yatırılan</div><div className="num text-[22px] font-bold">{money(placed.stake)}</div></div>
+            <div><div className="text-[12px] font-semibold text-subtle">Olası kazanç</div><div className="num text-[22px] font-bold text-primary">{money(placed.potential)}</div></div>
+          </div>
+          {placed.warn && <div className="mt-3 rounded-lg bg-caution/10 px-3 py-2 text-[12px] font-semibold text-caution">{placed.warn}</div>}
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <button onClick={() => { setPicks(placed.picks); setPlaced(null); }} className="btn btn-secondary">Tekrar oyna</button>
+            <button onClick={() => nav("/hesap/kuponlarim")} className="btn btn-primary">Kuponlarım</button>
+          </div>
+        </div>
+      ) : picks.length === 0 && undo ? (
+        <div className="flex items-center gap-3 px-4 py-6">
+          <span className="min-w-0 flex-1 text-sm font-semibold text-muted">Kupon temizlendi ({undo.length} seçim)</span>
+          <button onClick={() => { setPicks(undo); setUndo(null); }} className="btn btn-secondary btn-sm">Geri al</button>
+        </div>
+      ) : picks.length === 0 ? (
         <div className="px-6 py-10 text-center">
           <div className="mx-auto mb-3 grid size-14 place-items-center rounded-full bg-card text-primary"><I n="ticket" className="size-6" /></div>
           <div className="text-sm font-bold">Kuponun boş</div>
@@ -311,7 +346,7 @@ export default function Sport() {
             </div>}
             <div className="mt-2"><ErrBox e={err} /></div>
             <div className="mt-2 flex gap-2">
-              <button onClick={() => setPicks([])} className="grid h-[52px] w-11 shrink-0 place-items-center rounded-lg bg-card text-subtle hover:text-loss" aria-label="Kuponu temizle"><I n="trash" className="size-5" /></button>
+              <button onClick={() => { setUndo(picks); setPicks([]); setPlaced(null); }} className="grid h-[52px] w-11 shrink-0 place-items-center rounded-lg bg-card text-subtle hover:text-loss" aria-label="Kuponu temizle" title="Kuponu temizle"><I n="trash" className="size-5" /></button>
               {suspendedPicks.length > 0 ? (
                 <button onClick={() => setPicks((ps) => ps.filter((p) => !p.suspended))} className="flex h-[52px] flex-1 flex-col items-center justify-center rounded-lg bg-caution text-[#2a1d00] transition-colors hover:brightness-105">
                   <span className="text-[15px] font-extrabold leading-tight">Askıdaki {suspendedPicks.length} seçimi kaldır</span>
@@ -338,7 +373,7 @@ export default function Sport() {
   const SlipBar = (
     <div className="slip-grad flex h-12 items-center gap-2 px-3 text-primary-fg">
       <button onClick={() => setSlipOpen((o) => !o)} className="flex flex-1 items-center gap-2 text-left">
-        <span className="relative"><I n="ticket" className="size-6" />{picks.length > 0 && <span className="absolute -right-2 -top-2 grid size-[18px] place-items-center rounded-full bg-page text-[10px] font-extrabold text-fg">{picks.length}</span>}</span>
+        <span className="relative"><I n="ticket" className="size-6" />{picks.length > 0 && <span key={picks.length} className="animate-bump absolute -right-2 -top-2 grid size-[18px] place-items-center rounded-full bg-page text-[10px] font-extrabold text-fg">{picks.length}</span>}</span>
         <span className="ml-1 text-[15px] font-extrabold">Kupon</span>
         <I n={slipOpen ? "down" : "up"} className="size-4" />
         {picks.length > 1 && effMode === "combo" && <span className="ml-1 rounded bg-black/15 px-1.5 text-[12px] font-extrabold tabular-nums">{totalOdds.toFixed(2)}</span>}
@@ -586,7 +621,16 @@ export default function Sport() {
           {events && <span className="rounded bg-card px-1.5 text-[12px] font-bold text-soft">{filtered.length}</span>}
           {lg > 0 && <button onClick={() => pickLeague(0)} className="ml-auto flex items-center gap-1 rounded-lg bg-card px-2.5 py-1 text-[12px] font-bold text-muted hover:text-fg">Filtreyi kaldır <I n="x" className="size-3.5" /></button>}
         </div>
-        {!events ? <Spinner /> : filtered.length === 0 ? (
+        {!events ? (
+          <div className="space-y-2" aria-busy="true" aria-label="Maçlar yükleniyor">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="card overflow-hidden p-3">
+                <div className="mb-3 h-4 w-40 animate-pulse rounded bg-card" />
+                {[0, 1, 2].map((j) => <div key={j} className="mb-2 flex items-center gap-3"><div className="h-6 flex-1 animate-pulse rounded bg-card" /><div className="hidden h-10 w-64 animate-pulse rounded-[9px] bg-card sm:block" /></div>)}
+              </div>
+            ))}
+          </div>
+        ) : filtered.length === 0 ? (
           <div className="rounded-xl bg-panel p-12 text-center">
             <div className="mx-auto mb-3 grid size-14 place-items-center rounded-full bg-card text-primary"><SportIcon k="football" className="size-7" /></div>
             <p className="font-bold">{q ? "Eşleşen maç bulunamadı" : "Şu an bahse açık maç yok"}</p>
@@ -607,6 +651,7 @@ export default function Sport() {
       <div className={`fixed inset-x-0 bottom-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom))] z-40 lg:inset-x-auto lg:right-5 lg:bottom-5 lg:w-[370px] ${chatOpen ? "xl:right-[360px]" : ""}`}>
         <div className="overflow-hidden border-t border-line bg-panel shadow-[0_-12px_40px_rgba(0,0,0,.5)] lg:rounded-xl lg:border">
           {SlipBar}
+          {quick && <div className="flex items-center gap-2 bg-[#0b1520] px-3 py-1.5 text-[12px] font-semibold text-primary"><I n="spark" className="size-3.5" />Hızlı bahis açık: orana dokunduğunda {money(st)} ile tekli kupon oynanır.<button onClick={() => setQuick(false)} className="ml-auto font-bold text-subtle hover:text-fg">Kapat</button></div>}
           {slipOpen && SlipBody}
         </div>
       </div>
