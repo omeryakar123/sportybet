@@ -104,7 +104,7 @@ export const publicName = (u: string) => (/@|^\+?\d{9,}$/.test(u) ? u.slice(0, 2
 
 async function eligible(db: PrismaClient | Prisma.TransactionClient, player: { id: number; createdAt: Date }, hours: number, needDeposit: boolean) {
   if (hours > 0 && Date.now() - new Date(player.createdAt).getTime() < hours * 3600_000) return "ACCOUNT_TOO_NEW";
-  if (needDeposit && !(await db.paymentRequest.findFirst({ where: { playerId: player.id, type: "DEPOSIT", state: "PAID" }, select: { id: true } }))) return "DEPOSIT_REQUIRED";
+  if (needDeposit && !(await (db as PrismaClient).paymentRequest.findFirst({ where: { playerId: player.id, type: "DEPOSIT", state: "PAID" }, select: { id: true } }))) return "DEPOSIT_REQUIRED";
   return null;
 }
 export function muteState(p: { chatBanned: boolean; chatMutedUntil: Date | null }) {
