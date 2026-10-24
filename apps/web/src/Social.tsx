@@ -25,7 +25,7 @@ function RainCard({ rain, onJoin, busy }: { rain: NonNullable<ChatState["rain"]>
           <div className="flex items-baseline gap-2 text-[13px] font-extrabold">Yağmur başladı <span className="num text-[17px] text-primary">{money(rain.amount)}</span></div>
           <div className="text-[12px] font-semibold text-subtle">{rain.count} katılımcı · {left} sn kaldı</div>
         </div>
-        <button disabled={rain.joined || busy || left === 0} onClick={onJoin} className="h-9 shrink-0 rounded-lg bg-primary px-4 text-[13px] font-extrabold text-primary-fg hover:bg-primary-hover disabled:opacity-60">{rain.joined ? "Katıldın" : "Katıl"}</button>
+        <button disabled={rain.joined || busy || left === 0} onClick={onJoin} className="btn btn-primary btn-sm shrink-0 px-4">{rain.joined ? "Katıldın" : "Katıl"}</button>
       </div>
       <div className="mt-2 h-1 overflow-hidden rounded-full bg-black/25"><div className="h-full rounded-full bg-primary transition-all" style={{ width: `${Math.min(100, (left / 60) * 100)}%` }} /></div>
     </div>
@@ -122,14 +122,14 @@ export function ChatPanel({ onClose }: { onClose: () => void }) {
             <div className="text-[12px] font-semibold text-subtle">Yağmur: tutar {st?.limits?.rainMin ? `(min ${money(st.limits.rainMin)})` : ""} 60 sn içinde katılanlara eşit dağıtılır.</div>
             <div className="flex gap-2">
               <label className="flex h-11 flex-1 items-center gap-2 rounded-lg border border-line-strong bg-field px-2"><span className="grid size-6 place-items-center rounded bg-primary text-[13px] font-extrabold text-primary-fg">₺</span><input value={rainAmt} onChange={(e) => setRainAmt(e.target.value.replace(/[^0-9.,]/g, ""))} inputMode="decimal" className="w-full bg-transparent font-bold outline-none" /></label>
-              <button disabled={busy} onClick={makeRain} className="h-11 rounded-lg bg-primary px-4 text-sm font-extrabold text-primary-fg disabled:opacity-50">Başlat</button>
+              <button disabled={busy} onClick={makeRain} className="btn btn-primary px-4">Başlat</button>
               <button onClick={() => setRainOpen(false)} className="h-11 rounded-lg bg-card px-3 text-subtle hover:text-fg"><I n="x" className="size-4" /></button>
             </div>
           </div>
         ) : (
           <div className="flex gap-2">
             <input value={text} maxLength={st?.limits?.maxLen ?? 200} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && sendMsg()} onFocus={() => !me && setAuthOpen(true)}
-              placeholder={me ? "Bir şeyler yaz…" : "Yazmak için giriş yap"} className="h-11 min-w-0 flex-1 rounded-lg border border-line-strong bg-field px-3 text-sm font-medium outline-none placeholder:text-subtle focus:border-primary" />
+              placeholder={me ? "Bir şeyler yaz…" : "Yazmak için giriş yap"} className="input min-w-0 flex-1 text-sm" />
             {st?.limits?.rainEnabled && <button onClick={() => (me ? setRainOpen(true) : setAuthOpen(true))} title="Yağmur başlat" aria-label="Yağmur başlat" className="grid size-11 shrink-0 place-items-center rounded-lg bg-card text-accent hover:bg-surface-hover"><I n="rain" className="size-5" /></button>}
             <button disabled={busy || !text.trim()} onClick={sendMsg} className="grid size-11 shrink-0 place-items-center rounded-lg bg-card text-primary hover:bg-surface-hover disabled:opacity-40" aria-label="Gönder"><I n="send" className="size-5" /></button>
           </div>
@@ -162,7 +162,7 @@ export function ProfileModal() {
                 <div className="flex items-center gap-2 truncate text-lg font-extrabold">{p.name}{p.verified && <span title="Doğrulanmış" className="grid size-5 place-items-center rounded-full bg-primary text-primary-fg"><I n="check" className="size-3" /></span>}</div>
                 <div className="text-[13px] font-semibold text-subtle">Üyelik: {new Date(p.joinedAt).toLocaleDateString("tr-TR", { month: "long", year: "numeric" })}</div>
               </div>
-              {me && me.id !== p.id && <button onClick={() => { setTipTo(p.name); openProfile(null); setWalletOpen("tip"); }} className="flex h-10 shrink-0 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-extrabold text-primary-fg hover:bg-primary-hover"><I n="tip" className="size-4" />Bahşiş gönder</button>}
+              {me && me.id !== p.id && <button onClick={() => { setTipTo(p.name); openProfile(null); setWalletOpen("tip"); }} className="btn btn-primary btn-sm"><I n="tip" className="size-4" />Bahşiş gönder</button>}
             </div>
           )}
         </div>
@@ -241,9 +241,9 @@ export function WalletModal() {
           {walletOpen === "promo" && (
             <div className="space-y-3 pt-1">
               <label className="block"><span className="mb-1.5 block text-[13px] font-semibold text-soft">Promo veya hediye kodu</span>
-                <input value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="KODU GİR" className="h-12 w-full rounded-lg border border-line-strong bg-field px-4 font-bold tracking-wide outline-none focus:border-primary" /></label>
+                <input value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="Kodu gir" className="input input-lg font-bold" /></label>
               <ErrBox e={err} />{ok && <div className="rounded-md bg-win/10 px-3 py-2.5 text-sm font-bold text-win">{ok}</div>}
-              <button disabled={busy || code.trim().length < 3} onClick={redeem} className="h-12 w-full rounded-lg bg-primary font-extrabold text-primary-fg disabled:opacity-40">Kodu Kullan</button>
+              <button disabled={busy || code.trim().length < 3} onClick={redeem} className="btn btn-primary btn-lg w-full">Kodu Kullan</button>
             </div>
           )}
           {walletOpen === "tip" && (
@@ -251,10 +251,10 @@ export function WalletModal() {
               <label className="block"><span className="mb-1.5 block text-[13px] font-semibold text-soft">Tutar</span>
                 <span className="flex h-12 items-center gap-2 rounded-lg border border-line-strong bg-field px-3 focus-within:border-primary"><span className="grid size-6 place-items-center rounded bg-primary text-[13px] font-extrabold text-primary-fg">₺</span><input value={amt} onChange={(e) => setAmt(e.target.value.replace(/[^0-9.,]/g, ""))} inputMode="decimal" placeholder="0,00" className="w-full bg-transparent font-bold outline-none" /></span></label>
               <label className="block"><span className="mb-1.5 block text-[13px] font-semibold text-primary">Kullanıcı adı</span>
-                <input value={user} onChange={(e) => setUser(e.target.value)} placeholder="Kullanıcı adını gir" className="h-12 w-full rounded-lg border border-primary/60 bg-field px-4 font-semibold outline-none" /></label>
+                <input value={user} onChange={(e) => setUser(e.target.value)} placeholder="Kullanıcı adını gir" className="input input-lg" /></label>
               <div className="flex items-center gap-2 rounded-lg bg-caution/10 px-3 py-2.5 text-[13px] font-semibold text-caution"><I n="shield" className="size-4 shrink-0" />Bahşişler iade edilmez. Ana Para bakiyenden düşülür.</div>
               <ErrBox e={err} />{ok && <div className="rounded-md bg-win/10 px-3 py-2.5 text-sm font-bold text-win">{ok}</div>}
-              <button disabled={busy || !user.trim() || !(Number(amt.replace(",", ".")) > 0)} onClick={tip} className="h-12 w-full rounded-lg bg-primary font-extrabold text-primary-fg disabled:opacity-40">Bahşiş Gönder</button>
+              <button disabled={busy || !user.trim() || !(Number(amt.replace(",", ".")) > 0)} onClick={tip} className="btn btn-primary btn-lg w-full">Bahşiş gönder</button>
             </div>
           )}
         </div>

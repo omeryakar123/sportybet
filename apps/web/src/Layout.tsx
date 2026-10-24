@@ -140,7 +140,7 @@ function WalletChip() {
           {active === "BONUS" && <span className="hidden rounded-sm bg-caution/20 px-1 text-[10px] font-extrabold text-caution sm:inline">Bonus</span>}
           <I n="down" className="size-3 text-subtle" />
         </button>
-        <button onClick={() => setWalletOpen("menu")} className="ml-1 grid h-full place-items-center rounded-md bg-primary px-3 text-sm font-extrabold text-primary-fg hover:bg-primary-hover sm:px-4">Cüzdan</button>
+        <button onClick={() => setWalletOpen("menu")} className="btn btn-primary btn-sm ml-1 h-full rounded-[8px] px-3 sm:px-4">Cüzdan</button>
       </div>
       {open && (
         <div className="animate-slip-item absolute right-0 top-[calc(100%+8px)] z-50 w-[300px] rounded-xl border border-line bg-panel p-3 shadow-[0_18px_50px_rgba(0,0,0,.5)]">
@@ -155,8 +155,8 @@ function WalletChip() {
             </button>
           ))}
           <div className="mt-2 grid grid-cols-2 gap-2">
-            <Link to="/para-yatir" onClick={() => setOpen(false)} className="grid h-10 place-items-center rounded-lg bg-primary text-sm font-bold text-primary-fg hover:bg-primary-hover">Para Yatır</Link>
-            <Link to="/para-cek" onClick={() => setOpen(false)} className="grid h-10 place-items-center rounded-lg bg-elevated text-sm font-bold hover:bg-elevated-hover">Para Çek</Link>
+            <Link to="/para-yatir" onClick={() => setOpen(false)} className="btn btn-primary">Para yatır</Link>
+            <Link to="/para-cek" onClick={() => setOpen(false)} className="btn btn-secondary">Para çek</Link>
           </div>
         </div>
       )}
@@ -222,8 +222,8 @@ function Header() {
             <><WalletChip /><UserMenu /></>
           ) : (
             <>
-              <button onClick={() => setAuthOpen(true)} className="inline-flex h-[42px] items-center rounded-lg px-4 text-sm font-bold text-fg hover:bg-card">Giriş Yap</button>
-              <button onClick={() => setAuthOpen("register")} className="inline-flex h-[42px] items-center rounded-lg bg-primary px-5 text-sm font-bold text-primary-fg hover:bg-primary-hover">Kayıt Ol</button>
+              <button onClick={() => setAuthOpen(true)} className="btn btn-ghost">Giriş yap</button>
+              <button onClick={() => setAuthOpen("register")} className="btn btn-primary">Kayıt ol</button>
             </>
           )}
         </div>

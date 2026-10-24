@@ -460,7 +460,7 @@ export default function Sport() {
 
       {evParam ? (
         det ? <MatchDetail ev={det as any} info={info} onBack={() => (window.history.length > 1 ? nav(-1) : nav("/spor"))} isPicked={has} onPick={(e, m, x) => toggle(e as any, m as any, x as any)} changed={changed} />
-          : detErr ? <div className="rounded-xl bg-panel p-12 text-center"><p className="font-bold">Maç bulunamadı</p><button onClick={() => nav("/spor")} className="mt-3 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-fg">Spor sayfasına dön</button></div>
+          : detErr ? <div className="rounded-xl bg-panel p-12 text-center"><p className="font-bold">Maç bulunamadı</p><button onClick={() => nav("/spor")} className="btn btn-primary mt-3">Spor sayfasına dön</button></div>
           : <Spinner />
       ) : (<>
       {/* SPOR ŞERİDİ */}
@@ -514,7 +514,7 @@ export default function Sport() {
 
       <div className="no-scrollbar -mt-3 mb-5 flex gap-2 overflow-x-auto">
         {([["all", "Tümü"], ["today", "Bugün"], ["tomorrow", "Yarın"], ["3h", "3 saat içinde"]] as const).map(([k, l]) => (
-          <button key={k} onClick={() => setWhen(k)} className={`h-9 shrink-0 rounded-full border px-4 text-[13px] font-bold transition-colors ${when === k ? "border-primary bg-primary/10 text-primary" : "border-line bg-panel text-soft hover:text-fg"}`}>{l}</button>
+          <button key={k} onClick={() => setWhen(k)} className={`chip ${when === k ? "chip-on" : ""}`}>{l}</button>
         ))}
         {(when !== "all" || lg > 0 || q) && <button onClick={() => { setWhen("all"); pickLeague(0); setQ(""); }} className="h-9 shrink-0 rounded-full px-3 text-[13px] font-bold text-subtle hover:text-loss">Filtreleri temizle ✕</button>}
       </div>

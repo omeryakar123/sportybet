@@ -142,16 +142,12 @@ export function Spinner() {
 export function Empty({ text }: { text: string }) {
   return <div className="rounded-lg border border-line bg-card px-4 py-10 text-center text-[15px] text-subtle">{text}</div>;
 }
-export function Btn({ kind = "primary", className = "", ...p }: React.ButtonHTMLAttributes<HTMLButtonElement> & { kind?: "primary" | "soft" | "ghost" | "danger" }) {
-  const k = {
-    primary: "bg-primary text-primary-fg hover:bg-primary-hover",
-    soft: "bg-elevated text-fg hover:bg-elevated-hover",
-    ghost: "border border-line-strong text-muted hover:text-fg hover:border-subtle",
-    danger: "bg-loss/15 text-loss hover:bg-loss hover:text-white",
-  }[kind];
-  return <button {...p} className={`inline-flex h-[42px] cursor-pointer items-center justify-center gap-2 rounded-lg px-5 text-sm font-bold whitespace-nowrap transition-colors outline-none focus-visible:outline-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50 ${k} ${className}`} />;
+export function Btn({ kind = "primary", size = "md", className = "", ...p }: React.ButtonHTMLAttributes<HTMLButtonElement> & { kind?: "primary" | "soft" | "ghost" | "danger"; size?: "sm" | "md" | "lg" }) {
+  const k = { primary: "btn-primary", soft: "btn-secondary", ghost: "btn-ghost", danger: "btn-danger" }[kind];
+  const z = size === "sm" ? "btn-sm" : size === "lg" ? "btn-lg" : "";
+  return <button {...p} className={`btn ${k} ${z} ${className}`} />;
 }
-export const inp = "h-[46px] w-full rounded-[5px] border border-line-strong bg-field px-4 text-[15px] font-medium text-fg outline-none transition-colors placeholder:text-subtle hover:border-subtle focus:border-primary";
+export const inp = "input";
 export function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return <label className="block"><span className="mb-1.5 block text-[13px] font-semibold text-soft">{label}</span>{children}</label>;
 }

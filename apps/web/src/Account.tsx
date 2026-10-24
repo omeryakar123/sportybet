@@ -46,7 +46,7 @@ const H = ({ children, right }: { children: React.ReactNode; right?: React.React
 );
 const Seg = ({ tabs, value, onChange }: { tabs: [string, string][]; value: string; onChange: (v: string) => void }) => (
   <div className="flex rounded-full bg-field p-1">
-    {tabs.map(([v, l]) => <button key={v} onClick={() => onChange(v)} className={`h-9 rounded-full px-4 text-sm font-bold transition-colors ${value === v ? "bg-primary text-primary-fg" : "text-subtle hover:text-fg"}`}>{l}</button>)}
+    {tabs.map(([v, l]) => <button key={v} onClick={() => onChange(v)} className={`chip border-transparent ${value === v ? "chip-on" : "bg-transparent"}`}>{l}</button>)}
   </div>
 );
 
@@ -198,7 +198,7 @@ export function Transactions() {
     <>
       <H>İşlemler</H>
       <div className="no-scrollbar -mx-1 mb-4 flex gap-2 overflow-x-auto px-1">
-        {GROUPS.map(([v, l]) => <button key={v} onClick={() => setType(v)} className={`h-9 shrink-0 rounded-full px-4 text-sm font-bold transition-colors ${type === v ? "bg-primary text-primary-fg" : "bg-card text-subtle hover:text-fg"}`}>{l}</button>)}
+        {GROUPS.map(([v, l]) => <button key={v} onClick={() => setType(v)} className={`chip ${type === v ? "chip-on" : "bg-card text-subtle hover:text-fg"}`}>{l}</button>)}
       </div>
       {!rows ? <Spinner /> : rows.length === 0 ? <Empty text="İşlem bulunamadı." /> : (
         <div className="overflow-hidden rounded-lg border border-line">
@@ -347,7 +347,7 @@ export function MyBonuses() {
                 <div className="mt-3 flex items-center justify-between">
                   <span className="text-xs font-bold text-dim">{b.depositBonus ? `Yatırımda %${Number(b.percent)}` : `Çevrim x${Number(b.wageringMultiplier)}`} · {b.expirationDays} gün</span>
                   {b.depositBonus
-                    ? <Link to={`/para-yatir?bonus=${b.id}`} className="rounded-lg bg-primary px-4 py-2 text-xs font-extrabold text-primary-fg hover:bg-primary-hover">Yatırım Yap</Link>
+                    ? <Link to={`/para-yatir?bonus=${b.id}`} className="btn btn-primary btn-sm">Yatırım yap</Link>
                     : b.requested
                       ? <span className="text-xs font-bold text-caution">Talep beklemede</span>
                       : <Btn kind="soft" className="!h-9 !px-4 !text-xs" onClick={() => request(b.id)}>Talep Et</Btn>}

@@ -64,7 +64,7 @@ function Hero({ ev }: { ev?: any }) {
             <h1 className="title text-[38px] sm:text-[50px] lg:text-[58px]">{me ? `Hoş geldin, ${me.username}` : "Maçı oyna, gündemi tahmin et"}</h1>
             <p className="mt-3 max-w-[440px] text-[15px] font-medium leading-relaxed text-muted">Bültendeki her maça oyna; maç bittiği an kuponun sonuçlanır, kazancın {settings.siteName ?? "SportyBet"} cüzdanına geçer.</p>
             <div className="mt-6 flex flex-wrap gap-3">
-              <Link to="/spor" className="inline-flex h-12 items-center gap-2 rounded-xl bg-primary px-6 text-sm font-extrabold text-primary-fg shadow-pick hover:bg-primary-hover"><I n="ball" className="size-4" />Bülteni aç</Link>
+              <Link to="/spor" className="btn btn-primary btn-lg gap-2 px-6"><I n="ball" className="size-4" />Bülteni aç</Link>
               {!me && <button onClick={() => setAuthOpen("register")} className="inline-flex h-12 items-center rounded-xl bg-white/[.07] px-6 text-sm font-extrabold hover:bg-white/[.12]">Kayıt ol</button>}
             </div>
           </div>
@@ -98,7 +98,7 @@ function Hero({ ev }: { ev?: any }) {
           {p.endsAt && <div className="absolute inset-x-0 top-4 flex justify-center"><Countdown to={p.endsAt} /></div>}
           <div className="absolute inset-x-0 bottom-0 p-5 text-center sm:p-8">
             <h2 className="text-2xl leading-tight font-extrabold drop-shadow sm:text-4xl">{p.title}</h2>
-            <span className="mt-3 inline-flex h-10 items-center rounded-xl bg-primary px-5 text-sm font-extrabold text-primary-fg">Detaylar</span>
+            <span className="btn btn-primary mt-3">Detayları gör</span>
           </div>
         </div>
       </Link>

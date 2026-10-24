@@ -52,3 +52,40 @@ body { @apply bg-page font-sans text-fg antialiased; font-feature-settings: "cv1
 .green-fade { background-image: radial-gradient(120% 140% at 0% 0%, rgba(31,232,138,.16) 0%, transparent 55%); }
 @keyframes pulse-dot { 0%,100% { opacity: 1 } 50% { opacity: .35 } }
 .live-dot { animation: pulse-dot 1.2s ease-in-out infinite; }
+
+/* =====================================================================
+ * TASARIM SİSTEMİ — bileşen katmanı
+ * Köşe ölçeği (hiyerarşi): kapsayıcı 16 · iç kart 12 · kontrol 10 · etiket 6 · çip tam
+ * Kontrol yüksekliği: sm 36 · md 44 · lg 48
+ * ===================================================================== */
+@layer components {
+  /* buton */
+  .btn { @apply inline-flex shrink-0 cursor-pointer select-none items-center justify-center gap-2 whitespace-nowrap rounded-[10px] px-5 text-sm font-extrabold transition-[background-color,box-shadow,color,transform] duration-150 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-45 disabled:active:translate-y-0; height: 44px; }
+  .btn-sm { @apply px-3 text-[13px]; height: 36px; }
+  .btn-lg { @apply px-6 text-[15px]; height: 48px; }
+  .btn-primary { @apply bg-primary text-primary-fg hover:bg-primary-hover; box-shadow: inset 0 1px 0 rgba(255,255,255,.35), 0 6px 18px -8px rgba(31,232,138,.7); }
+  .btn-secondary { @apply bg-white/[.07] text-fg hover:bg-white/[.11]; box-shadow: inset 0 1px 0 rgba(255,255,255,.06), inset 0 0 0 1px rgba(255,255,255,.05); }
+  .btn-ghost { @apply bg-transparent text-muted hover:bg-white/[.06] hover:text-fg; }
+  .btn-danger { @apply bg-loss/15 text-loss hover:bg-loss hover:text-white; }
+  .btn-icon { @apply px-0; width: 44px; }
+  .btn-icon.btn-sm { width: 36px; }
+
+  /* giriş alanı */
+  .input { @apply w-full rounded-[10px] border border-line-strong bg-field px-3.5 text-[15px] font-medium text-fg outline-none transition-colors placeholder:text-subtle hover:border-subtle focus:border-primary disabled:opacity-60; height: 44px; }
+  .input-lg { height: 48px; }
+
+  /* çip / filtre */
+  .chip { @apply inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-line bg-panel px-4 text-[13px] font-bold text-soft transition-colors hover:text-fg; }
+  .chip-on { @apply border-primary bg-primary/10 text-primary hover:text-primary; }
+
+  /* kapsayıcılar */
+  .card { @apply rounded-2xl; background: #15212e; box-shadow: inset 0 1px 0 rgba(255,255,255,.045), 0 1px 2px rgba(0,0,0,.35); }
+  .card-inset { @apply rounded-xl; background: #1a2734; box-shadow: inset 0 1px 0 rgba(255,255,255,.05); }
+
+  /* etiket */
+  .tag { @apply inline-flex items-center gap-1 rounded-[6px] px-1.5 py-px text-[11px] font-extrabold; }
+  .tag-live { @apply tag bg-live text-white; }
+  .tag-bonus { @apply tag bg-caution/15 text-caution; }
+  .tag-ok { @apply tag bg-win/15 text-win; }
+  .tag-muted { @apply tag bg-elevated text-soft; }
+}
