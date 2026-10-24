@@ -6,7 +6,7 @@
 @media (min-width:1024px) { :root { --header-h: 72px; } }
 /* gamdom gibi uygulama kabuğu: sayfa değil içerik alanı kayar (başlık ve alt menü sabit) */
 html, body, #root { height: 100%; overflow: hidden; overscroll-behavior: none; }
-#scroller { overscroll-behavior-y: contain; -webkit-overflow-scrolling: touch; scrollbar-gutter: stable; }
+#scroller { overscroll-behavior-y: contain; -webkit-overflow-scrolling: touch; }
 html { scrollbar-color: #252f3a #080d13; }
 body { @apply bg-page font-sans text-fg antialiased; }
 /* klavye odağı her yerde görünür */

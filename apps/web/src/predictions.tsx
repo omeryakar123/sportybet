@@ -367,7 +367,7 @@ export function Leaderboard() {
   const mine = rows?.find((r) => me && r.playerId === me.id);
   const coin = <span className="grid size-5 shrink-0 place-items-center rounded-lg bg-[#0ee07b] text-[13px] font-medium text-white">₺</span>;
   const Podium = ({ r, big }: { r: any; big?: boolean }) => (
-    <button onClick={() => r.playerId && openProfile(r.playerId)} className={`relative flex flex-1 flex-col items-center rounded-2xl bg-card px-2 pb-4 text-center ${big ? "pt-6 sm:-mt-6" : "pt-5"}`}>
+    <button onClick={() => r.playerId && openProfile(r.playerId)} className={`relative flex min-w-0 flex-1 flex-col items-center rounded-2xl bg-card px-2 pb-4 text-center ${big ? "pt-6 sm:-mt-6" : "pt-5"}`}>
       <span className="absolute -top-3"><RankBadge n={r.rank} /></span>
       <Avatar src={r.avatar} name={r.username} className={`${big ? "size-16" : "size-12"} !rounded-lg`} />
       <p className="mt-2 w-full truncate text-[14px] font-bold">{r.username}</p>

@@ -156,7 +156,7 @@ export function Rewards() {
   return (
     <div className="animate-sports-fade relative isolate">
       {/* gamdom ödül sayfası arka ışığı */}
-      <div aria-hidden className="pointer-events-none absolute -top-24 left-1/2 -z-10 h-[420px] w-[min(1100px,140vw)] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(0,255,134,.22),transparent)] blur-2xl" />
+      <div aria-hidden className="pointer-events-none absolute -top-24 left-1/2 -z-10 h-[420px] w-full max-w-[1100px] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(0,255,134,.22),transparent)] blur-2xl" />
       <PageTitle>Ödüller</PageTitle>
       {!me ? (
         <div className="rounded-2xl bg-[rgba(8,13,19,.6)] p-8 text-center backdrop-blur">
