@@ -23,8 +23,8 @@ function LogoMark({ className = "h-9", text = true }: { className?: string; text
   return (
     <span className={`inline-flex items-center gap-2 ${className}`} aria-label={name}>
       <svg viewBox="0 0 40 40" className="h-full w-auto shrink-0" aria-hidden>
-        <defs><linearGradient id="lm" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#6dffb7" /><stop offset="1" stopColor="#00c86a" /></linearGradient></defs>
-        <rect x="2" y="2" width="36" height="36" rx="11" fill="url(#lm)" />
+        <rect x="2" y="2" width="36" height="36" rx="11" fill="#00ff86" />
+        <path d="M2 13a11 11 0 0 1 11-11h14a11 11 0 0 1 11 11v2H2Z" fill="#fff" opacity=".22" />
         <path d="M26.5 12.5c-1.6-1.4-3.9-2.2-6.4-2.2-4.2 0-7 2.2-7 5.4 0 3.1 2.4 4.3 6.2 5.1 2.6.6 3.5 1 3.5 2 0 1-1.1 1.7-2.9 1.7-2 0-3.9-.8-5.4-2.2l-2.6 3.3c2 1.9 4.9 3 8 3 4.6 0 7.4-2.3 7.4-5.6 0-3.1-2.2-4.4-6.3-5.3-2.6-.5-3.4-.9-3.4-1.8 0-.9.9-1.5 2.5-1.5 1.7 0 3.3.6 4.6 1.6Z" fill="#06090e" />
       </svg>
       {text && <span className="text-[19px] font-extrabold tracking-tight text-white">{name}</span>}
@@ -239,6 +239,9 @@ function UserPanel({ onClose, onLogout }: { onClose: () => void; onLogout: () =>
       </nav>
     </>
   );
+  // tek kopya çiz (gizli kopyadaki SVG gradyanları görünen kopyayı bozar)
+  const desk = typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches;
+  if (desk) return <div className="animate-slip-item absolute right-0 top-[calc(100%+10px)] z-50 w-[300px] rounded-2xl bg-panel shadow-[0_18px_50px_rgba(0,0,0,.55)]">{body}</div>;
   return (
     <>
       {/* mobil: tam ekran alt sayfa */}
@@ -248,8 +251,6 @@ function UserPanel({ onClose, onLogout }: { onClose: () => void; onLogout: () =>
           {body}
         </section>
       </div>
-      {/* masaüstü: açılır panel */}
-      <div className="animate-slip-item absolute right-0 top-[calc(100%+10px)] z-50 hidden w-[300px] rounded-2xl bg-panel shadow-[0_18px_50px_rgba(0,0,0,.55)] lg:block">{body}</div>
     </>
   );
 }

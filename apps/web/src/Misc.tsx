@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, asset } from "./api";
 import { Accordion, Pager, PageTitle, Pill, Progress, SearchBox, Tabs } from "./g";
@@ -127,7 +127,7 @@ const TIER: Record<string, [string, string]> = {
 const tierOf = (name: string) => TIER[name.split(" ")[0]] ?? ["#cfd6df", "#6b7785"];
 /** Seviye rozeti: renkli taş (kendi çizimimiz) */
 export function LevelGem({ name, size = 125, dim }: { name: string; size?: number; dim?: boolean }) {
-  const [a, b] = tierOf(name); const id = "g" + name.replace(/\W/g, "");
+  const [a, b] = tierOf(name); const id = "g" + useId().replace(/:/g, "");
   const n = Number(name.split(" ")[1]) || 1;
   return (
     <svg viewBox="0 0 100 100" width={size} height={size} className={dim ? "opacity-40 grayscale-[.6]" : ""} aria-hidden>

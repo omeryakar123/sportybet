@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState, useId } from "react";
 import { api, getToken, setToken, asset } from "./api";
 
 // ---------- biçimleme ----------
@@ -212,11 +212,14 @@ export const AVATAR_PRESETS: { bg: [string, string]; shape: React.ReactNode }[] 
   { bg: ["#ff4d5e", "#ffd731"], shape: <path d="M18 38c6-14 22-14 28 0M24 30l-3-8M40 30l3-8M32 27v-9" stroke="#3a0d00" strokeWidth="3.5" fill="none" strokeLinecap="round" /> },
 ];
 export function Avatar({ src, name = "?", className = "size-[30px]" }: { src?: string | null; name?: string; className?: string }) {
-  const n = src?.startsWith("av:") ? Number(src.slice(3)) : 0;
+  const uid = useId().replace(/:/g, "");
+  // fotoğraf/seçim yoksa isme göre sabit bir hazır avatar (gamdom gibi hep resimli)
+  const hash = [...(name || "?")].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
+  const n = src?.startsWith("av:") ? Number(src.slice(3)) : !src ? (hash % AVATAR_PRESETS.length) + 1 : 0;
   const pre = n >= 1 ? AVATAR_PRESETS[(n - 1) % AVATAR_PRESETS.length] : null;
   if (src && src.startsWith("data:image/")) return <img src={src} alt="" className={`${className} shrink-0 rounded-full object-cover`} />;
   if (pre) {
-    const id = `avg${n}`;
+    const id = `avg${n}${uid}`;
     return (
       <svg viewBox="0 0 64 64" className={`${className} shrink-0 rounded-full`} aria-hidden>
         <defs><linearGradient id={id} x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor={pre.bg[0]} /><stop offset="1" stopColor={pre.bg[1]} /></linearGradient></defs>
