@@ -11,6 +11,38 @@ export const pct = (v: any) => `${Number(v ?? 0).toFixed(2)}%`;
 export const dt = (v: any) => (v ? new Date(v).toLocaleString("tr-TR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "");
 export const dOnly = (v: any) => (v ? new Date(v).toLocaleDateString("tr-TR") : "");
 
+/** BetConstruct tarzı dolgulu glifler (özgün çizim) */
+const G: Record<string, ReactNode> = {
+  dashboard: <><rect x="3" y="3" width="8" height="8" rx="1" /><rect x="13" y="3" width="8" height="5" rx="1" /><rect x="13" y="10" width="8" height="11" rx="1" /><rect x="3" y="13" width="8" height="8" rx="1" /></>,
+  players: <><circle cx="9" cy="8" r="3.5" /><path d="M2 20c.6-4 3.4-6 7-6s6.4 2 7 6Z" /><circle cx="17" cy="9" r="2.6" /><path d="M16.5 13.2c2.8.2 4.8 2 5.3 5.3H18c-.3-2-1-3.7-1.5-5.3Z" /></>,
+  reports: <><rect x="3" y="12" width="4" height="9" rx="1" /><rect x="10" y="7" width="4" height="14" rx="1" /><rect x="17" y="3" width="4" height="18" rx="1" /></>,
+  finance: <><rect x="2" y="5" width="20" height="14" rx="2" /><rect x="2" y="8.5" width="20" height="3" fill="#fff" opacity=".9" /><rect x="5" y="14" width="6" height="2" rx="1" fill="#fff" opacity=".9" /></>,
+  gift: <><rect x="3" y="8" width="18" height="4" rx="1" /><rect x="4.5" y="12.5" width="15" height="8.5" rx="1" /><rect x="11" y="8" width="2" height="13" fill="#fff" opacity=".8" /><path d="M12 8C9 8 6.5 6.8 7.2 4.8 8 2.8 11 4.5 12 8Zm0 0c3 0 5.5-1.2 4.8-3.2C16 2.8 13 4.5 12 8Z" /></>,
+  sport: <><circle cx="12" cy="12" r="9.5" /><path d="M12 7.2 15.6 9.8l-1.4 4.2H9.8L8.4 9.8Z" fill="#fff" /></>,
+  prediction: <><circle cx="12" cy="10" r="7.5" /><rect x="6" y="18.5" width="12" height="3" rx="1.2" /><circle cx="9.5" cy="8" r="2" fill="#fff" opacity=".7" /></>,
+  users: <><circle cx="12" cy="7.5" r="4" /><path d="M4 21c.8-5 4-7.5 8-7.5s7.2 2.5 8 7.5Z" /></>,
+  cms: <path d="M9 3h3.5a2 2 0 1 1 4 0H20v4a2 2 0 1 1 0 4v4h-4a2 2 0 1 0-4 0H9v-4a2 2 0 1 0 0-4Z" transform="translate(-2.5 3)" />,
+  deposit: <><circle cx="13" cy="13" r="8.5" /><text x="13" y="17.3" textAnchor="middle" fontSize="12" fontWeight="700" fill="#fff">$</text><path d="M4 2v6M1.5 5.5 4 8l2.5-2.5" stroke="currentColor" strokeWidth="2" fill="none" /></>,
+  withdraw: <><circle cx="13" cy="13" r="8.5" /><text x="13" y="17.3" textAnchor="middle" fontSize="12" fontWeight="700" fill="#fff">$</text><path d="M4 8V2M1.5 4.5 4 2l2.5 2.5" stroke="currentColor" strokeWidth="2" fill="none" /></>,
+  login: <><circle cx="12" cy="12" r="9.5" /><path d="M7 12h8M12 8.5 15.5 12 12 15.5" stroke="#fff" strokeWidth="2.2" fill="none" strokeLinecap="round" strokeLinejoin="round" /></>,
+  register: <><circle cx="13" cy="9" r="4" /><path d="M5.5 21c.7-4.5 3.7-6.5 7.5-6.5s6.8 2 7.5 6.5Z" /><path d="M4 2.5v6M1 5.5h6" stroke="currentColor" strokeWidth="2" /></>,
+  balance: <><rect x="2" y="6" width="20" height="12" rx="2" /><circle cx="12" cy="12" r="3" fill="#fff" /><text x="12" y="14" textAnchor="middle" fontSize="5" fontWeight="700">$</text></>,
+  profit: <><circle cx="12" cy="12" r="9.5" /><path d="M7 16v-2M10 16v-4M13 16v-6M16 16V8" stroke="#fff" strokeWidth="2" strokeLinecap="round" /></>,
+  bonus: <><circle cx="12" cy="12" r="9.5" /><rect x="7" y="10" width="10" height="7" rx="1" fill="#fff" /><rect x="6.5" y="8" width="11" height="2.5" rx=".6" fill="#fff" /><rect x="11.3" y="8" width="1.4" height="9" /></>,
+  up: <><circle cx="12" cy="12" r="9.5" /><path d="m8 14 4-4 4 4" stroke="#fff" strokeWidth="2.4" fill="none" strokeLinecap="round" strokeLinejoin="round" /></>,
+  down: <><circle cx="12" cy="12" r="9.5" /><path d="m8 10 4 4 4-4" stroke="#fff" strokeWidth="2.4" fill="none" strokeLinecap="round" strokeLinejoin="round" /></>,
+  clock: <><circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" strokeWidth="2" /><path d="M12 7v5l3 2" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" /></>,
+  user: <><circle cx="12" cy="7.5" r="4" /><path d="M4 21c.8-5 4-7.5 8-7.5s7.2 2.5 8 7.5Z" /></>,
+  menu: <><rect x="3" y="5" width="18" height="2.4" rx="1.2" /><rect x="3" y="10.8" width="18" height="2.4" rx="1.2" /><rect x="3" y="16.6" width="18" height="2.4" rx="1.2" /></>,
+  logout: <><path d="M10 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h5" stroke="currentColor" strokeWidth="2" fill="none" /><path d="M9 12h11M16 8l4 4-4 4" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" /></>,
+  globe: <><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="2" /><path d="M3 12h18M12 3c3 3.3 3 14.7 0 18M12 3c-3 3.3-3 14.7 0 18" stroke="currentColor" strokeWidth="1.6" fill="none" /></>,
+  cal: <><rect x="3" y="5" width="18" height="16" rx="2" /><rect x="5" y="10" width="14" height="9" fill="#fff" /><rect x="7" y="2.5" width="2" height="4" rx="1" /><rect x="15" y="2.5" width="2" height="4" rx="1" /></>,
+};
+export function BoIcon({ n, className = "size-[18px]" }: { n: string; className?: string }) {
+  return <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden>{G[n] ?? <circle cx="12" cy="12" r="8" />}</svg>;
+}
+const EMOJI_ICON: Record<string, string> = { "⬇": "deposit", "⬆": "withdraw", "👤": "user", "➜": "login", "＋": "register", "💵": "balance", "📈": "profit", "🎁": "bonus", "✚": "up", "✖": "down", "⚽": "sport", "🔮": "prediction", "💳": "finance", "📊": "reports", "👥": "players" };
+
 export function Panel({ title, right, children, pad = true, collapsible }: { title: ReactNode; right?: ReactNode; children: ReactNode; pad?: boolean; collapsible?: boolean }) {
   const isFilter = collapsible ?? title === "Filtre";
   const [open, setOpen] = useState(true);
@@ -125,19 +157,36 @@ const STATE_TR: Record<string, string> = {
   NEW: "Yeni", PAID: "Ödendi", REJECTED: "Reddedildi", COMPLETED: "Tamamlandı", EXPIRED: "Süresi doldu", CANCELED: "İptal", APPROVED: "Onaylandı",
   OPEN: "Açık", BLOCKED: "Bloke", CLOSED: "Kapalı", SELF_EXCLUDED: "Kendini dışladı", REVERSED: "Geri alındı",
 };
-export const StateBadge = ({ s }: { s: string }) => <span className={STATE_COLORS[s] ?? ""}>{STATE_TR[s] ?? s}</span>;
+const STATE_ICON: Record<string, string> = { NEW: "dot", PENDING: "tri", PAID: "ok", WON: "ok", COMPLETED: "ok", APPROVED: "ok", SUCCESS: "ok", OPEN: "ok", REJECTED: "x", LOST: "x", CANCELLED: "x", CANCELED: "x", BLOCKED: "x", EXPIRED: "x", REVERSED: "back", RETURNED: "back", ACTIVE: "dot", CASHED_OUT: "ok" };
+export const StateBadge = ({ s }: { s: string }) => {
+  const k = STATE_ICON[s];
+  const ic = k === "ok" ? <svg viewBox="0 0 16 16" className="size-[13px]"><circle cx="8" cy="8" r="7" fill="currentColor" /><path d="m4.8 8.2 2.2 2.2 4.2-4.4" stroke="#fff" strokeWidth="1.8" fill="none" strokeLinecap="round" /></svg>
+    : k === "x" ? <svg viewBox="0 0 16 16" className="size-[13px]"><circle cx="8" cy="8" r="7" fill="currentColor" /><path d="m5.5 5.5 5 5m0-5-5 5" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" /></svg>
+    : k === "dot" ? <span className="inline-block size-[10px] rounded-full bg-current" />
+    : k === "back" ? <svg viewBox="0 0 16 16" className="size-[13px]"><circle cx="8" cy="8" r="7" fill="currentColor" /><path d="M5 7h5a2 2 0 0 1 0 4H8M5 7l2-2M5 7l2 2" stroke="#fff" strokeWidth="1.5" fill="none" strokeLinecap="round" /></svg>
+    : null;
+  return <span className={`inline-flex items-center gap-1.5 whitespace-nowrap ${STATE_COLORS[s] ?? ""}`}>{ic}{STATE_TR[s] ?? s}{k === "tri" && <span className="-mt-2 -ml-0.5 size-0 border-l-[6px] border-t-[6px] border-l-transparent border-t-bo-orange" />}</span>;
+};
 
 /** KPI kartı (BC dashboard / player KPIs) */
 export function Kpi({ label, value, icon, color = "bo-blue", to }: { label: string; value: ReactNode; icon: string; color?: string; to?: string }) {
-  const bg: Record<string, string> = { "bo-blue": "bg-sky-100 text-sky-600", "bo-red": "bg-rose-100 text-rose-600", "bo-orange": "bg-amber-100 text-amber-600", "bo-green": "bg-emerald-100 text-emerald-600", "bo-purple": "bg-violet-100 text-violet-600", lime: "bg-lime-100 text-lime-700", teal: "bg-teal-100 text-teal-600" };
+  // BC: pastel ikon bölgesi + içinde dolu renkli daire, beyaz glif
+  const pal: Record<string, [string, string]> = {
+    "bo-blue": ["#e3f3fd", "#36a9f0"], "bo-red": ["#fde5e7", "#f0454f"], "bo-orange": ["#fff1dc", "#f7a52b"], "bo-green": ["#e1f6ea", "#38c172"],
+    "bo-purple": ["#ebe7fc", "#7462e4"], lime: ["#f1f7d9", "#a9c62b"], teal: ["#dcf6f4", "#22c3b3"],
+  };
+  const [bg, fg] = pal[color] ?? pal["bo-blue"];
+  const g = EMOJI_ICON[icon] ?? (G[icon] ? icon : null);
   const body = (
     <>
-      <div className={`grid w-[74px] shrink-0 place-items-center ${bg[color] ?? bg["bo-blue"]}`}><div className="grid size-10 place-items-center rounded-full bg-white/80 text-xl shadow-sm">{icon}</div></div>
-      <div className="flex min-w-0 flex-col justify-center px-3"><div className="truncate text-[11px] uppercase tracking-wide text-[#3b4351]">{label}</div><div className="mt-1 truncate text-[19px] text-[#8a93a1]">{value}</div></div>
+      <div className="grid w-[74px] shrink-0 place-items-center" style={{ background: bg }}>
+        <div className="grid size-[38px] place-items-center rounded-full text-white" style={{ background: fg }}>{g ? <BoIcon n={g} className="size-[22px]" /> : <span className="text-lg">{icon}</span>}</div>
+      </div>
+      <div className="flex min-w-0 flex-col justify-center px-3"><div className="truncate text-[11px] uppercase tracking-wide text-[#3b4351]">{label}</div><div className="mt-1.5 truncate text-[19px] leading-none text-[#8a93a1]">{value}</div></div>
     </>
   );
   return to
-    ? <Link to={to} title="Detaya git" className="panel flex h-[74px] items-stretch overflow-hidden transition-shadow hover:shadow-md hover:ring-1 hover:ring-bo-blue/40">{body}</Link>
+    ? <Link to={to} title="Detaya git" className="panel flex h-[74px] items-stretch overflow-hidden transition-shadow hover:shadow-[0_2px_10px_rgba(46,138,230,.25)]">{body}</Link>
     : <div className="panel flex h-[74px] items-stretch overflow-hidden">{body}</div>;
 }
 
@@ -174,7 +223,7 @@ export function DateRange({ value, onChange }: { value: Range; onChange: (r: Ran
   const [active, setActive] = useState<string>("");
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {PRESETS.map(([k, l]) => <button key={k} onClick={() => { setActive(k); onChange(presetRange(k)); }} className={`h-8 rounded-sm border px-3 text-[13px] ${active === k ? "border-bo-blue bg-bo-blue text-white" : "border-bo-blue/30 bg-bo-blue/5 text-bo-blue"}`}>{l}</button>)}
+      {PRESETS.map(([k, l]) => <button key={k} onClick={() => { setActive(k); onChange(presetRange(k)); }} className={`h-[30px] min-w-[104px] rounded-[2px] border px-3 text-[13px] transition-colors ${active === k ? "border-[#2e8ae6] bg-[#2e8ae6] text-white" : "border-[#bcd8f5] bg-[#e3f0fd] text-[#2e8ae6] hover:bg-[#d4e8fc]"}`}>{l}</button>)}
       <input type="datetime-local" className="inp w-48" value={toLocalInput(value.from)} onChange={(e) => { setActive(""); onChange({ ...value, from: new Date(e.target.value).toISOString() }); }} />
       <span>—</span>
       <input type="datetime-local" className="inp w-48" value={toLocalInput(value.to)} onChange={(e) => { setActive(""); onChange({ ...value, to: new Date(e.target.value).toISOString() }); }} />
