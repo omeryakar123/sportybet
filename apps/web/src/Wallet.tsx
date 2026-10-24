@@ -253,6 +253,7 @@ export function WithdrawPanel() {
         </div>
       )}
       {problem && <p className="text-[13px] font-bold text-caution">{problem}</p>}
+      {!amt && bal < min && <p className="text-[13px] font-bold text-subtle">Bu yöntemle çekim için en az {money(min)} Ana Para bakiyen olmalı.</p>}
       <ErrBox e={err} />
       <Btn className="w-full" disabled={busy || !ready} onClick={submit}>{busy ? "Gönderiliyor…" : missing.length && amt ? `${missing[0].label} alanını doldur` : amt ? `${money(amt)} çekim talebi oluştur` : "Tutarı gir"}</Btn>
       <p className="text-center text-[12px] font-medium text-subtle">Tutar talep anında bakiyenden ayrılır; reddedilir ya da iptal edersen anında geri yüklenir.</p>
