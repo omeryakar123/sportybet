@@ -46,6 +46,7 @@ export const NAV: Group[] = [
     { to: "/system", label: "Sistem / Demo Veri", roles: [] },
   ] },
   { label: "CMS", icon: "cms", roles: ["ADMIN", "CMS"], items: [
+    { to: "/cms/home", label: "Anasayfa Düzeni" },
     { to: "/cms/banners", label: "Bannerlar" },
     { to: "/cms/promotions", label: "Promosyonlar" },
     { to: "/cms/pages", label: "Sayfalar" },

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api } from "./api";
 import { Avatar, Btn, RankBadge, Empty, ErrBox, I, Spinner, inp, money, money0, pct, timeLeft, useStore } from "./lib";
+import { BannerSlot } from "./CmsSlot";
 
 const PLACE = (q: string) => {
   const hues = [[28, 60], [210, 55], [150, 45], [330, 45], [260, 50]];
@@ -104,15 +105,7 @@ export function PredictionsPage() {
   return (
     <div className="animate-sports-fade">
       {/* üst tanıtım şeridi */}
-      <section className="no-scrollbar -mx-4 mb-5 flex gap-3 overflow-x-auto px-4">
-        <PromoTile grad="linear-gradient(115deg,#0b1a17,#123326)" tag="GÜNDEMİ TAHMİN ET" title={<>Gündeme Yön Ver,<br />Kazan</>} art={
-          <div className="relative mr-2 h-[84px] w-[130px]"><span className="absolute top-3 left-0 rotate-[-6deg] rounded-md bg-win px-2.5 py-1 text-xs font-extrabold text-[#06130c]">Evet · %62</span>
-            <span className="absolute bottom-3 right-0 rotate-3 rounded-md bg-loss px-2.5 py-1 text-xs font-extrabold text-white">Hayır · %38</span></div>} to="/tahminler" />
-        <PromoTile grad="linear-gradient(115deg,#0d1f19,#14402d)" tag="SPOR · HEMEN OYNA" title={<>Maçı Oyna,<br />Oranı Yakala</>} art={
-          <div className="mr-2 flex gap-1.5"><span className="grid size-12 place-items-center rounded-lg bg-caution text-sm font-extrabold text-[#0f2219]">FB</span>
-            <span className="grid size-12 place-items-center rounded-lg bg-primary text-sm font-extrabold text-primary-fg">GS</span></div>} to="/spor" />
-        <PromoTile grad="linear-gradient(115deg,#0f1a33,#1d3c78)" tag="LİDERLİK TABLOSU" title={<>Zirveye<br />Sen Oyna</>} art={<I n="trophy" className="mr-3 size-14 text-caution" />} to="/liderlik" />
-      </section>
+      <BannerSlot group="predictions-top" className="-mx-4 mb-5 px-4" />
 
       {/* kategori sekmeleri */}
       <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
@@ -279,7 +272,7 @@ export function PredictionDetail() {
         </div>
 
         {/* satın alma kuponu */}
-        <aside className="h-fit lg:sticky lg:top-[calc(var(--header-h)+16px)]">
+        <aside className="h-fit lg:sticky lg:top-4">
           <div className="animate-slip-reveal rounded-xl border border-line bg-panel p-4 shadow-[0_18px_50px_rgba(0,0,0,.35)]">
             <div className="mb-3 flex items-center justify-between">
               <span className="text-[15px] font-extrabold">Tahmin Kuponu</span>

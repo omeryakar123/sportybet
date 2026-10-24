@@ -593,6 +593,19 @@ export async function adminRoutes(app: FastifyInstance) {
     app.patch(`/cms/${path}/:id`, async (req) => { const { siteId: _s, ...data } = clean(req.body); const r = await m.update({ where: { id: idParam(req) }, data }); await audit(req, `CMS_${path.toUpperCase()}_UPDATE`, `${path}:${r.id}`); return r; });
     app.delete(`/cms/${path}/:id`, async (req) => { await m.delete({ where: { id: idParam(req) } }); await audit(req, `CMS_${path.toUpperCase()}_DELETE`, `${path}:${idParam(req)}`); return { ok: true }; });
   }
+  // görsel yükleme: { name, dataUrl } (base64) → { url }
+  app.post("/cms/upload", { bodyLimit: 12 * 1024 * 1024 }, async (req) => {
+    const { name = "gorsel", dataUrl = "" } = (req.body ?? {}) as any;
+    const m = /^data:(image\/(png|jpe?g|webp|gif|svg\+xml|avif));base64,(.+)$/.exec(String(dataUrl));
+    if (!m) throw new BizError("INVALID_IMAGE");
+    const buf = Buffer.from(m[3], "base64");
+    if (buf.length > 8 * 1024 * 1024) throw new BizError("FILE_TOO_LARGE");
+    const r = await db.cmsAsset.create({ data: { siteId: await sid(req), name: String(name).slice(0, 120), mime: m[1], size: buf.length, data: buf } });
+    await audit(req, "CMS_ASSET_UPLOAD", `asset:${r.id}`);
+    return { id: r.id, url: `/api/cms/asset/${r.id}` };
+  });
+  app.get("/cms/assets", async (req) => db.cmsAsset.findMany({ where: { siteId: await sid(req) }, select: { id: true, name: true, mime: true, size: true, createdAt: true }, orderBy: { id: "desc" }, take: 200 }));
+  app.delete("/cms/assets/:id", async (req) => { await db.cmsAsset.delete({ where: { id: idParam(req) } }); await audit(req, "CMS_ASSET_DELETE", `asset:${idParam(req)}`); return { ok: true }; });
   app.get("/cms/settings/:key", async (req) => db.cmsSetting.findUnique({ where: { siteId_key: { siteId: await sid(req), key: (req.params as any).key } } }));
   app.put("/cms/settings/:key", async (req) => {
     const key = (req.params as any).key;

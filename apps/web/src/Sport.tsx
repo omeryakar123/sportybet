@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import MatchDetail, { type DInfo } from "./MatchDetail";
 import { api } from "./api";
-import { ErrBox, I, Spinner, money, useStore } from "./lib";
+import { BannerSlot } from "./CmsSlot";
+import { ErrBox, I, Spinner, money, useStore, scrollMain } from "./lib";
 
 /**
  * Sportsbook — lacivert + neon yeşil, yoğun lig/maç ızgarası.
@@ -161,7 +162,7 @@ export default function Sport() {
   // maç detayı: canlıda 5 sn, maç öncesi 30 sn'de bir oran; olay/istatistik canlıda 2 dk'da bir
   useEffect(() => {
     if (!evParam) { setDet(null); setInfo(null); return; }
-    let alive = true; setDet(null); setDetErr(""); setInfo(null); window.scrollTo(0, 0);
+    let alive = true; setDet(null); setDetErr(""); setInfo(null); scrollMain(0, 0);
     let isLive = false;
     const f = () => api(`/api/sb/event/${evParam}`).then((e: Ev) => { if (!alive) return; isLive = !!e.live; setDet(e); syncPicks([e]); }).catch((x) => { if (!alive) return; if (x.message === "NOT_FOUND") setDetErr(x.message); else setTimeout(() => alive && f(), 3000); });
     const g = () => api(`/api/sb/event/${evParam}/detail`).then((d: DInfo) => alive && setInfo(d)).catch(() => {});
@@ -340,7 +341,7 @@ export default function Sport() {
           </div>
           <div className="mt-3 border-t border-line px-3 pt-3 pb-3">
             <label className="mb-2 flex cursor-pointer items-center gap-2 text-[12px] font-semibold text-subtle">
-              <input type="checkbox" className="accent-[#00ff81]" checked={acceptHigher} onChange={(e) => { setAcceptHigher(e.target.checked); try { localStorage.setItem("sb_accept", e.target.checked ? "higher" : "none"); } catch {} }} />
+              <input type="checkbox" className="accent-[#00ff86]" checked={acceptHigher} onChange={(e) => { setAcceptHigher(e.target.checked); try { localStorage.setItem("sb_accept", e.target.checked ? "higher" : "none"); } catch {} }} />
               Yükselen oranları otomatik kabul et
             </label>
             {effMode === "combo" && <div className="mb-2 flex items-center justify-between text-[13px] text-subtle">Toplam oran <b className="num text-[20px] font-bold text-fg">{totalOdds.toFixed(2)}</b></div>}
@@ -511,6 +512,7 @@ export default function Sport() {
           : detErr ? <div className="rounded-xl bg-panel p-12 text-center"><p className="font-bold">Maç bulunamadı</p><button onClick={() => nav("/spor")} className="btn btn-primary mt-3">Spor sayfasına dön</button></div>
           : <Spinner />
       ) : (<>
+      <BannerSlot group="sport-top" className="mb-3" />
       {/* SPOR ŞERİDİ */}
       <div className="relative mb-3">
         <div className="sb-scroll flex gap-1 overflow-x-auto px-2 py-2">
@@ -665,19 +667,19 @@ export default function Sport() {
       <div className={`fixed inset-x-0 bottom-[calc(var(--bottom-nav-h)+56px+env(safe-area-inset-bottom))] z-40 lg:inset-x-auto lg:right-5 lg:bottom-5 lg:w-[370px] ${chatOpen ? "xl:right-[360px]" : ""} ${slipOpen ? "" : "hidden lg:block"}`}>
         <div className="overflow-hidden rounded-t-2xl border-t border-line bg-panel shadow-[0_-12px_40px_rgba(0,0,0,.5)] lg:rounded-xl lg:border">
           {SlipBar}
-          {quick && <div className="flex items-center gap-2 bg-[#0b0f13] px-3 py-1.5 text-[12px] font-semibold text-primary"><I n="spark" className="size-3.5" />Hızlı bahis açık: orana dokunduğunda {money(st)} ile tekli kupon oynanır.<button onClick={() => setQuick(false)} className="ml-auto font-bold text-subtle hover:text-fg">Kapat</button></div>}
+          {quick && <div className="flex items-center gap-2 bg-[#080d13] px-3 py-1.5 text-[12px] font-semibold text-primary"><I n="spark" className="size-3.5" />Hızlı bahis açık: orana dokunduğunda {money(st)} ile tekli kupon oynanır.<button onClick={() => setQuick(false)} className="ml-auto font-bold text-subtle hover:text-fg">Kapat</button></div>}
           {slipOpen && SlipBody}
         </div>
       </div>
 
       {/* mobil spor alt menüsü (ana menünün üstünde) */}
-      <nav aria-label="Spor menüsü" className="fixed inset-x-0 bottom-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom))] z-[41] grid h-14 grid-cols-5 border-t border-line bg-[#0f161c] lg:hidden">
+      <nav aria-label="Spor menüsü" className="fixed inset-x-0 bottom-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom))] z-[41] grid h-14 grid-cols-5 border-t border-line bg-[#0f151b] lg:hidden">
         {([
-          ["home", "Lobi", () => { setSlipOpen(false); if (evParam) nav("/spor"); else window.scrollTo({ top: 0, behavior: "smooth" }); }, !slipOpen && !evParam],
+          ["home", "Lobi", () => { setSlipOpen(false); if (evParam) nav("/spor"); else scrollMain({ top: 0, behavior: "smooth" }); }, !slipOpen && !evParam],
           ["live", "Canlı", () => { setSlipOpen(false); if (evParam) nav("/spor"); setTimeout(() => document.getElementById("canli")?.scrollIntoView({ behavior: "smooth", block: "start" }), evParam ? 400 : 0); }, false],
           ["ticket", "Kuponlarım", () => nav("/hesap/kuponlarim"), false],
           ["promo", "Kupon", () => setSlipOpen(!slipOpen), slipOpen],
-          ["search", "Ara", () => { setSlipOpen(false); if (evParam) nav("/spor"); setTimeout(() => { window.scrollTo({ top: 0, behavior: "smooth" }); (document.getElementById("sb-search") as HTMLInputElement | null)?.focus(); }, evParam ? 400 : 50); }, false],
+          ["search", "Ara", () => { setSlipOpen(false); if (evParam) nav("/spor"); setTimeout(() => { scrollMain({ top: 0, behavior: "smooth" }); (document.getElementById("sb-search") as HTMLInputElement | null)?.focus(); }, evParam ? 400 : 50); }, false],
         ] as [string, string, () => void, boolean][]).map(([ic, l, fn, on]) => (
           <button key={l} onClick={fn} aria-pressed={on} className={`relative flex flex-col items-center justify-center gap-0.5 text-[11px] font-bold ${on ? "text-primary" : "text-subtle"}`}>
             <span className="relative"><I n={ic} className="size-5" />{l === "Kupon" && picks.length > 0 && <span key={picks.length} className="animate-bump absolute -right-2.5 -top-2 grid size-[17px] place-items-center rounded-full bg-primary text-[10px] font-extrabold text-primary-fg">{picks.length}</span>}</span>{l}

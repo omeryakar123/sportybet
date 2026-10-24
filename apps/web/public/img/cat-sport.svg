@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 240">
+<defs>
+<linearGradient id="fade" x1="0" x2="1"><stop offset=".25" stop-color="#5b1fb0" stop-opacity="0"/><stop offset=".75" stop-color="#6a26d4" stop-opacity=".9"/><stop offset="1" stop-color="#8b3dff"/></linearGradient>
+<radialGradient id="ball" cx="40%" cy="35%" r="70%"><stop offset="0" stop-color="#ffffff"/><stop offset=".7" stop-color="#d9d2f2"/><stop offset="1" stop-color="#9c8fd0"/></radialGradient>
+<filter id="glow"><feGaussianBlur stdDeviation="18"/></filter>
+</defs>
+<rect width="700" height="240" fill="url(#fade)"/>
+<circle cx="560" cy="130" r="120" fill="#b06bff" opacity=".7" filter="url(#glow)"/>
+<g transform="translate(560 125)">
+<circle r="118" fill="url(#ball)"/>
+<g fill="#4b1d9a"><path d="M0-42 L40-13 L25 34 L-25 34 L-40-13Z"/><path d="M0-118 L22-82 L0-60 L-22-82Z" opacity=".95"/><path d="M95-70 L112-28 L80-12 L66-48Z"/><path d="M-95-70 L-66-48 L-80-12 L-112-28Z"/><path d="M60 92 L82 60 L106 72 L86 104Z"/><path d="M-60 92 L-86 104 L-106 72 L-82 60Z"/></g>
+<g stroke="#4b1d9a" stroke-width="5" fill="none" opacity=".7"><path d="M0-42 L0-60 M40-13 L66-48 M-40-13 L-66-48 M25 34 L60 92 M-25 34 L-60 92"/></g>
+<circle r="118" fill="none" stroke="#ffffff" stroke-opacity=".5" stroke-width="3"/>
+</g>
+</svg>

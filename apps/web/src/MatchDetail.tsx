@@ -70,7 +70,7 @@ function Tracker({ ev, info }: { ev: DEv; info: DInfo | null }) {
   const final = ["FT", "AET", "PEN"].includes(ev.status);
   const notStarted = !ev.live && !final && (ev.status === "NS" || ev.status === "TBD");
   const lastEv = info?.events?.length ? info.events[info.events.length - 1] : null;
-  const box = "num grid min-w-12 place-items-center rounded-md bg-white px-2 py-1 text-[22px] font-bold text-[#0b0f13]";
+  const box = "num grid min-w-12 place-items-center rounded-md bg-white px-2 py-1 text-[22px] font-bold text-[#080d13]";
   return (
     <Pitch>
       <div className="w-full max-w-[340px] rounded-xl border border-white/15 bg-black/35 px-4 py-3 text-center text-white backdrop-blur-sm">
@@ -103,7 +103,7 @@ const evLabel = (e: DInfo["events"][number]) =>
     : e.type === "Card" ? (e.detail?.includes("Red") ? "Kırmızı kart" : "Sarı kart") : e.type === "subst" ? "Oyuncu değişikliği" : e.type === "Var" ? `VAR: ${e.detail}` : e.detail;
 
 function EvIcon({ e, size = "size-3" }: { e: DInfo["events"][number]; size?: string }) {
-  if (e.type === "Goal") return <svg viewBox="0 0 24 24" className={size}><circle cx="12" cy="12" r="10" fill="#fff" /><path d="M12 7.5 16 10.5l-1.5 4.5h-5L8 10.5Z" fill="#0b0f13" /></svg>;
+  if (e.type === "Goal") return <svg viewBox="0 0 24 24" className={size}><circle cx="12" cy="12" r="10" fill="#fff" /><path d="M12 7.5 16 10.5l-1.5 4.5h-5L8 10.5Z" fill="#080d13" /></svg>;
   if (e.type === "Card") return <span className={`inline-block h-3 w-2 rounded-[1px] ${e.detail?.includes("Red") ? "bg-loss" : "bg-caution"}`} />;
   if (e.type === "subst") return <span className="text-[10px] font-extrabold leading-none text-win">⇅</span>;
   return <span className="text-[9px] font-extrabold leading-none text-soft">VAR</span>;
@@ -319,7 +319,7 @@ export default function MatchDetail(props: Props) {
         {trk === "pitch" ? <Tracker ev={ev} info={info} /> : trk === "stats" ? <Stats info={info} /> : trk === "lineups" ? <Lineups ev={ev} info={info} /> : <Events info={info} />}
         {goals.length > 0 && trk === "pitch" && (
           <div className="grid grid-cols-2 gap-2 px-3 py-2 text-[12px] text-soft">
-            {(["home", "away"] as const).map((s) => <div key={s} className={s === "away" ? "text-right" : ""}>{goals.filter((g) => g.side === s).map((g, i) => <div key={i} className="flex items-center gap-1.5" style={{ justifyContent: s === "away" ? "flex-end" : undefined }}><svg viewBox="0 0 24 24" className="size-3.5"><circle cx="12" cy="12" r="10" fill="#fff" /><path d="M12 7.5 16 10.5l-1.5 4.5h-5L8 10.5Z" fill="#0b0f13" /></svg>{g.player} {g.min}'{g.detail === "Penalty" ? " (P)" : g.detail === "Own Goal" ? " (KK)" : ""}</div>)}</div>)}
+            {(["home", "away"] as const).map((s) => <div key={s} className={s === "away" ? "text-right" : ""}>{goals.filter((g) => g.side === s).map((g, i) => <div key={i} className="flex items-center gap-1.5" style={{ justifyContent: s === "away" ? "flex-end" : undefined }}><svg viewBox="0 0 24 24" className="size-3.5"><circle cx="12" cy="12" r="10" fill="#fff" /><path d="M12 7.5 16 10.5l-1.5 4.5h-5L8 10.5Z" fill="#080d13" /></svg>{g.player} {g.min}'{g.detail === "Penalty" ? " (P)" : g.detail === "Own Goal" ? " (KK)" : ""}</div>)}</div>)}
           </div>
         )}
       </div>

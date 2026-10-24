@@ -14,3 +14,6 @@ export async function api<T = any>(path: string, opts: RequestInit & { json?: an
   if (!res.ok) throw new Error(data?.error || data?.message || `HTTP ${res.status}`);
   return data as T;
 }
+
+/** CMS görsel adresi: /api/... yüklemeleri API sunucusundan, diğerleri olduğu gibi */
+export const asset = (u?: string | null) => (u && u.startsWith("/api/") ? API_URL + u : u || "");

@@ -23,7 +23,7 @@ export function AccountLayout() {
   );
   return (
     <div className="animate-sports-fade grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[230px_minmax(0,1fr)] lg:gap-6">
-      <aside className="h-fit min-w-0 lg:sticky lg:top-[calc(var(--header-h)+16px)]">
+      <aside className="h-fit min-w-0 lg:sticky lg:top-4">
         <nav className="no-scrollbar -mx-4 flex gap-1 overflow-x-auto border-l-0 px-4 lg:mx-0 lg:flex-col lg:border-l lg:border-line lg:px-0">
           {NAV.map(([to, icon, label, end]) => (
             <NavLink key={to} to={to} end={end as boolean} className={({ isActive }) =>
@@ -143,7 +143,7 @@ function AvatarPicker() {
       )}
       <label className="mt-4 flex cursor-pointer items-center justify-between gap-3 border-t border-line pt-3">
         <span><span className="block text-sm font-bold">İstatistiklerimi gizle</span><span className="block text-[12px] text-subtle">Diğer oyuncular profilinde bahis sayını, yatırdığın tutarı ve net kârını göremez.</span></span>
-        <input type="checkbox" className="size-5 accent-[#00ff81]" checked={!!me.hideStats} disabled={busy} onChange={async (e) => { setBusy(true); try { await api("/api/me", { method: "PATCH", json: { hideStats: e.target.checked } }); await refreshMe(); } catch (x: any) { setErr(x.message); } setBusy(false); }} />
+        <input type="checkbox" className="size-5 accent-[#00ff86]" checked={!!me.hideStats} disabled={busy} onChange={async (e) => { setBusy(true); try { await api("/api/me", { method: "PATCH", json: { hideStats: e.target.checked } }); await refreshMe(); } catch (x: any) { setErr(x.message); } setBusy(false); }} />
       </label>
       {err && <div className="mt-3"><ErrBox e={err} /></div>}
     </div>

@@ -17,3 +17,7 @@ export async function api<T = any>(path: string, opts: RequestInit & { json?: an
   if (!res.ok) { const err: any = new Error(data?.error || data?.message || `HTTP ${res.status}`); err.detail = data?.detail; throw err; }
   return data as T;
 }
+
+/** CMS görsel önizleme: /api/... → API, /img/... → sitenin kendi public klasörü (bo-<alan> → <alan>) */
+export const WEB_URL = (import.meta as any).env?.VITE_WEB_URL || (() => { try { return location.protocol + "//" + location.host.replace(/^bo-/, ""); } catch { return ""; } })();
+export const asset = (u?: string | null) => (!u ? "" : u.startsWith("/api/") ? API_URL + u : u.startsWith("/") ? WEB_URL + u : u);

@@ -11,19 +11,20 @@ export default {
       boxShadow: {
         lift: "inset 0 1px 0 rgba(255,255,255,.045), 0 1px 2px rgba(0,0,0,.35)",
         float: "inset 0 1px 0 rgba(255,255,255,.06), 0 18px 48px -12px rgba(0,0,0,.65)",
-        pick: "inset 0 1px 0 rgba(255,255,255,.35), 0 6px 18px -6px rgba(0,255,129,.65)",
+        pick: "rgba(0,255,102,.28) 0 0 6.2px",
+        glow: "rgba(0,255,102,.28) 0 0 6.2px",
       },
       colors: {
-        // Gamdom ekran görüntülerinden ölçülen palet
-        page: "#0b0f13", "panel-deep": "#080b0e", rail: "#0f161c", field: "#0b0f13", panel: "#0f161c", header: "#0f161c", row: "#12191f",
-        card: "#161c22", "card-2": "#1b2127", "surface-hover": "#1f262d", elevated: "#21272d", "elevated-hover": "#2a3138",
-        line: "#1b2228", "line-strong": "#28313a",
-        fg: "#ffffff", muted: "#c0c5cc", soft: "#a3afbb", subtle: "#8794a2", dim: "#7b8896",
-        primary: { DEFAULT: "#00ff81", hover: "#4dffa6", soft: "#9dffcd", fg: "#03140b" },
-        accent: "#00e8ff",
-        win: "#00ff81", loss: "#ff4d5e", odds: "#00ff81", caution: "#ffd731", live: "#e5243b",
+        // gamdom.com getComputedStyle ölçümleri
+        page: "#080d13", "panel-deep": "#06090e", rail: "#0f151b", field: "#131a22", panel: "#0f151b", header: "#080d13", row: "#0f1d28",
+        card: "#131a22", "card-2": "#19212a", "card-blue": "#0f1d28", "surface-hover": "#19212a", elevated: "#252f3a", "elevated-hover": "#2e3945",
+        line: "#19212a", "line-strong": "#252f3a",
+        fg: "#f9f9f9", muted: "#bfc3c7", soft: "#a2adb9", subtle: "#818e9d", dim: "#818e9d",
+        primary: { DEFAULT: "#00ff86", hover: "#4dffa8", soft: "#9dffcd", fg: "#06090e" },
+        accent: "#00e8ff", lime: "#75fb56",
+        win: "#00ff86", loss: "#da322c", odds: "#00ff86", caution: "#ffd900", live: "#da322c",
       },
-      borderRadius: { sm: ".25rem", md: ".375rem", lg: ".5rem", xl: ".75rem", "2xl": "1rem" },
+      borderRadius: { sm: "4px", md: "6px", lg: "8px", xl: "10px", "2xl": "16px", "xl2": "12px" },
       transitionTimingFunction: { side: "cubic-bezier(.22,1,.36,1)" },
       keyframes: {
         "slip-reveal": { from: { opacity: "0", transform: "translateY(16px) scale(.98)" }, to: { opacity: "1", transform: "none" } },

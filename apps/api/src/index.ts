@@ -67,6 +67,19 @@ await seedAdmin();
     await db.paymentSystem.updateMany({ where: { name: "BankTransfer", kind: "BOTH" }, data: { kind: "DEPOSIT" } });
     await setSetting(db, "migr_bank_withdraw_off", { at: new Date().toISOString() }, s.id);
   }
+  // Anasayfa CMS içeriği: gamdom düzeni (hero + kategori kartları) — bir kez tohumlanır, sonra tamamen backoffice'ten yönetilir
+  if (!(await getSetting(db, "migr_cms_home_v1", s.id))) {
+    const end = new Date(Date.now() + 30 * 864e5);
+    const rows = [
+      { group: "home-hero", title: "Haftanın Kralı", highlight: "₺50.000 Ödül Havuzu", subtitle: "", imageUrl: "/img/hero-crown.svg", linkUrl: "/promosyonlar", sortOrder: 0, endsAt: end },
+      { group: "home-hero", title: "Kombine Kuponlara", highlight: "%50 Ekstra Kazanç", imageUrl: "/img/hero-combo.svg", linkUrl: "/spor", sortOrder: 1 },
+      { group: "home-category", title: "Spor", subtitle: "40+ Lig", imageUrl: "/img/cat-sport.svg", linkUrl: "/spor", sortOrder: 0 },
+      { group: "home-category", title: "Canlı", subtitle: "Anlık Oranlar", imageUrl: "/img/cat-live.svg", linkUrl: "/spor?page=live", sortOrder: 1 },
+      { group: "home-category", title: "Tahminler", subtitle: "Gündemi Tahmin Et", imageUrl: "/img/cat-predict.svg", linkUrl: "/tahminler", sortOrder: 2 },
+    ];
+    for (const r of rows) await db.cmsBanner.create({ data: { ...r, siteId: s.id, platform: "all", language: "tr", isPublished: true } as any });
+    await setSetting(db, "migr_cms_home_v1", { at: new Date().toISOString() }, s.id);
+  }
   if (cu && !cu.config) await db.paymentSystem.update({ where: { id: cu.id }, data: { config: { network: "TRC20", depositAddress: "", requireTxid: true } } });
 }
 setInterval(() => settleRains(db).catch((e) => app.log.error(e, "rain")), 5_000); // süresi dolan sohbet yağmurlarını dağıt

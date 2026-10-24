@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "./api";
 import { Btn, Empty, ErrBox, Field, I, Spinner, dt, inp, money, money0, useStore } from "./lib";
+import { BannerSlot } from "./CmsSlot";
 
 const PAY_TR: Record<string, [string, string]> = {
   NEW: ["İnceleniyor", "bg-odds/15 text-odds"], PENDING: ["Onaylandı · Ödeme bekliyor", "bg-caution/15 text-caution"],
@@ -90,6 +91,7 @@ export function Deposit() {
     <div className="animate-sports-fade mx-auto max-w-2xl">
       <h1 className="flex items-center gap-2.5 text-2xl font-extrabold"><I n="arrowdown" className="size-6 text-win" />Para Yatır</h1>
       <p className="mt-1 text-sm font-medium text-subtle">Yöntemi seç, tutarı gir; talebin dakikalar içinde onaylanır.</p>
+      <BannerSlot group="deposit-top" className="mt-4" />
       <div className="mt-5 space-y-5">
         <SystemPicker systems={systems} value={sys} onChange={(s) => { setSys(s); setTxid(""); }} />
         {sys?.instructions && <div className="rounded-md border border-odds/30 bg-odds/10 px-3 py-2.5 text-sm font-semibold text-muted">{sys.instructions}</div>}
@@ -121,11 +123,11 @@ export function Deposit() {
             <div className="mb-2 text-[13px] font-semibold text-soft">Yatırım bonusu seç (isteğe bağlı)</div>
             <div className="space-y-2">
               <label className={`flex cursor-pointer items-center gap-3 rounded-lg border p-3 ${!bonusId ? "border-primary bg-primary/10" : "border-line bg-card"}`}>
-                <input type="radio" checked={!bonusId} onChange={() => setBonusId(0)} className="accent-[#00ff81]" /><span className="text-sm font-bold">Bonus istemiyorum</span>
+                <input type="radio" checked={!bonusId} onChange={() => setBonusId(0)} className="accent-[#00ff86]" /><span className="text-sm font-bold">Bonus istemiyorum</span>
               </label>
               {bonuses.map((b) => (
                 <label key={b.id} className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 ${bonusId === b.id ? "border-primary bg-primary/10" : "border-line bg-card"}`}>
-                  <input type="radio" checked={bonusId === b.id} onChange={() => setBonusId(b.id)} className="mt-1 accent-[#00ff81]" />
+                  <input type="radio" checked={bonusId === b.id} onChange={() => setBonusId(b.id)} className="mt-1 accent-[#00ff86]" />
                   <span>
                     <span className="block text-sm font-extrabold">{b.name} <span className="text-primary">%{Number(b.percent)}</span></span>
                     <span className="block text-xs font-medium text-subtle">{b.description ?? `Çevrim x${Number(b.wageringMultiplier)} · ${b.expirationDays} gün geçerli`}</span>

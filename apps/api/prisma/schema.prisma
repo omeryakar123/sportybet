@@ -549,9 +549,14 @@ model CmsBanner {
   siteId     Int      @default(1)
   group      String   // ör. homepage-main-left
   title      String
+  subtitle   String?  // küçük üst satır (ör. "40+ Lig")
+  highlight  String?  // başlık altında renkli ikinci satır (ör. "₺50.000 Günlük")
+  ctaText    String?  // buton yazısı (boşsa buton yok)
+  badge      String?  // köşe etiketi (ör. "YENİ")
+  bgColor    String?  // görsel yokken / arkasında zemin rengi veya CSS gradyanı
   imageUrl   String
   linkUrl    String?
-  platform   String   @default("web") // web, mobile
+  platform   String   @default("web") // web, mobile, all
   language   String   @default("tr")
   isPublished Boolean @default(true)
   sortOrder  Int      @default(0)
@@ -770,4 +775,15 @@ model ChatRainEntry {
   rain      ChatRain @relation(fields: [rainId], references: [id], onDelete: Cascade)
 
   @@unique([rainId, playerId])
+}
+
+// CMS'e yüklenen görseller (banner, logo, kategori kartları) — DB'de saklanır, /api/cms/asset/:id ile sunulur
+model CmsAsset {
+  id        Int      @id @default(autoincrement())
+  siteId    Int      @default(1)
+  name      String
+  mime      String
+  size      Int
+  data      Bytes
+  createdAt DateTime @default(now())
 }

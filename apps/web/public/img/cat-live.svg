@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 240">
+<defs>
+<linearGradient id="fade" x1="0" x2="1"><stop offset=".25" stop-color="#8a1010" stop-opacity="0"/><stop offset=".75" stop-color="#b3201b" stop-opacity=".85"/><stop offset="1" stop-color="#da322c"/></linearGradient>
+<linearGradient id="scr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1b2a38"/><stop offset="1" stop-color="#0f1d28"/></linearGradient>
+<filter id="glow"><feGaussianBlur stdDeviation="16"/></filter>
+</defs>
+<rect width="700" height="240" fill="url(#fade)"/>
+<circle cx="560" cy="120" r="110" fill="#ff5a4a" opacity=".55" filter="url(#glow)"/>
+<g transform="translate(560 122) rotate(-6)">
+<rect x="-130" y="-82" width="260" height="164" rx="20" fill="url(#scr)" stroke="#ffffff" stroke-opacity=".25" stroke-width="3"/>
+<rect x="-108" y="-62" width="64" height="26" rx="8" fill="#da322c"/><circle cx="-94" cy="-49" r="6" fill="#fff"/>
+<text x="-80" y="-43" font-family="Arial" font-weight="800" font-size="16" fill="#fff">LIVE</text>
+<text x="0" y="30" text-anchor="middle" font-family="Arial Black,Arial" font-weight="900" font-size="68" fill="#ffffff">2 : 1</text>
+<rect x="-90" y="50" width="180" height="8" rx="4" fill="#ffffff" opacity=".2"/><rect x="-90" y="50" width="122" height="8" rx="4" fill="#00ff86"/>
+</g>
+<g fill="none" stroke="#fff" stroke-linecap="round" opacity=".8"><path d="M690 70 a60 60 0 0 1 0 100" stroke-width="7"/><path d="M670 90 a32 32 0 0 1 0 60" stroke-width="7"/></g>
+</svg>

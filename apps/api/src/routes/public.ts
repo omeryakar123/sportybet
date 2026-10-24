@@ -56,11 +56,16 @@ export async function publicRoutes(app: FastifyInstance) {
     const now = new Date();
     return db.cmsBanner.findMany({
       where: {
-        siteId: site.id, isPublished: true, language: lang, platform, ...(group ? { group } : {}),
+        siteId: site.id, isPublished: true, language: lang, platform: { in: [platform, "all"] }, ...(group ? { group } : {}),
         AND: [{ OR: [{ startsAt: null }, { startsAt: { lte: now } }] }, { OR: [{ endsAt: null }, { endsAt: { gte: now } }] }],
       },
       orderBy: { sortOrder: "asc" },
     });
+  });
+  app.get("/cms/asset/:id", async (req, reply) => {
+    const a = await db.cmsAsset.findUnique({ where: { id: Number((req.params as any).id) || 0 } });
+    if (!a) return reply.code(404).send({ error: "NOT_FOUND" });
+    return reply.header("Content-Type", a.mime).header("Cache-Control", "public, max-age=31536000, immutable").send(Buffer.from(a.data));
   });
   app.get("/cms/promotions", async (req) => {
     const site = await resolveSite(db, req);

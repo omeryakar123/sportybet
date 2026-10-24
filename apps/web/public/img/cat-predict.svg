@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 240">
+<defs>
+<linearGradient id="fade" x1="0" x2="1"><stop offset=".25" stop-color="#00607a" stop-opacity="0"/><stop offset=".75" stop-color="#00889f" stop-opacity=".85"/><stop offset="1" stop-color="#00c8e0"/></linearGradient>
+<linearGradient id="bar" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#00ff86"/><stop offset="1" stop-color="#00a85a"/></linearGradient>
+<linearGradient id="bar2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff6b6b"/><stop offset="1" stop-color="#b3201b"/></linearGradient>
+<filter id="glow"><feGaussianBlur stdDeviation="16"/></filter>
+</defs>
+<rect width="700" height="240" fill="url(#fade)"/>
+<circle cx="560" cy="120" r="110" fill="#00e8ff" opacity=".45" filter="url(#glow)"/>
+<g transform="translate(560 125)">
+<rect x="-140" y="-90" width="280" height="180" rx="22" fill="#0f1d28" stroke="#ffffff" stroke-opacity=".25" stroke-width="3"/>
+<rect x="-108" y="-10" width="40" height="76" rx="8" fill="url(#bar2)"/><rect x="-52" y="-46" width="40" height="112" rx="8" fill="url(#bar)"/><rect x="4" y="-24" width="40" height="90" rx="8" fill="url(#bar2)"/><rect x="60" y="-66" width="40" height="132" rx="8" fill="url(#bar)"/>
+<path d="M-100 -40 L-32 -72 L24 -50 L84 -96" fill="none" stroke="#ffd900" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="84" cy="-96" r="10" fill="#ffd900"/>
+</g>
+</svg>
