@@ -96,8 +96,8 @@ function Rail({ title, icon, to, children }: { title: string; icon: React.ReactN
     <section className="mt-8">
       <div className="mb-3 flex items-center gap-2.5">
         <span className="grid size-8 place-items-center rounded-full bg-primary/15 text-primary">{icon}</span>
-        <h2 className="text-xl font-extrabold">{title}</h2>
-        <Link to={to} className="ml-2 text-[13px] font-bold text-subtle hover:text-primary">Tümü</Link>
+        <h2 className="min-w-0 truncate text-lg font-extrabold sm:text-xl">{title}</h2>
+        <Link to={to} className="ml-1 shrink-0 text-[13px] font-bold text-subtle hover:text-primary">Tümü</Link>
         <div className="ml-auto flex gap-1.5">
           <button onClick={() => by(-1)} aria-label="Önceki" className="grid size-9 place-items-center rounded-lg bg-panel text-muted hover:text-fg"><I n="left" className="size-4" /></button>
           <button onClick={() => by(1)} aria-label="Sonraki" className="grid size-9 place-items-center rounded-lg bg-panel text-muted hover:text-fg"><I n="right" className="size-4" /></button>

@@ -106,7 +106,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [profileId, openProfile] = useState<number | null>(null);
   const [walletOpen, setWalletOpen] = useState<false | "menu" | "promo" | "tip">(false);
   const [tipTo, setTipTo] = useState("");
-  const refreshMe = async () => { if (!getToken()) return setMe(null); try { setMe(await api("/api/me")); } catch { setMe(null); } };
+  // Ağ/deploy hatasında oturumu düşürme — yalnızca gerçek yetki hatasında çıkış
+  const refreshMe = async () => { if (!getToken()) return setMe(null); try { setMe(await api("/api/me")); } catch (e: any) { if (e?.message === "UNAUTHORIZED" || !getToken()) setMe(null); else setTimeout(() => { if (getToken()) api("/api/me").then(setMe).catch(() => {}); }, 4000); } };
   useEffect(() => {
     refreshMe();
     api("/api/cms/settings/site_general").then((v) => setSettings(v ?? {})).catch(() => {});
