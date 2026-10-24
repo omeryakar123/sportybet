@@ -70,7 +70,7 @@ function Tracker({ ev, info }: { ev: DEv; info: DInfo | null }) {
   const final = ["FT", "AET", "PEN"].includes(ev.status);
   const notStarted = !ev.live && !final && (ev.status === "NS" || ev.status === "TBD");
   const lastEv = info?.events?.length ? info.events[info.events.length - 1] : null;
-  const box = "grid min-w-11 place-items-center rounded-md bg-white px-2 py-1 text-lg font-extrabold text-[#0f1923] tabular-nums";
+  const box = "num grid min-w-12 place-items-center rounded-md bg-white px-2 py-1 text-[22px] font-bold text-[#0f1923]";
   return (
     <Pitch>
       <div className="w-full max-w-[340px] rounded-xl border border-white/15 bg-black/35 px-4 py-3 text-center text-white backdrop-blur-sm">
@@ -86,7 +86,7 @@ function Tracker({ ev, info }: { ev: DEv; info: DInfo | null }) {
         ) : (
           <>
             <div className="text-[12px] font-bold text-white/80">{STATUS_TR[ev.status] ?? ev.status}{ev.live && ev.minute ? ` · ${ev.minute}'` : ""}</div>
-            <div className="mt-1 text-4xl font-extrabold tabular-nums">{ev.score?.h ?? 0} : {ev.score?.a ?? 0}</div>
+            <div className="num mt-1 text-5xl font-bold">{ev.score?.h ?? 0} : {ev.score?.a ?? 0}</div>
             {ev.score?.hh != null && <div className="text-[11px] font-semibold text-white/70">İY {ev.score.hh}-{ev.score.ha}</div>}
             {lastEv && <div className="mt-1.5 truncate text-[12px] font-semibold text-white/90">{lastEv.min}' {evLabel(lastEv)}{lastEv.player ? ` · ${lastEv.player}` : ""}</div>}
             {ev.liveStopped && !final && <div className="mt-1.5 inline-block rounded bg-caution px-2 py-0.5 text-[11px] font-extrabold text-[#2a1d00]">Oyun durdu · bahisler askıda</div>}
@@ -121,7 +121,7 @@ function Timeline({ ev, info }: { ev: DEv; info: DInfo | null }) {
       </div>
       {(["home", "away"] as const).map((side) => (
         <div key={side} className="flex h-6 items-center">
-          <span className="w-10 shrink-0 truncate text-[11px] font-extrabold text-soft uppercase">{(side === "home" ? ev.home : ev.away).slice(0, 3)}</span>
+          <span className="w-10 shrink-0 truncate text-[12px] font-semibold text-soft">{(side === "home" ? ev.home : ev.away).slice(0, 3)}</span>
           <div className="relative mr-2 h-full flex-1">
             <div className="absolute inset-x-0 top-1/2 h-px bg-line-strong" />
             {[15, 30, 45, 60, 75, 90].map((m) => <div key={m} className="absolute top-1 bottom-1 w-px bg-line" style={{ left: pos(m) }} />)}
@@ -200,9 +200,9 @@ function OddBtn({ ev, m, s, label, row, props }: { ev: DEv; m: DMarket; s: DSel;
   if (s.suspended) return <div className="flex h-12 w-full items-center justify-between rounded-lg bg-card/60 px-3 text-[14px] text-dim"><span className="truncate">{label}</span><I n="lock" className="size-4" /></div>;
   return (
     <button onClick={() => props.onPick(ev, m, s)}
-      className={`flex h-12 w-full items-center justify-between gap-2 rounded-lg px-3 text-[14px] font-semibold transition-all ${on ? "bg-primary text-primary-fg glow-green" : "bg-card text-muted hover:bg-surface-hover hover:text-fg"}`}>
+      aria-pressed={on} className={`odd h-12 w-full text-[14px] font-semibold ${on ? "odd-on" : "text-muted hover:text-fg"}`}>
       <span className="truncate text-left">{label}</span>
-      <span className={`flex items-center gap-1 font-extrabold tabular-nums ${on ? "" : c === "up" ? "text-win" : c === "down" ? "text-loss" : "text-fg"}`}>{!on && c === "up" ? "▲" : !on && c === "down" ? "▼" : ""}{s.odds.toFixed(2)}</span>
+      <span className={`num flex items-center gap-1 text-[17px] font-bold ${on ? "" : c === "up" ? "text-win" : c === "down" ? "text-loss" : "text-fg"}`}>{!on && c === "up" ? "▲" : !on && c === "down" ? "▼" : ""}{s.odds.toFixed(2)}</span>
     </button>
   );
 }
@@ -291,7 +291,7 @@ export default function MatchDetail(props: Props) {
           <div key={k as string} className="flex items-center gap-3 py-1.5">
             <Logo src={l as string} name={n as string} size="size-7" />
             <span className="min-w-0 flex-1 truncate text-[16px] font-bold">{n as string}</span>
-            {(ev.live || final) && <span className="grid h-8 min-w-8 place-items-center rounded-md bg-card px-2 text-[16px] font-extrabold tabular-nums">{(g as number) ?? 0}</span>}
+            {(ev.live || final) && <span className="num grid h-8 min-w-8 place-items-center rounded-md bg-card px-2 text-[19px] font-bold">{(g as number) ?? 0}</span>}
             <span className="w-20 text-right text-[13px] font-bold text-subtle">
               {i === 0 ? (ev.live ? <span className="rounded bg-live px-2 py-0.5 text-[11px] font-extrabold text-white">CANLI</span> : final ? "Maç Sonu" : d.toLocaleDateString("tr-TR", { day: "2-digit", month: "short" }))
                 : ev.live ? `${ev.minute ?? 0}'` : final ? (ev.score?.hh != null ? `İY ${ev.score.hh}-${ev.score.ha}` : "") : d.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}
@@ -307,7 +307,7 @@ export default function MatchDetail(props: Props) {
           <span className="shrink-0 rounded bg-card px-2 py-0.5 text-[11px] font-bold text-soft">{ev.live ? `${STATUS_TR[ev.status] ?? ev.status} | ${ev.minute ?? 0}'` : final ? "Maç Sonu" : `${d.toLocaleDateString("tr-TR", { day: "2-digit", month: "short" })} | ${d.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}`}</span>
           <span className="min-w-0 flex-1 truncate text-right">{ev.away}</span><Logo src={ev.awayLogo} name={ev.away} size="size-5" />
         </div>
-        {(ev.live || final) && <div className="text-center text-xl font-extrabold tabular-nums">{ev.score?.h ?? 0} : {ev.score?.a ?? 0}</div>}
+        {(ev.live || final) && <div className="num text-center text-[28px] font-bold">{ev.score?.h ?? 0} : {ev.score?.a ?? 0}</div>}
         <Timeline ev={ev} info={info} />
         <div className="grid grid-cols-4 border-y border-line">
           {tabsIc.map((t) => (
@@ -319,7 +319,7 @@ export default function MatchDetail(props: Props) {
         {trk === "pitch" ? <Tracker ev={ev} info={info} /> : trk === "stats" ? <Stats info={info} /> : trk === "lineups" ? <Lineups ev={ev} info={info} /> : <Events info={info} />}
         {goals.length > 0 && trk === "pitch" && (
           <div className="grid grid-cols-2 gap-2 px-3 py-2 text-[12px] text-soft">
-            {(["home", "away"] as const).map((s) => <div key={s} className={s === "away" ? "text-right" : ""}>{goals.filter((g) => g.side === s).map((g, i) => <div key={i}>⚽ {g.player} {g.min}'{g.detail === "Penalty" ? " (P)" : g.detail === "Own Goal" ? " (KK)" : ""}</div>)}</div>)}
+            {(["home", "away"] as const).map((s) => <div key={s} className={s === "away" ? "text-right" : ""}>{goals.filter((g) => g.side === s).map((g, i) => <div key={i} className="flex items-center gap-1.5" style={{ justifyContent: s === "away" ? "flex-end" : undefined }}><svg viewBox="0 0 24 24" className="size-3.5"><circle cx="12" cy="12" r="10" fill="#fff" /><path d="M12 7.5 16 10.5l-1.5 4.5h-5L8 10.5Z" fill="#0f1923" /></svg>{g.player} {g.min}'{g.detail === "Penalty" ? " (P)" : g.detail === "Own Goal" ? " (KK)" : ""}</div>)}</div>)}
           </div>
         )}
       </div>

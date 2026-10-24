@@ -46,26 +46,59 @@ function Countdown({ to }: { to: string }) {
 }
 
 /* ---------- hero: CMS promosyonları (yoksa karşılama kartı) ---------- */
-function Hero() {
+function BigLogo({ src, name }: { src?: string; name: string }) {
+  const [bad, setBad] = useState(false);
+  if (!src || bad) return <span className="grid size-14 place-items-center rounded-full bg-elevated text-lg font-extrabold text-soft">{name.slice(0, 1)}</span>;
+  return <img src={src} alt="" onError={() => setBad(true)} className="size-14 object-contain drop-shadow-[0_6px_14px_rgba(0,0,0,.5)]" />;
+}
+
+function Hero({ ev }: { ev?: any }) {
   const { me, setAuthOpen, settings } = useStore();
   const [promos, setPromos] = useState<any[]>([]); const [i, setI] = useState(0);
   useEffect(() => { api("/api/cms/promotions").then((r) => setPromos((Array.isArray(r) ? r : []).filter((p: any) => !p.endsAt || new Date(p.endsAt) > new Date()).slice(0, 6))).catch(() => {}); }, []);
   useEffect(() => { if (promos.length < 2) return; const t = setInterval(() => setI((x) => (x + 1) % promos.length), 7000); return () => clearInterval(t); }, [promos.length]);
   const p = promos[i];
-  if (!p) return (
-    <section className="relative isolate overflow-hidden rounded-2xl bg-[linear-gradient(120deg,#0b1a17_0%,#0f2a20_45%,#14402d_100%)] px-6 py-10 sm:px-10 lg:py-14">
-      <BallArt className="absolute -right-10 top-1/2 -z-10 h-[340px] -translate-y-1/2 opacity-90 max-sm:-right-24 max-sm:h-[240px] max-sm:opacity-50" />
-      <div className="max-w-[520px]">
-        <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-primary/15 px-3 py-1 text-[12px] font-extrabold text-primary"><span className="live-dot size-2 rounded-full bg-primary" />Canlı skor · Maç öncesi · Tahminler</div>
-        <h1 className="text-3xl leading-tight font-extrabold sm:text-4xl lg:text-5xl">{me ? <>Hoş geldin,<br /><span className="text-primary">{me.username}</span></> : <>Maçı Oyna,<br /><span className="text-primary">Gündemi Tahmin Et</span></>}</h1>
-        <p className="mt-3 max-w-[420px] text-[15px] font-medium text-muted">{settings.siteName ?? "SportyBet"} ile bültendeki her maça oyna, kazancın maç biter bitmez cüzdanında.</p>
-        <div className="mt-6 flex flex-wrap gap-3">
-          <Link to="/spor" className="inline-flex h-12 items-center gap-2 rounded-xl bg-primary px-6 text-sm font-extrabold text-primary-fg hover:bg-primary-hover"><I n="ball" className="size-4" />Bahis Yap</Link>
-          {!me && <button onClick={() => setAuthOpen("register")} className="inline-flex h-12 items-center rounded-xl bg-white/10 px-6 text-sm font-extrabold backdrop-blur hover:bg-white/15">Hemen Kayıt Ol</button>}
+  if (!p) {
+    const m1 = (ev?.markets ?? []).find((m: any) => m.key === "1x2");
+    const o = (c: string) => m1?.selections.find((x: any) => x.code === c)?.odds;
+    const d = ev ? new Date(ev.startsAt) : null;
+    return (
+      <section className="relative isolate overflow-hidden rounded-2xl bg-[#0d1b16] shadow-lift">
+        {/* saha çizgileri — konunun kendi dokusu */}
+        <svg viewBox="0 0 400 220" preserveAspectRatio="xMidYMid slice" className="absolute inset-0 -z-10 size-full opacity-[.16]" fill="none" stroke="#1fe88a" strokeWidth="1.2" aria-hidden>
+          <rect x="10" y="10" width="380" height="200" /><line x1="200" y1="10" x2="200" y2="210" /><circle cx="200" cy="110" r="34" /><rect x="10" y="60" width="52" height="100" /><rect x="338" y="60" width="52" height="100" />
+        </svg>
+        <div className="absolute inset-0 -z-10 bg-[radial-gradient(70%_90%_at_50%_0%,rgba(31,232,138,.18),transparent_70%)]" />
+        <div className="grid gap-6 px-5 py-7 sm:px-8 lg:grid-cols-[1fr_minmax(0,460px)] lg:items-center lg:py-10">
+          <div>
+            <h1 className="title text-[38px] sm:text-[50px] lg:text-[58px]">{me ? `Hoş geldin, ${me.username}` : "Maçı oyna, gündemi tahmin et"}</h1>
+            <p className="mt-3 max-w-[440px] text-[15px] font-medium leading-relaxed text-muted">Bültendeki her maça oyna; maç bittiği an kuponun sonuçlanır, kazancın {settings.siteName ?? "SportyBet"} cüzdanına geçer.</p>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <Link to="/spor" className="inline-flex h-12 items-center gap-2 rounded-xl bg-primary px-6 text-sm font-extrabold text-primary-fg shadow-pick hover:bg-primary-hover"><I n="ball" className="size-4" />Bülteni aç</Link>
+              {!me && <button onClick={() => setAuthOpen("register")} className="inline-flex h-12 items-center rounded-xl bg-white/[.07] px-6 text-sm font-extrabold hover:bg-white/[.12]">Kayıt ol</button>}
+            </div>
+          </div>
+          {ev && d && (
+            <Link to={`/spor/mac/${ev.id}`} className="block rounded-2xl bg-[#0b1520]/85 p-4 shadow-float ring-1 ring-white/[.06] backdrop-blur transition-[box-shadow] hover:ring-primary/40 sm:p-5">
+              <div className="flex items-center gap-2 text-[12px] font-semibold text-soft">
+                {ev.leagueLogo ? <img src={ev.leagueLogo} alt="" className="size-4 object-contain" /> : <I n="ball" className="size-4" />}
+                <span className="min-w-0 flex-1 truncate">{ev.league}</span><span>Sıradaki maç</span>
+              </div>
+              <div className="mt-4 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+                <div className="flex min-w-0 flex-col items-center gap-2 text-center"><BigLogo src={ev.homeLogo} name={ev.home} /><span className="w-full truncate text-[14px] font-bold">{ev.home}</span></div>
+                <div className="text-center">
+                  <div className="num text-[44px] font-bold leading-none sm:text-[52px]">{d.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}</div>
+                  <div className="mt-1 text-[12px] font-semibold text-subtle">{d.toLocaleDateString("tr-TR", { weekday: "long", day: "numeric", month: "long" })}</div>
+                </div>
+                <div className="flex min-w-0 flex-col items-center gap-2 text-center"><BigLogo src={ev.awayLogo} name={ev.away} /><span className="w-full truncate text-[14px] font-bold">{ev.away}</span></div>
+              </div>
+              {m1 && <div className="mt-4 grid grid-cols-3 gap-2">{[["1", "HOME"], ["X", "DRAW"], ["2", "AWAY"]].map(([l, c]) => <span key={c} className="odd h-11"><span className="l">{l}</span><span className="o text-[17px]">{o(c)?.toFixed(2) ?? "-"}</span></span>)}</div>}
+            </Link>
+          )}
         </div>
-      </div>
-    </section>
-  );
+      </section>
+    );
+  }
   return (
     <section className="relative isolate overflow-hidden rounded-2xl bg-card">
       <Link to={`/promosyonlar/${p.slug}`} className="block">
@@ -96,7 +129,7 @@ function Rail({ title, icon, to, children }: { title: string; icon: React.ReactN
     <section className="mt-8">
       <div className="mb-3 flex items-center gap-2.5">
         <span className="grid size-8 place-items-center rounded-full bg-primary/15 text-primary">{icon}</span>
-        <h2 className="min-w-0 truncate text-lg font-extrabold sm:text-xl">{title}</h2>
+        <h2 className="title min-w-0 truncate text-[22px] sm:text-[26px]">{title}</h2>
         <Link to={to} className="ml-1 shrink-0 text-[13px] font-bold text-subtle hover:text-primary">Tümü</Link>
         <div className="ml-auto flex gap-1.5">
           <button onClick={() => by(-1)} aria-label="Önceki" className="grid size-9 place-items-center rounded-lg bg-panel text-muted hover:text-fg"><I n="left" className="size-4" /></button>
@@ -144,7 +177,7 @@ export default function Home() {
   ];
   return (
     <div className="animate-sports-fade">
-      <Hero />
+      <Hero ev={featured[0]} />
 
       {/* kategori kartları */}
       <section className="mt-4 grid gap-3 sm:grid-cols-3">
@@ -152,7 +185,7 @@ export default function Home() {
           <Link key={title} to={to} className={`group relative flex h-[104px] items-center overflow-hidden rounded-2xl bg-gradient-to-r ${bg} px-5 ring-1 ring-line/70 transition-shadow hover:ring-primary/50 sm:h-[120px]`}>
             <div className="relative z-10">
               <div className="text-[13px] font-bold text-soft">{top}</div>
-              <div className="mt-1 text-2xl font-extrabold">{title}</div>
+              <div className="title mt-1 text-[30px]">{title}</div>
             </div>
             <Art className="absolute -right-6 top-1/2 h-[150px] -translate-y-1/2 transition-transform duration-300 group-hover:scale-105 sm:h-[170px]" />
           </Link>
@@ -174,7 +207,7 @@ export default function Home() {
             <Link key={ev.id} to={`/spor/mac/${ev.id}`} className="w-[270px] shrink-0 snap-start rounded-xl bg-panel p-3 transition-colors hover:bg-card">
               <div className="mb-2 flex items-center gap-2 text-[12px] font-semibold text-soft"><span className="rounded bg-live px-1.5 text-[10px] font-extrabold text-white">CANLI</span><span className="min-w-0 flex-1 truncate">{ev.league}</span><span className="tabular-nums">{ev.minute ? `${ev.minute}'` : ""}</span></div>
               {[[ev.home, ev.homeLogo, ev.score?.h], [ev.away, ev.awayLogo, ev.score?.a]].map(([n, l, g]: any) => (
-                <div key={n} className="flex items-center gap-2 py-0.5"><Logo src={l} name={n} /><span className="min-w-0 flex-1 truncate text-[14px] font-bold">{n}</span><span className="text-[15px] font-extrabold text-primary tabular-nums">{g ?? 0}</span></div>
+                <div key={n} className="flex items-center gap-2 py-0.5"><Logo src={l} name={n} /><span className="min-w-0 flex-1 truncate text-[14px] font-bold">{n}</span><span className="num text-[18px] font-bold text-primary">{g ?? 0}</span></div>
               ))}
             </Link>
           ))}
@@ -225,7 +258,7 @@ export default function Home() {
           <p className="text-[14px] leading-relaxed text-subtle">Futbolda maç öncesi oranlar, canlı skorlar ve gündem tahminleri tek hesapta. Kuponun maç bittiği an otomatik sonuçlanır, kazancın beklemeden cüzdanına geçer. Sohbette diğer oyuncularla maçları konuş, yağmur etkinliklerine katıl.</p>
           <div className="mt-4 grid grid-cols-3 gap-2 text-center">
             {[[`${total.ev}+`, "Bültendeki maç"], [`${live.length}`, "Şu an canlı"], [`${total.pred || markets.length}`, "Tahmin piyasası"]].map(([v, l]) => (
-              <div key={l} className="rounded-xl bg-card p-3"><div className="text-xl font-extrabold text-primary">{v}</div><div className="text-[12px] font-semibold text-subtle">{l}</div></div>
+              <div key={l} className="rounded-xl bg-card p-3"><div className="num text-[28px] font-bold text-primary">{v}</div><div className="text-[12px] font-semibold text-subtle">{l}</div></div>
             ))}
           </div>
         </div>

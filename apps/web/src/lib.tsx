@@ -68,6 +68,15 @@ const PATHS: Record<string, React.ReactNode> = {
   play: <path d="M8 5v14l11-7Z" fill="currentColor" />,
   camera: <><path d="M4 8h3l2-3h6l2 3h3v11H4Z" /><circle cx="12" cy="13" r="3.5" /></>,
   rewards: <><circle cx="12" cy="9" r="5" /><path d="m8.5 13-1.5 8 5-3 5 3-1.5-8" /></>,
+  deposit: <><rect x="3" y="7" width="18" height="13" rx="2.5" /><path d="M3 11h18" /><path d="M12 2.5v6.5M9.5 6.5 12 9l2.5-2.5" /></>,
+  withdraw: <><rect x="3" y="7" width="18" height="13" rx="2.5" /><path d="M3 11h18" /><path d="M12 9V2.5M9.5 5 12 2.5 14.5 5" /></>,
+  promo: <><path d="M4 7h16v3.5a1.5 1.5 0 0 0 0 3V17H4v-3.5a1.5 1.5 0 0 0 0-3Z" /><path d="m9.5 14.5 5-5" /><circle cx="9.8" cy="9.8" r=".9" fill="currentColor" stroke="none" /><circle cx="14.2" cy="14.2" r=".9" fill="currentColor" stroke="none" /></>,
+  tip: <><circle cx="15.5" cy="7" r="3.5" /><path d="M15.5 5.6v2.8" /><path d="M2.5 14.5h3l3 .5h3a1.5 1.5 0 0 1 0 3H9" /><path d="M5.5 14.5v6M5.5 20.5h8.2l6.3-4.2a1.6 1.6 0 0 0-1.8-2.6L14 16" /></>,
+  history: <><path d="M6 3h12v18l-3-2-3 2-3-2-3 2Z" /><path d="M9 8h6M9 12h6M9 16h3" /></>,
+  rain: <><path d="M7 15a4 4 0 0 1-.6-7.96A5.5 5.5 0 0 1 17 7.5a3.75 3.75 0 0 1 .5 7.5Z" /><path d="m8 18-1 3M12.5 18l-1 3M17 18l-1 3" /></>,
+  coin: <><ellipse cx="12" cy="7" rx="7" ry="3" /><path d="M5 7v5c0 1.66 3.13 3 7 3s7-1.34 7-3V7" /><path d="M5 12v5c0 1.66 3.13 3 7 3s7-1.34 7-3v-5" /></>,
+  globe: <><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3c3 3.3 3 14.7 0 18M12 3c-3 3.3-3 14.7 0 18" /></>,
+  medal: <><path d="M8 3h8l-2.2 6H10.2Z" /><circle cx="12" cy="15" r="6" /><path d="m12 12.2.9 1.8 2 .3-1.45 1.4.35 2-1.8-.95-1.8.95.35-2-1.45-1.4 2-.3Z" fill="currentColor" stroke="none" /></>,
   copy: <><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" /></>,
 };
 export function I({ n, className = "size-4" }: { n: string; className?: string }) {
@@ -197,5 +206,30 @@ export function Avatar({ src, name = "?", className = "size-[30px]" }: { src?: s
       </svg>
     );
   }
-  return <span className={`${className} grid shrink-0 place-items-center rounded-full bg-primary text-sm font-extrabold text-primary-fg uppercase`}>{name[0] ?? "?"}</span>;
+  return <span className={`${className} grid shrink-0 place-items-center rounded-full bg-primary text-sm font-extrabold text-primary-fg`}>{name[0] ?? "?"}</span>;
 }
+
+/** Sıralama rozeti (1-2-3 için altın/gümüş/bronz) */
+export function RankBadge({ n }: { n: number }) {
+  const c = n === 1 ? ["#ffd35c", "#c98a12"] : n === 2 ? ["#e3e9f1", "#8a97a8"] : n === 3 ? ["#f0a870", "#a35a22"] : null;
+  if (!c) return <span className="num grid size-7 place-items-center rounded-full bg-card text-[13px] font-bold text-subtle">{n}</span>;
+  return (
+    <svg viewBox="0 0 28 28" className="size-7" aria-label={`${n}.`}>
+      <defs><linearGradient id={`rk${n}`} x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor={c[0]} /><stop offset="1" stopColor={c[1]} /></linearGradient></defs>
+      <circle cx="14" cy="14" r="13" fill={`url(#rk${n})`} /><circle cx="14" cy="14" r="10" fill="none" stroke="rgba(255,255,255,.45)" />
+      <text x="14" y="18.5" textAnchor="middle" fontSize="13" fontWeight="800" fill="#1a1205" fontFamily="Barlow Semi Condensed, sans-serif">{n}</text>
+    </svg>
+  );
+}
+/** Türkiye bayrağı (sohbet odası seçici) */
+export const FlagTR = ({ className = "h-4 w-6" }: { className?: string }) => (
+  <svg viewBox="0 0 30 20" className={`${className} rounded-[3px]`} aria-label="Türkçe">
+    <rect width="30" height="20" fill="#e30a17" /><circle cx="11" cy="10" r="5" fill="#fff" /><circle cx="12.25" cy="10" r="4" fill="#e30a17" />
+    <polygon points="19.50,10.00 17.75,10.62 17.70,12.47 16.58,11.00 14.80,11.53 15.85,10.00 14.80,8.47 16.58,9.00 17.70,7.53 17.75,9.38" fill="#fff" />
+  </svg>
+);
+/** Ikonlu kare rozet (menü satırları) */
+export const IconTile = ({ n, tone = "green" }: { n: string; tone?: "green" | "amber" | "cyan" | "red" | "slate" }) => {
+  const t = { green: "bg-primary/15 text-primary", amber: "bg-caution/15 text-caution", cyan: "bg-accent/15 text-accent", red: "bg-loss/15 text-loss", slate: "bg-elevated text-soft" }[tone];
+  return <span className={`grid size-10 shrink-0 place-items-center rounded-[11px] ${t}`}><I n={n} className="size-5" /></span>;
+};

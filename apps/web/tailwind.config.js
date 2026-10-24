@@ -3,7 +3,16 @@ export default {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
   theme: {
     extend: {
-      fontFamily: { sans: ["Manrope", "ui-sans-serif", "system-ui", "sans-serif"] },
+      fontFamily: {
+        sans: ["Manrope", "ui-sans-serif", "system-ui", "sans-serif"],
+        // skorbord rakamları ve başlıklar: dar, sportif
+        num: ["Barlow Semi Condensed", "Manrope", "ui-sans-serif", "sans-serif"],
+      },
+      boxShadow: {
+        lift: "inset 0 1px 0 rgba(255,255,255,.045), 0 1px 2px rgba(0,0,0,.35)",
+        float: "inset 0 1px 0 rgba(255,255,255,.06), 0 18px 48px -12px rgba(0,0,0,.65)",
+        pick: "inset 0 1px 0 rgba(255,255,255,.35), 0 6px 18px -6px rgba(31,232,138,.65)",
+      },
       colors: {
         // Lacivert + neon yeşil tema
         page: "#0f1923", "panel-deep": "#0b131c", rail: "#121d29", field: "#0d1620", panel: "#15212e", header: "#121d29", row: "#17232f",

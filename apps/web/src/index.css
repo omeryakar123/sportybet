@@ -4,7 +4,24 @@
 
 :root { --header-h: 64px; --sidebar-w: 260px; --bottom-nav-h: 60px; }
 html { scrollbar-color: #2c3e52 #0f1923; }
-body { @apply bg-page font-sans text-fg antialiased; }
+body { @apply bg-page font-sans text-fg antialiased; font-feature-settings: "cv11", "ss01"; }
+/* klavye odağı her yerde görünür */
+:focus-visible { outline: 2px solid #1fe88a; outline-offset: 2px; border-radius: 6px; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; } }
+/* rakamlar: oran, skor, bakiye — sitenin imza öğesi */
+.num { font-family: "Barlow Semi Condensed", Manrope, sans-serif; font-variant-numeric: tabular-nums; letter-spacing: .01em; }
+.title { font-family: "Barlow Semi Condensed", Manrope, sans-serif; font-weight: 700; letter-spacing: .005em; line-height: 1.05; }
+/* yüzeyler: üstte ince ışık çizgisi ile derinlik */
+.surface { background: #15212e; box-shadow: inset 0 1px 0 rgba(255,255,255,.045), 0 1px 2px rgba(0,0,0,.35); }
+.surface-2 { background: #1a2734; box-shadow: inset 0 1px 0 rgba(255,255,255,.05); }
+/* oran butonu */
+.odd { @apply relative flex h-10 items-center justify-between gap-1 rounded-[9px] px-2.5 transition-[background-color,box-shadow,transform] duration-150; background: #1c2a38; box-shadow: inset 0 1px 0 rgba(255,255,255,.05), inset 0 0 0 1px rgba(255,255,255,.03); }
+.odd:hover { background: #233548; }
+.odd:active { transform: translateY(1px); }
+.odd-on { background: #1fe88a !important; color: #062314; box-shadow: inset 0 1px 0 rgba(255,255,255,.35), 0 6px 18px -6px rgba(31,232,138,.65); }
+.odd .o { font-family: "Barlow Semi Condensed", Manrope, sans-serif; font-variant-numeric: tabular-nums; font-weight: 700; font-size: 15px; }
+.odd .l { font-size: 12px; font-weight: 600; color: #7f8ea0; }
+.odd-on .l { color: rgba(6,35,20,.65); }
 .no-scrollbar { scrollbar-width: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
 ::-webkit-scrollbar { width: 10px; height: 10px; }

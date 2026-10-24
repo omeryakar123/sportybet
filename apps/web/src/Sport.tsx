@@ -242,14 +242,13 @@ export default function Sport() {
   // ---------- oran butonu ----------
   const odd = ({ ev, m, code, label, key }: { ev: Ev; m?: Market; code: string; label?: string; key?: any }) => {
     const s = sel(m, code);
-    if (!s || !m || s.suspended) return <div key={key ?? code} title={s?.suspended ? "Askıda" : ""} className="flex h-10 items-center justify-between rounded-md bg-card/60 px-2.5 text-dim">{label && s ? <span className="text-[12px] font-semibold">{label}</span> : <span />}<I n="lock" className="size-3.5" /></div>;
+    if (!s || !m || s.suspended) return <div key={key ?? code} title={s?.suspended ? "Askıda" : ""} className="flex h-10 items-center justify-between rounded-[9px] bg-card/50 px-2.5 text-dim">{label && s ? <span className="text-[12px] font-semibold">{label}</span> : <span />}<I n="lock" className="size-3.5" /></div>;
     const on = has(s.id); const c = changed[s.id];
     return (
-      <button key={key ?? s.id} onClick={() => toggle(ev, m, s)} title={`${m.name}: ${s.name}`}
-        className={`relative flex h-10 items-center justify-between gap-1 rounded-md px-2.5 text-[13px] font-bold transition-all ${on ? "bg-primary text-primary-fg glow-green" : "bg-card text-fg hover:bg-surface-hover"}`}>
-        {label && <span className={`${on ? "text-primary-fg/70" : "text-subtle"} text-[12px] font-semibold`}>{label}</span>}
-        <span className={`ml-auto tabular-nums ${!on && c === "up" ? "text-win" : !on && c === "down" ? "text-loss" : ""}`}>{s.odds.toFixed(2)}</span>
-        {c && !on && <span className={`absolute right-0.5 top-0.5 size-0 border-x-[4px] border-x-transparent ${c === "up" ? "border-b-[5px] border-b-win" : "border-t-[5px] border-t-loss"}`} />}
+      <button key={key ?? s.id} onClick={() => toggle(ev, m, s)} title={`${m.name}: ${s.name}`} aria-pressed={on} className={`odd ${on ? "odd-on" : ""}`}>
+        {label && <span className="l">{label}</span>}
+        <span className={`o ml-auto ${!on && c === "up" ? "text-win" : !on && c === "down" ? "text-loss" : ""}`}>{s.odds.toFixed(2)}</span>
+        {c && !on && <span className={`absolute right-1 top-1 size-0 border-x-[4px] border-x-transparent ${c === "up" ? "border-b-[5px] border-b-win" : "border-t-[5px] border-t-loss"}`} />}
       </button>
     );
   };
@@ -279,7 +278,7 @@ export default function Sport() {
                   <div className="flex items-start gap-2">
                     <SportIcon k="football" className="mt-0.5 size-4 shrink-0 text-primary" />
                     <span className="min-w-0 flex-1 truncate text-sm font-bold text-primary">{p.pick}</span>
-                    <span className={`flex items-center gap-1 text-sm font-extrabold tabular-nums ${p.changed === "up" ? "text-win" : p.changed === "down" ? "text-loss" : ""}`}>{p.changed === "up" ? "▲" : p.changed === "down" ? "▼" : ""}{p.odds.toFixed(2)}</span>
+                    <span className={`num flex items-center gap-1 text-[17px] font-bold ${p.changed === "up" ? "text-win" : p.changed === "down" ? "text-loss" : ""}`}>{p.changed === "up" ? "▲" : p.changed === "down" ? "▼" : ""}{p.odds.toFixed(2)}</span>
                   </div>
                   <div className="truncate pl-6 text-[13px] text-subtle">{p.match}</div>
                   <div className="flex items-center gap-2 truncate pl-6 text-[13px] font-semibold text-muted">{p.market}
@@ -295,7 +294,7 @@ export default function Sport() {
               <input type="checkbox" className="accent-[#1fe88a]" checked={acceptHigher} onChange={(e) => { setAcceptHigher(e.target.checked); try { localStorage.setItem("sb_accept", e.target.checked ? "higher" : "none"); } catch {} }} />
               Yükselen oranları otomatik kabul et
             </label>
-            {effMode === "combo" && <div className="mb-2 flex items-center justify-between text-[13px] text-subtle">Toplam oran <b className="text-base text-fg tabular-nums">{totalOdds.toFixed(2)}</b></div>}
+            {effMode === "combo" && <div className="mb-2 flex items-center justify-between text-[13px] text-subtle">Toplam oran <b className="num text-[20px] font-bold text-fg">{totalOdds.toFixed(2)}</b></div>}
             <div className="flex gap-2">
               <label className="flex h-11 min-w-0 flex-1 items-center gap-2 rounded-lg border border-line-strong bg-field px-2 focus-within:border-primary">
                 <span className="grid size-6 shrink-0 place-items-center rounded bg-primary text-[13px] font-extrabold text-primary-fg">₺</span>
@@ -358,7 +357,7 @@ export default function Sport() {
                 <TeamLogo src={ev.homeLogo} name={ev.home} size="size-6" />
               </span>
               {isLive || ev.score ? (
-                <span className="grid h-7 min-w-[52px] shrink-0 place-items-center rounded-md bg-card px-1.5 text-[14px] font-extrabold text-primary tabular-nums">{ev.score?.h ?? 0} - {ev.score?.a ?? 0}</span>
+                <span className="num grid h-7 min-w-[52px] shrink-0 place-items-center rounded-md bg-card px-1.5 text-[16px] font-bold text-primary">{ev.score?.h ?? 0} - {ev.score?.a ?? 0}</span>
               ) : <span className="w-6 shrink-0 text-center text-[12px] font-bold text-dim">vs</span>}
               <span className="flex min-w-0 flex-1 items-center gap-2">
                 <TeamLogo src={ev.awayLogo} name={ev.away} size="size-6" />
@@ -405,7 +404,7 @@ export default function Sport() {
   );
 
   const colHead = () => (
-    <div className="hidden grid-cols-[minmax(260px,1.7fr)_72px_minmax(200px,1.1fr)_minmax(130px,.75fr)_minmax(130px,.75fr)_44px] gap-2 px-3 pb-1.5 text-center text-[10px] font-extrabold tracking-wider text-dim uppercase lg:grid">
+    <div className="hidden grid-cols-[minmax(260px,1.7fr)_72px_minmax(200px,1.1fr)_minmax(130px,.75fr)_minmax(130px,.75fr)_44px] gap-2 px-3 pb-1.5 text-center text-[10px] font-semibold text-dim lg:grid">
       <span /><span /><span>Maç Sonucu</span><span>Alt / Üst 2.5</span><span>Karşılıklı Gol</span><span />
     </div>
   );
@@ -507,7 +506,7 @@ export default function Sport() {
         <section className="mb-7">
           <div className="mb-3 flex items-center gap-2">
             <span className="grid size-7 place-items-center rounded-full bg-primary/15 text-primary"><I n="flame" className="size-4" /></span>
-            <h2 className="text-lg font-extrabold">Öne Çıkanlar</h2>
+            <h2 className="title text-[22px]">Öne Çıkanlar</h2>
             <div className="ml-auto hidden gap-1.5 sm:flex">
               <button onClick={() => scrollBy(-620)} className="grid size-8 place-items-center rounded-lg bg-panel text-muted hover:text-fg"><I n="left" className="size-4" /></button>
               <button onClick={() => scrollBy(620)} className="grid size-8 place-items-center rounded-lg bg-panel text-muted hover:text-fg"><I n="right" className="size-4" /></button>
@@ -546,7 +545,7 @@ export default function Sport() {
         <section className="mb-7">
           <div className="mb-3 flex items-center gap-2">
             <span className="grid size-7 place-items-center rounded-full bg-live text-white"><I n="play" className="size-3.5" /></span>
-            <h2 className="text-lg font-extrabold">Canlı Maçlar</h2>
+            <h2 className="title text-[22px]">Canlı Maçlar</h2>
             <span className="rounded bg-live/15 px-1.5 text-[12px] font-extrabold text-live">{live.length}</span>
             <span className="ml-2 hidden text-[12px] font-semibold text-subtle sm:inline">{limits?.liveEnabled ? "Oranlar canlı güncelleniyor · kilitli oranlar askıda" : "Canlı skor · canlı bahis şu an kapalı"}</span>
           </div>
@@ -559,7 +558,7 @@ export default function Sport() {
       {sport === "football" && <section>
         <div className="mb-3 flex items-center gap-2">
           <span className="grid size-7 place-items-center rounded-full bg-primary/15 text-primary"><I n="calendar" className="size-4" /></span>
-          <h2 className="text-lg font-extrabold">{q ? `“${q}” için sonuçlar` : "Yaklaşan Maçlar"}</h2>
+          <h2 className="title text-[22px]">{q ? `“${q}” için sonuçlar` : "Yaklaşan Maçlar"}</h2>
           {events && <span className="rounded bg-card px-1.5 text-[12px] font-bold text-soft">{filtered.length}</span>}
           {lg > 0 && <button onClick={() => pickLeague(0)} className="ml-auto flex items-center gap-1 rounded-lg bg-card px-2.5 py-1 text-[12px] font-bold text-muted hover:text-fg">Filtreyi kaldır <I n="x" className="size-3.5" /></button>}
         </div>

@@ -69,7 +69,7 @@ export function Profile() {
         {[["Ana Para", balance("MAIN"), "wallet"], ["Bonus", balance("BONUS"), "gift"], ["Oynadığın Cüzdan", me.activeWallet === "BONUS" ? "Bonus" : "Ana Para", "check"]].map(([l, v, ic]: any) => (
           <div key={l} className="flex items-center gap-3 rounded-lg border border-line bg-card px-4 py-3.5">
             <span className="grid size-10 place-items-center rounded-lg bg-primary/15 text-primary"><I n={ic} className="size-5" /></span>
-            <span><span className="block text-xs font-bold text-subtle uppercase">{l}</span><span className="text-[15px] font-extrabold">{typeof v === "number" ? money(v) : v}</span></span>
+            <span><span className="block text-xs font-bold text-subtle">{l}</span><span className="text-[15px] font-extrabold">{typeof v === "number" ? money(v) : v}</span></span>
           </div>
         ))}
       </div>
@@ -166,7 +166,7 @@ export function MyPredictions() {
             <div key={p.id} className="rounded-lg border border-line bg-card p-3.5">
               <div className="flex items-start justify-between gap-3">
                 <Link to={`/tahminler/${p.market.slug}`} className="line-clamp-2 text-sm font-bold hover:underline">{p.market.question}</Link>
-                <span className={`shrink-0 rounded-sm px-2 py-0.5 text-[11px] font-extrabold uppercase ${p.status === "OPEN" ? "bg-odds/15 text-odds" : p.status === "WON" ? "bg-win/15 text-win" : p.status === "LOST" ? "bg-loss/15 text-loss" : "bg-elevated text-muted"}`}>
+                <span className={`shrink-0 rounded-sm px-2 py-0.5 text-[12px] font-extrabold ${p.status === "OPEN" ? "bg-odds/15 text-odds" : p.status === "WON" ? "bg-win/15 text-win" : p.status === "LOST" ? "bg-loss/15 text-loss" : "bg-elevated text-muted"}`}>
                   {{ OPEN: "Açık", WON: "Kazandı", LOST: "Kaybetti", SOLD: "Bozduruldu", REFUNDED: "İade" }[p.status as string]}
                 </span>
               </div>
@@ -176,7 +176,7 @@ export function MyPredictions() {
                 {p.status === "OPEN"
                   ? <><span>Güncel değer: <b className="text-primary">{money(p.currentValue)}</b></span><span>Kazanırsa: <b className="text-win">{money(p.shares)}</b></span></>
                   : <span>Ödeme: <b className="text-muted">{money(p.payout)}</b></span>}
-                {p.wallet === "BONUS" && <span className="rounded-sm bg-primary/15 px-1.5 text-[11px] font-extrabold text-primary uppercase">Bonus</span>}
+                {p.wallet === "BONUS" && <span className="rounded-sm bg-primary/15 px-1.5 text-[12px] font-extrabold text-primary">Bonus</span>}
                 <span className="ml-auto">{dt(p.createdAt)}</span>
               </div>
               {p.status === "OPEN" && <div className="-mt-7"><MyPositions positions={[p]} onChange={() => { load(); refreshMe(); }} /></div>}
@@ -206,7 +206,7 @@ export function Transactions() {
             <div key={t.id} className="flex items-center gap-3 border-b border-line bg-row px-4 py-3 last:border-0">
               <span className={`grid size-9 shrink-0 place-items-center rounded-lg ${Number(t.amount) >= 0 ? "bg-win/10 text-win" : "bg-loss/10 text-loss"}`}><I n={Number(t.amount) >= 0 ? "arrowdown" : "arrowup"} className="size-4" /></span>
               <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-bold">{TX_TR[t.type] ?? t.type}{t.wallet?.type === "BONUS" && <span className="ml-2 rounded-sm bg-primary/15 px-1.5 text-[10px] font-extrabold text-primary uppercase">Bonus</span>}</div>
+                <div className="truncate text-sm font-bold">{TX_TR[t.type] ?? t.type}{t.wallet?.type === "BONUS" && <span className="ml-2 rounded-sm bg-primary/15 px-1.5 text-[10px] font-extrabold text-primary">Bonus</span>}</div>
                 <div className="truncate text-xs font-medium text-subtle">{dt(t.createdAt)}{t.note ? ` · ${t.note}` : t.paymentSystem ? ` · ${t.paymentSystem}` : ""}</div>
               </div>
               <div className="text-right">
@@ -242,10 +242,10 @@ export function MyCoupons() {
             return (
               <div key={b.id} className="overflow-hidden rounded-lg border border-line bg-card">
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line px-4 py-2.5 text-sm">
-                  <span className={`rounded-sm px-2 py-0.5 text-[11px] font-extrabold uppercase ${cls}`}>{lbl}</span>
+                  <span className={`rounded-sm px-2 py-0.5 text-[12px] font-extrabold ${cls}`}>{lbl}</span>
                   <span className="font-bold">{b.type === "MULTIPLE" ? "Kombine" : "Tekli"}</span>
                   {b.couponId && <span className="flex items-center gap-1 text-xs font-semibold text-dim">ID: {b.couponId}<button onClick={() => navigator.clipboard?.writeText(b.couponId)} className="text-dim hover:text-fg"><I n="copy" className="size-3" /></button></span>}
-                  {Number(b.stakeFromBonus) > 0 && <span className="rounded-sm bg-primary/15 px-1.5 text-[10px] font-extrabold text-primary uppercase">Bonus</span>}
+                  {Number(b.stakeFromBonus) > 0 && <span className="rounded-sm bg-primary/15 px-1.5 text-[10px] font-extrabold text-primary">Bonus</span>}
                   <span className="ml-auto text-xs font-semibold text-subtle">{dt(b.createdAt)}</span>
                 </div>
                 <div className="px-4 py-2">
@@ -311,7 +311,7 @@ export function MyBonuses() {
               <div key={b.id} className="rounded-lg border border-line bg-card p-4">
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-sm font-extrabold">{b.bonus.name}</span>
-                  <span className={`rounded-sm px-2 py-0.5 text-[11px] font-extrabold uppercase ${cls}`}>{lbl}</span>
+                  <span className={`rounded-sm px-2 py-0.5 text-[12px] font-extrabold ${cls}`}>{lbl}</span>
                 </div>
                 {b.bonus.description && <p className="mt-1 text-[13px] font-medium text-subtle">{b.bonus.description}</p>}
                 <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-[13px] font-semibold text-subtle">

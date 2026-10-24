@@ -28,12 +28,12 @@ function SideLink({ to, icon, label, count, badge, exact }: { to: string; icon: 
       className={({ isActive }) => `flex h-9 items-center gap-2.5 rounded-lg px-2 text-[13px] font-semibold transition-colors ${isActive ? "bg-card text-primary" : "text-muted hover:bg-card hover:text-fg"}`}>
       <I n={icon} className="size-4 shrink-0" />
       <span className="flex-1 truncate">{label}</span>
-      {badge && <span className="rounded-sm bg-primary px-1.5 py-0.5 text-[10px] font-extrabold tracking-wide text-primary-fg uppercase">{badge}</span>}
+      {badge && <span className="rounded-sm bg-primary px-1.5 py-0.5 text-[10px] font-extrabold text-primary-fg">{badge}</span>}
       {count !== undefined && count > 0 && <span className="rounded-sm bg-elevated px-1.5 py-0.5 text-[11px] font-bold text-soft">{count}</span>}
     </NavLink>
   );
 }
-const SideHead = ({ t }: { t: string }) => <div className="mt-5 mb-1.5 px-3 text-[11px] font-extrabold tracking-wider text-dim uppercase">{t}</div>;
+const SideHead = ({ t }: { t: string }) => <div className="mt-5 mb-1.5 px-3 text-[12px] font-semibold text-dim">{t}</div>;
 
 const TILES = [
   { to: "/", icon: "home", label: "Lobi", exact: true },
@@ -45,7 +45,7 @@ function SideCard({ title, children, open: o = true }: { title: string; children
   const [open, setOpen] = useState(o);
   return (
     <div className="mt-3 rounded-xl bg-panel">
-      <button onClick={() => setOpen(!open)} className="flex h-10 w-full items-center gap-2 px-3 text-[11px] font-extrabold tracking-wider text-soft uppercase">
+      <button onClick={() => setOpen(!open)} className="flex h-10 w-full items-center gap-2 px-3 text-[12px] font-semibold text-soft">
         <span className="flex-1 text-left">{title}</span>
         <span className={`grid size-5 place-items-center rounded-full ${open ? "bg-primary/15 text-primary" : "bg-card text-subtle"}`}><I n={open ? "minus" : "plus"} className="size-3" /></span>
       </button>
@@ -63,7 +63,7 @@ function SidebarBody() {
       <div className="grid grid-cols-2 gap-1.5">
         {TILES.map((t) => (
           <NavLink key={t.to} to={t.to} end={t.exact} onClick={() => setSidebarOpen(false)}
-            className={({ isActive }) => `flex h-[58px] flex-col items-center justify-center gap-1 rounded-lg text-[11px] font-extrabold uppercase tracking-wide transition-colors ${isActive ? "bg-primary text-primary-fg" : "bg-panel text-muted hover:bg-card hover:text-fg"}`}>
+            className={({ isActive }) => `flex h-[58px] flex-col items-center justify-center gap-1 rounded-lg text-[12px] font-bold transition-colors ${isActive ? "bg-primary text-primary-fg" : "bg-panel text-muted hover:bg-card hover:text-fg"}`}>
             <I n={t.icon} className="size-5" />{t.label}
           </NavLink>
         ))}
@@ -136,15 +136,15 @@ function WalletChip() {
       <div className="flex h-[42px] items-center rounded-lg bg-panel-deep p-1">
         <button onClick={() => { setOpen(!open); refreshMe(); }} className="flex h-full cursor-pointer items-center gap-2 rounded-md pr-2 pl-1 text-sm font-extrabold transition-colors hover:bg-card">
           <span className={`grid size-[26px] place-items-center rounded-md text-[14px] font-extrabold ${active === "BONUS" ? "bg-caution text-[#2a1d00]" : "bg-primary text-primary-fg"}`}>₺</span>
-          <span className="tabular-nums">{money(balance(active as any)).replace("₺", "")}</span>
-          {active === "BONUS" && <span className="hidden rounded-sm bg-caution/20 px-1 text-[10px] font-extrabold text-caution uppercase sm:inline">Bonus</span>}
+          <span className="num text-[16px] font-bold">{money(balance(active as any)).replace("₺", "")}</span>
+          {active === "BONUS" && <span className="hidden rounded-sm bg-caution/20 px-1 text-[10px] font-extrabold text-caution sm:inline">Bonus</span>}
           <I n="down" className="size-3 text-subtle" />
         </button>
         <button onClick={() => setWalletOpen("menu")} className="ml-1 grid h-full place-items-center rounded-md bg-primary px-3 text-sm font-extrabold text-primary-fg hover:bg-primary-hover sm:px-4">Cüzdan</button>
       </div>
       {open && (
         <div className="animate-slip-item absolute right-0 top-[calc(100%+8px)] z-50 w-[300px] rounded-xl border border-line bg-panel p-3 shadow-[0_18px_50px_rgba(0,0,0,.5)]">
-          <div className="mb-2 text-[11px] font-extrabold tracking-wider text-dim uppercase">Oynadığın cüzdan</div>
+          <div className="mb-2 text-[12px] font-semibold text-dim">Oynadığın cüzdan</div>
           {(["MAIN", "BONUS"] as const).map((w) => (
             <button key={w} onClick={async () => { await setWallet(w); }} className={`mb-1.5 flex w-full items-center justify-between rounded-lg border px-3 py-2.5 text-left transition-colors ${active === w ? "border-primary/60 bg-primary/10" : "border-line bg-card hover:bg-surface-hover"}`}>
               <span>
@@ -252,7 +252,7 @@ function Footer() {
         <div className="grid grid-cols-2 gap-8 sm:grid-cols-4">
           {cols.map((c) => (
             <div key={c.title}>
-              <div className="mb-3 text-[12px] font-extrabold tracking-wider text-soft uppercase">{c.title}</div>
+              <div className="mb-3 text-[12px] font-extrabold text-soft">{c.title}</div>
               <ul className="space-y-2.5">
                 {(c.links ?? []).map((l: any) => (
                   <li key={l.label}>{l.url?.startsWith("/") ? <Link to={l.url} className="text-sm font-medium text-subtle hover:text-fg">{l.label}</Link> : <a href={l.url} className="text-sm font-medium text-subtle hover:text-fg">{l.label}</a>}</li>

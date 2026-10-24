@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api } from "./api";
-import { Avatar, Btn, Empty, ErrBox, I, Spinner, inp, money, money0, pct, timeLeft, useStore } from "./lib";
+import { Avatar, Btn, RankBadge, Empty, ErrBox, I, Spinner, inp, money, money0, pct, timeLeft, useStore } from "./lib";
 
 const PLACE = (q: string) => {
   const hues = [[28, 60], [210, 55], [150, 45], [330, 45], [260, 50]];
@@ -75,7 +75,7 @@ export function MarketCard({ m }: { m: any }) {
       <div className="flex items-center justify-between text-sm font-medium text-subtle">
         <span className="flex items-center gap-1 text-[13px] font-bold text-primary"><I n="spark" className="size-3.5" />{m.totalVolume > 0 ? money(m.totalVolume) : "YENİ"}</span>
         <span className="flex items-center gap-2">
-          {locked && <span className="rounded-sm bg-caution/15 px-1.5 py-0.5 text-[10px] font-extrabold text-caution uppercase">{m.status === "locked" ? "Kilitli" : "Kapalı"}</span>}
+          {locked && <span className="rounded-sm bg-caution/15 px-1.5 py-0.5 text-[10px] font-extrabold text-caution">{m.status === "locked" ? "Kilitli" : "Kapalı"}</span>}
           <span className="flex items-center gap-1 text-[12px]"><I n="clock" className="size-3.5" />{timeLeft(m.deadline)}</span>
           <SaveBtn m={m} />
         </span>
@@ -168,7 +168,7 @@ function PromoTile({ grad, tag, title, art, to }: any) {
   return (
     <Link to={to} className="relative flex h-[132px] w-[min(390px,calc(100vw-1.5rem))] shrink-0 items-center justify-between overflow-hidden rounded-lg px-5 transition-transform hover:-translate-y-px" style={{ background: grad }}>
       <div>
-        <span className="rounded-sm border border-line-strong bg-black/30 px-2 py-0.5 text-[10px] font-extrabold tracking-wider text-muted uppercase">{tag}</span>
+        <span className="rounded-sm border border-line-strong bg-black/30 px-2 py-0.5 text-[10px] font-extrabold text-muted">{tag}</span>
         <div className="mt-2 text-xl leading-tight font-extrabold">{title}</div>
       </div>
       {art}
@@ -256,7 +256,7 @@ export function PredictionDetail() {
                         className={`flex h-12 cursor-pointer items-center justify-between rounded-md border px-3 transition-colors disabled:cursor-default disabled:opacity-40 ${on ? "border-primary bg-primary/15" : "border-line-strong bg-elevated/50 hover:bg-elevated"}`}>
                         <span className="flex items-center gap-2 truncate text-sm font-bold">
                           {o.color && <span className="size-2.5 shrink-0 rounded-full" style={{ background: o.color }} />}
-                          {o.name}{o.isWinner && " 🏆"}
+                          {o.name}{o.isWinner && <I n="trophy" className="ml-1 inline size-4 text-caution" />}
                         </span>
                         <span className={`shrink-0 text-sm font-extrabold ${on ? "text-primary" : "text-odds"}`}>{Math.round(o.probability)}% <span className="text-xs font-bold text-dim">({(1 / Number(o.price)).toFixed(2)}x)</span></span>
                       </button>
@@ -346,7 +346,7 @@ export function MyPositions({ positions, markets, onChange }: { positions: any[]
             <span className="font-bold">{outName(p)}</span>
             <span className="text-subtle">Tutar <b className="text-muted">{money(p.stake)}</b></span>
             <span className="text-subtle">Kazanırsa <b className="text-muted">{money(p.shares)}</b></span>
-            {p.wallet === "BONUS" && <span className="rounded-sm bg-primary/15 px-1.5 text-[10px] font-extrabold text-primary uppercase">Bonus</span>}
+            {p.wallet === "BONUS" && <span className="rounded-sm bg-primary/15 px-1.5 text-[10px] font-extrabold text-primary">Bonus</span>}
             <span className={`ml-auto font-extrabold ${POS_TR[p.status]?.[1]}`}>{POS_TR[p.status]?.[0] ?? p.status}{p.status !== "OPEN" && Number(p.payout) > 0 ? ` · ${money(p.payout)}` : ""}</span>
             {p.status === "OPEN" && <Btn kind="soft" className="!h-8 !px-3 !text-xs" onClick={() => openQuote(p)}>Bozdur</Btn>}
           </div>
@@ -376,7 +376,6 @@ export function Leaderboard() {
   const [days, setDays] = useState(7);
   const [rows, setRows] = useState<any[] | null>(null);
   useEffect(() => { setRows(null); api(`/api/predictions/leaderboard?days=${days}`).then((r) => setRows(r.data)).catch(() => setRows([])); }, [days]);
-  const medal = ["🥇", "🥈", "🥉"];
   return (
     <div className="animate-sports-fade mx-auto max-w-3xl">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -391,13 +390,13 @@ export function Leaderboard() {
       {!rows ? <Spinner /> : rows.length === 0 ? <div className="mt-6"><Empty text="Bu dönemde sonuçlanan tahmin yok." /></div> : (
         <div className="mt-5 overflow-hidden rounded-lg border border-line">
           <table className="w-full text-sm">
-            <thead><tr className="bg-card text-left text-[11px] font-extrabold tracking-wider text-dim uppercase">
+            <thead><tr className="bg-card text-left text-[12px] font-semibold text-dim">
               <th className="px-4 py-3">#</th><th className="px-4 py-3">Oyuncu</th><th className="px-4 py-3 text-right">Net Kazanç</th><th className="hidden px-4 py-3 text-right sm:table-cell">Hacim</th><th className="hidden px-4 py-3 text-right sm:table-cell">Tahmin</th><th className="px-4 py-3 text-right">İsabet</th>
             </tr></thead>
             <tbody>
               {rows.map((r) => (
                 <tr key={r.rank} className="border-t border-line bg-row font-semibold hover:bg-surface-hover">
-                  <td className="px-4 py-3 text-base">{medal[r.rank - 1] ?? <span className="text-subtle">{r.rank}</span>}</td>
+                  <td className="px-4 py-3"><RankBadge n={r.rank} /></td>
                   <td className="px-4 py-3 font-bold"><button onClick={() => r.playerId && openProfile(r.playerId)} className="flex items-center gap-2.5 hover:text-primary"><Avatar src={r.avatar} name={r.username} className="size-8" /><span className="truncate">{r.username}</span></button></td>
                   <td className={`px-4 py-3 text-right font-extrabold ${r.profit >= 0 ? "text-win" : "text-loss"}`}>{money(r.profit)}</td>
                   <td className="hidden px-4 py-3 text-right text-muted sm:table-cell">{money(r.volume)}</td>

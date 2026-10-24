@@ -44,7 +44,7 @@ function MyRequests({ type, refresh, onCancelled }: { type: "DEPOSIT" | "WITHDRA
               <span className="font-extrabold">{money(r.amount)}</span>
               <span className="font-semibold text-subtle">{r.paymentSystem}</span>
               <span className="text-xs font-semibold text-dim">{dt(r.createdAt)}</span>
-              <span className={`ml-auto rounded-sm px-2 py-0.5 text-[11px] font-extrabold uppercase ${cls}`}>{lbl}</span>
+              <span className={`ml-auto rounded-sm px-2 py-0.5 text-[12px] font-extrabold ${cls}`}>{lbl}</span>
               {r.state === "REJECTED" && r.rejectReason && <span className="w-full text-xs font-semibold text-loss">Sebep: {r.rejectReason}</span>}
               {type === "WITHDRAWAL" && r.state === "NEW" && <button onClick={() => cancel(r.id)} className="text-xs font-bold text-loss hover:underline">İptal et</button>}
             </div>

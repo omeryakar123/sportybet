@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "./api";
-import { Avatar, ErrBox, I, money, useStore } from "./lib";
+import { Avatar, ErrBox, FlagTR, I, IconTile, money, useStore } from "./lib";
 
 /* ============================================================
  * SOHBET — 3 sn'de bir yeni mesajlar (after=id), yağmur kartı, susturma bildirimi.
@@ -20,12 +20,12 @@ function RainCard({ rain, onJoin, busy }: { rain: NonNullable<ChatState["rain"]>
   return (
     <div className="mx-3 mb-2 overflow-hidden rounded-xl border border-primary/40 bg-[linear-gradient(120deg,rgba(31,232,138,.18),rgba(25,227,209,.08))] p-3">
       <div className="flex items-center gap-3">
-        <span className="grid size-10 shrink-0 place-items-center rounded-full bg-primary/20 text-xl">🌧️</span>
+        <span className="grid size-10 shrink-0 place-items-center rounded-full bg-primary/20 text-primary"><I n="rain" className="size-5" /></span>
         <div className="min-w-0 flex-1">
-          <div className="text-[13px] font-extrabold">Yağmur yağıyor! <span className="text-primary">{money(rain.amount)}</span></div>
+          <div className="flex items-baseline gap-2 text-[13px] font-extrabold">Yağmur başladı <span className="num text-[17px] text-primary">{money(rain.amount)}</span></div>
           <div className="text-[12px] font-semibold text-subtle">{rain.count} katılımcı · {left} sn kaldı</div>
         </div>
-        <button disabled={rain.joined || busy || left === 0} onClick={onJoin} className="h-9 shrink-0 rounded-lg bg-primary px-4 text-[13px] font-extrabold text-primary-fg hover:bg-primary-hover disabled:opacity-60">{rain.joined ? "Katıldın ✓" : "Katıl"}</button>
+        <button disabled={rain.joined || busy || left === 0} onClick={onJoin} className="h-9 shrink-0 rounded-lg bg-primary px-4 text-[13px] font-extrabold text-primary-fg hover:bg-primary-hover disabled:opacity-60">{rain.joined ? "Katıldın" : "Katıl"}</button>
       </div>
       <div className="mt-2 h-1 overflow-hidden rounded-full bg-black/25"><div className="h-full rounded-full bg-primary transition-all" style={{ width: `${Math.min(100, (left / 60) * 100)}%` }} /></div>
     </div>
@@ -88,7 +88,7 @@ export function ChatPanel({ onClose }: { onClose: () => void }) {
   return (
     <div className="flex h-full flex-col bg-panel-deep">
       <div className="flex h-[var(--header-h)] shrink-0 items-center gap-2 border-b border-line/60 px-3">
-        <span className="flex h-9 items-center gap-2 rounded-lg bg-card px-3 text-sm font-bold">🇹🇷 Türkçe</span>
+        <span className="flex h-9 items-center gap-2 rounded-lg bg-card px-3 text-sm font-bold"><FlagTR />Türkçe</span>
         <span className="ml-auto flex items-center gap-1.5 text-[13px] font-bold text-soft"><span className="live-dot size-2 rounded-full bg-primary" />{st?.online ?? 0}</span>
         <button onClick={onClose} className="grid size-8 place-items-center rounded-full bg-card text-subtle hover:text-fg" aria-label="Sohbeti kapat"><I n="x" className="size-4" /></button>
       </div>
@@ -98,7 +98,7 @@ export function ChatPanel({ onClose }: { onClose: () => void }) {
         {msgs.map((m) => m.kind === "SYSTEM" ? (
           <div key={m.id} className="mx-2 rounded-lg bg-card/60 px-3 py-2 text-center text-[12px] font-semibold text-soft">{m.text}</div>
         ) : m.kind === "RAIN" || m.kind === "TIP" ? (
-          <div key={m.id} className="mx-2 flex items-center gap-2 rounded-lg border border-primary/25 bg-primary/10 px-3 py-2 text-[12px] font-bold text-primary"><span>{m.kind === "RAIN" ? "🌧️" : "💸"}</span><span className="min-w-0 flex-1">{m.text}</span><span className="text-[10px] text-subtle">{hhmm(m.at)}</span></div>
+          <div key={m.id} className="mx-2 flex items-center gap-2 rounded-lg border border-primary/25 bg-primary/10 px-3 py-2 text-[12px] font-bold text-primary"><I n={m.kind === "RAIN" ? "rain" : "tip"} className="size-4 shrink-0" /><span className="min-w-0 flex-1">{m.text}</span><span className="text-[10px] text-subtle">{hhmm(m.at)}</span></div>
         ) : (
           <div key={m.id} className={`group flex gap-2.5 rounded-lg px-2 py-1.5 hover:bg-card/50 ${m.user?.id === me?.id ? "bg-card/40" : ""}`}>
             <button onClick={() => m.user && openProfile(m.user.id)} className="shrink-0 pt-0.5"><Avatar src={m.user?.avatar} name={m.user?.name ?? "?"} className="size-8" /></button>
@@ -106,7 +106,7 @@ export function ChatPanel({ onClose }: { onClose: () => void }) {
               <div className="flex items-center gap-2">
                 <button onClick={() => m.user && openProfile(m.user.id)} className="truncate text-[13px] font-extrabold text-primary hover:underline">{m.user?.name ?? "—"}</button>
                 <span className="text-[10px] font-semibold text-dim">{hhmm(m.at)}</span>
-                {me && m.user && m.user.id !== me.id && <button onClick={() => { setTipTo(m.user!.name); setWalletOpen("tip"); }} className="ml-auto hidden text-[11px] font-bold text-subtle hover:text-primary group-hover:inline" title="Bahşiş gönder">💸</button>}
+                {me && m.user && m.user.id !== me.id && <button onClick={() => { setTipTo(m.user!.name); setWalletOpen("tip"); }} className="ml-auto hidden text-subtle hover:text-primary group-hover:block" title="Bahşiş gönder" aria-label="Bahşiş gönder"><I n="tip" className="size-4" /></button>}
               </div>
               <div className="break-words text-[13px] font-medium leading-snug text-muted">{m.text}</div>
             </div>
@@ -130,7 +130,7 @@ export function ChatPanel({ onClose }: { onClose: () => void }) {
           <div className="flex gap-2">
             <input value={text} maxLength={st?.limits?.maxLen ?? 200} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && sendMsg()} onFocus={() => !me && setAuthOpen(true)}
               placeholder={me ? "Bir şeyler yaz…" : "Yazmak için giriş yap"} className="h-11 min-w-0 flex-1 rounded-lg border border-line-strong bg-field px-3 text-sm font-medium outline-none placeholder:text-subtle focus:border-primary" />
-            {st?.limits?.rainEnabled && <button onClick={() => (me ? setRainOpen(true) : setAuthOpen(true))} title="Yağmur başlat" className="grid size-11 shrink-0 place-items-center rounded-lg bg-card text-lg hover:bg-surface-hover">🌧️</button>}
+            {st?.limits?.rainEnabled && <button onClick={() => (me ? setRainOpen(true) : setAuthOpen(true))} title="Yağmur başlat" aria-label="Yağmur başlat" className="grid size-11 shrink-0 place-items-center rounded-lg bg-card text-accent hover:bg-surface-hover"><I n="rain" className="size-5" /></button>}
             <button disabled={busy || !text.trim()} onClick={sendMsg} className="grid size-11 shrink-0 place-items-center rounded-lg bg-card text-primary hover:bg-surface-hover disabled:opacity-40" aria-label="Gönder"><I n="send" className="size-5" /></button>
           </div>
         )}
@@ -162,14 +162,14 @@ export function ProfileModal() {
                 <div className="flex items-center gap-2 truncate text-lg font-extrabold">{p.name}{p.verified && <span title="Doğrulanmış" className="grid size-5 place-items-center rounded-full bg-primary text-primary-fg"><I n="check" className="size-3" /></span>}</div>
                 <div className="text-[13px] font-semibold text-subtle">Üyelik: {new Date(p.joinedAt).toLocaleDateString("tr-TR", { month: "long", year: "numeric" })}</div>
               </div>
-              {me && me.id !== p.id && <button onClick={() => { setTipTo(p.name); openProfile(null); setWalletOpen("tip"); }} className="h-10 shrink-0 rounded-lg bg-primary px-4 text-sm font-extrabold text-primary-fg hover:bg-primary-hover">💸 Bahşiş</button>}
+              {me && me.id !== p.id && <button onClick={() => { setTipTo(p.name); openProfile(null); setWalletOpen("tip"); }} className="flex h-10 shrink-0 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-extrabold text-primary-fg hover:bg-primary-hover"><I n="tip" className="size-4" />Bahşiş gönder</button>}
             </div>
           )}
         </div>
         {p && (
           <div className="px-5 pb-5">
             <div className="mb-2 text-[15px] font-extrabold">İstatistikler</div>
-            {p.hidden ? <div className="rounded-xl bg-card px-4 py-6 text-center text-sm text-subtle">🔒 Bu oyuncu istatistiklerini gizli tutuyor.</div> : (
+            {p.hidden ? <div className="flex items-center justify-center gap-2 rounded-xl bg-card px-4 py-6 text-sm text-subtle"><I n="lock" className="size-4" />Bu oyuncu istatistiklerini gizli tutuyor.</div> : (
               <div className="grid grid-cols-2 gap-2">
                 <div className="rounded-xl bg-card p-4"><div className="text-xl font-extrabold tabular-nums">{p.stats.bets.toLocaleString("tr-TR")}</div><div className="text-[12px] font-semibold text-subtle">Oynanan Bahis</div></div>
                 <div className="rounded-xl bg-card p-4"><div className="text-xl font-extrabold tabular-nums">{money(p.stats.wagered)}</div><div className="text-[12px] font-semibold text-subtle">Toplam Yatırılan</div></div>
@@ -207,9 +207,9 @@ export function WalletModal() {
     catch (e: any) { setErr(e.message === "TIP_MIN" ? `Bahşiş en az ${money(e.detail?.min)}` : e.message === "TIP_DAILY_LIMIT" ? `Günlük bahşiş limiti ${money(e.detail?.max)}` : e.message); }
     setBusy(false);
   }
-  const Row = ({ ic, t, s, onClick }: { ic: string; t: string; s: string; onClick: () => void }) => (
+  const Row = ({ ic, tone, t, s, onClick }: { ic: string; tone?: "green" | "amber" | "cyan" | "red" | "slate"; t: string; s: string; onClick: () => void }) => (
     <button onClick={onClick} className="flex w-full items-center gap-3 border-b border-line/60 px-4 py-3.5 text-left last:border-0 hover:bg-card">
-      <span className="grid size-10 place-items-center rounded-xl bg-card text-xl">{ic}</span>
+      <IconTile n={ic} tone={tone} />
       <span className="min-w-0 flex-1"><span className="block text-[15px] font-extrabold">{t}</span><span className="block text-[12px] font-semibold text-subtle">{s}</span></span>
       <I n="right" className="size-4 text-subtle" />
     </button>
@@ -226,15 +226,15 @@ export function WalletModal() {
           {walletOpen === "menu" && (
             <>
               <div className="mb-3 grid grid-cols-2 gap-2">
-                <div className="rounded-xl bg-card p-3"><div className="text-[11px] font-bold text-subtle uppercase">Ana Para</div><div className="text-lg font-extrabold tabular-nums">{money(balance("MAIN"))}</div></div>
-                <div className="rounded-xl bg-card p-3"><div className="text-[11px] font-bold text-subtle uppercase">Bonus</div><div className="text-lg font-extrabold text-caution tabular-nums">{money(balance("BONUS"))}</div></div>
+                <div className="rounded-xl bg-card p-3"><div className="text-[12px] font-semibold text-subtle">Ana para</div><div className="num text-[22px] font-bold">{money(balance("MAIN"))}</div></div>
+                <div className="rounded-xl bg-card p-3"><div className="text-[12px] font-semibold text-subtle">Bonus</div><div className="num text-[22px] font-bold text-caution">{money(balance("BONUS"))}</div></div>
               </div>
               <div className="overflow-hidden rounded-xl bg-panel">
-                <Row ic="💳" t="Para Yatır" s="Kripto ve diğer yöntemler" onClick={() => go("/para-yatir")} />
-                <Row ic="💰" t="Para Çek" s="Kazancını hesabına aktar" onClick={() => go("/para-cek")} />
-                <Row ic="🎟️" t="Promo Kodu" s="Kodu gir, bonusu al" onClick={() => setWalletOpen("promo")} />
-                <Row ic="💸" t="Bahşiş Gönder" s="Başka bir oyuncuya bakiye gönder" onClick={() => setWalletOpen("tip")} />
-                <Row ic="📜" t="İşlem Geçmişi" s="Tüm hareketlerin" onClick={() => go("/hesap/islemler")} />
+                <Row ic="deposit" tone="green" t="Para Yatır" s="Kripto ve diğer yöntemler" onClick={() => go("/para-yatir")} />
+                <Row ic="withdraw" tone="cyan" t="Para Çek" s="Kazancını hesabına aktar" onClick={() => go("/para-cek")} />
+                <Row ic="promo" tone="amber" t="Promo Kodu" s="Kodu gir, bonusu al" onClick={() => setWalletOpen("promo")} />
+                <Row ic="tip" tone="green" t="Bahşiş Gönder" s="Başka bir oyuncuya bakiye gönder" onClick={() => setWalletOpen("tip")} />
+                <Row ic="history" tone="slate" t="İşlem Geçmişi" s="Tüm hareketlerin" onClick={() => go("/hesap/islemler")} />
               </div>
             </>
           )}
@@ -252,7 +252,7 @@ export function WalletModal() {
                 <span className="flex h-12 items-center gap-2 rounded-lg border border-line-strong bg-field px-3 focus-within:border-primary"><span className="grid size-6 place-items-center rounded bg-primary text-[13px] font-extrabold text-primary-fg">₺</span><input value={amt} onChange={(e) => setAmt(e.target.value.replace(/[^0-9.,]/g, ""))} inputMode="decimal" placeholder="0,00" className="w-full bg-transparent font-bold outline-none" /></span></label>
               <label className="block"><span className="mb-1.5 block text-[13px] font-semibold text-primary">Kullanıcı adı</span>
                 <input value={user} onChange={(e) => setUser(e.target.value)} placeholder="Kullanıcı adını gir" className="h-12 w-full rounded-lg border border-primary/60 bg-field px-4 font-semibold outline-none" /></label>
-              <div className="flex items-center gap-2 rounded-lg bg-caution/10 px-3 py-2.5 text-[13px] font-semibold text-caution"><span className="grid size-5 place-items-center rounded-full bg-caution text-[12px] font-extrabold text-[#2a1d00]">!</span>Bahşişler iade edilmez. Ana Para bakiyenden düşülür.</div>
+              <div className="flex items-center gap-2 rounded-lg bg-caution/10 px-3 py-2.5 text-[13px] font-semibold text-caution"><I n="shield" className="size-4 shrink-0" />Bahşişler iade edilmez. Ana Para bakiyenden düşülür.</div>
               <ErrBox e={err} />{ok && <div className="rounded-md bg-win/10 px-3 py-2.5 text-sm font-bold text-win">{ok}</div>}
               <button disabled={busy || !user.trim() || !(Number(amt.replace(",", ".")) > 0)} onClick={tip} className="h-12 w-full rounded-lg bg-primary font-extrabold text-primary-fg disabled:opacity-40">Bahşiş Gönder</button>
             </div>
