@@ -366,7 +366,7 @@ export default function Sport() {
             </div>
           </div>
           <div className="hidden flex-col items-center text-[11px] font-semibold text-subtle lg:flex">
-            {isLive ? <><span className="rounded bg-live px-1.5 py-px text-[10px] font-extrabold text-white">CANLI</span><span className="mt-1 tabular-nums">{ev.minute ? `${ev.minute}'` : ev.status}</span></>
+            {isLive ? <><span className="rounded bg-live px-1.5 py-px text-[10px] font-extrabold text-white">CANLI</span><span className="num mt-1 text-[13px]">{ev.minute ? `${ev.minute}'` : ({ HT: "Devre", "1H": "1. yarı", "2H": "2. yarı", ET: "Uzatma", P: "Penaltı" } as Record<string, string>)[ev.status] ?? "Başladı"}</span></>
               : <><span className="flex items-center gap-1"><I n="calendar" className="size-3" />{dayLabel(ev.startsAt)}</span><span className="mt-1 flex items-center gap-1"><I n="clock" className="size-3" />{hm(ev.startsAt)}</span></>}
           </div>
           <div className="grid grid-cols-[3fr_2fr] gap-1.5 lg:contents">
