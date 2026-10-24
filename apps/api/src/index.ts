@@ -9,7 +9,7 @@ import { sbSiteRoutes } from "./routes/sb.js";
 import { siteRoutes } from "./routes/site.js";
 import { predictionSiteRoutes } from "./routes/predictions.js";
 import { autoClose, syncFeed } from "./services/predictions.js";
-import { syncFixtures, syncOdds, syncResults } from "./services/sb.js";
+import { syncFixtures, syncOdds, syncResults, syncLive, getConfig as sbConfig, liveMinInterval } from "./services/sb.js";
 import { seedDemo } from "./services/demo.js";
 import { expireBonuses } from "./services/bonus.js";
 import { seedSiteDefaults, bustSiteCache } from "./services/sites.js";
@@ -73,6 +73,20 @@ setInterval(() => { if (SB_ON()) syncFixtures(db).catch((e) => app.log.error(e, 
 setInterval(() => { if (SB_ON()) syncOdds(db).catch((e) => app.log.error(e, "sb odds")); }, 90 * 60_000);
 // Sonuçlandırma: 10 dk'da bir — sadece başlamış/bitmemiş maç varsa API'ye gider (tek çağrı/20 maç)
 setInterval(() => { if (SB_ON()) syncResults(db).catch((e) => app.log.error(e, "sb results")); }, 10 * 60_000);
+// Canlı oranlar: ayarlanan aralıkta, ama kotanın izin verdiğinden sık değil (kota yetmezse oranlar bayatlar → canlı otomatik kilitlenir)
+async function liveLoop() {
+  let next = 60;
+  try {
+    const c = await sbConfig(db);
+    if (SB_ON() && c.enabled && c.liveEnabled) {
+      await syncLive(db);
+      const min = liveMinInterval();
+      next = Math.max(c.liveIntervalSec, min === null ? 0 : Math.min(min, 3600));
+    }
+  } catch (e) { app.log.error(e, "sb live"); }
+  setTimeout(liveLoop, next * 1000);
+}
+setTimeout(liveLoop, 8000);
 // Açılışta bir kez program + oran
 if (SB_ON()) setTimeout(() => syncFixtures(db).then(() => syncOdds(db)).catch((e) => app.log.error(e, "sb boot sync")), 4000);
 

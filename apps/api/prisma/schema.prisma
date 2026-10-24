@@ -276,6 +276,8 @@ model SbEvent {
   isOpen        Boolean   @default(true)  // bahise açık mı (admin kapatabilir)
   featured      Boolean   @default(false)
   oddsUpdatedAt DateTime?
+  liveUpdatedAt DateTime? // canlı oranların son güncellenme anı (bayat oran kilidi için)
+  liveStopped   Boolean   @default(false) // feed maçı durdurdu/blokladı (gol, VAR, penaltı...)
   settledAt     DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -307,6 +309,7 @@ model SbSelection {
   baseOdds Decimal  @db.Decimal(12, 3) // feed oranı
   odds     Decimal  @db.Decimal(12, 3) // marj uygulanmış site oranı
   result   String?  // WON | LOST | VOID (settlement sonucu)
+  suspended Boolean @default(false) // canlıda feed askıya aldı / bu turda gelmedi
   market   SbMarket @relation(fields: [marketId], references: [id], onDelete: Cascade)
 
   @@unique([marketId, code])

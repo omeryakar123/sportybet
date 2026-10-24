@@ -102,6 +102,58 @@ export const feed = {
   },
 };
 
+// ---------- CANLI (in-play) ----------
+// Tek çağrı (/odds/live) tüm canlı maçları döndürür → kota maç sayısından bağımsız.
+export type LiveSel = { odd: number; suspended: boolean };
+export type LiveFixture = {
+  fixtureId: number; status: string; minute: number | null; h: number | null; a: number | null;
+  stopped: boolean; finished: boolean; update: string; markets: Record<string, Record<string, LiveSel>>;
+};
+const LONG_TO_SHORT: Record<string, string> = {
+  "First Half": "1H", "Halftime": "HT", "Half Time": "HT", "Second Half": "2H", "Extra Time": "ET", "Break Time": "BT",
+  "Penalty In Progress": "P", "Penalties": "P", "Match Suspended": "SUSP", "Match Interrupted": "INT", "In Progress": "LIVE",
+};
+// canlı bahis adı → bizim market + değer eşlemesi (yalnızca maç sonu skoruyla sonuçlananlar)
+const LIVE_MARKETS: { key: string; bets: RegExp; map: Record<string, string>; line?: string }[] = [
+  { key: "1x2", bets: /^(Fulltime Result|Match Winner|1x2)$/i, map: { Home: "HOME", Draw: "DRAW", Away: "AWAY", "1": "HOME", X: "DRAW", "2": "AWAY" } },
+  { key: "dc", bets: /^Double Chance$/i, map: { "Home/Draw": "1X", "Home/Away": "12", "Draw/Away": "X2", "1X": "1X", "12": "12", X2: "X2" } },
+  { key: "ou15", bets: /^(Match Goals|Over\/Under Line|Goals Over\/Under)$/i, map: { Over: "OVER", Under: "UNDER" }, line: "1.5" },
+  { key: "ou25", bets: /^(Match Goals|Over\/Under Line|Goals Over\/Under)$/i, map: { Over: "OVER", Under: "UNDER" }, line: "2.5" },
+  { key: "ou35", bets: /^(Match Goals|Over\/Under Line|Goals Over\/Under)$/i, map: { Over: "OVER", Under: "UNDER" }, line: "3.5" },
+  { key: "btts", bets: /^Both Teams (To )?Score$/i, map: { Yes: "YES", No: "NO" } },
+  { key: "dnb", bets: /^Draw No Bet$/i, map: { Home: "HOME", Away: "AWAY", "1": "HOME", "2": "AWAY" } },
+  { key: "oe", bets: /^Goals Odd\/Even$/i, map: { Odd: "ODD", Even: "EVEN" } },
+];
+
+export async function liveOdds(): Promise<LiveFixture[]> {
+  const resp: any[] = await call("/odds/live");
+  return resp.map((f) => {
+    const markets: LiveFixture["markets"] = {};
+    for (const def of LIVE_MARKETS) {
+      for (const b of f.odds ?? []) {
+        if (!def.bets.test(String(b.name))) continue;
+        const set: Record<string, LiveSel> = {};
+        for (const v of b.values ?? []) {
+          if (def.line != null && String(v.handicap ?? "") !== def.line) continue;
+          // "Over 2.5" gibi birleşik değerleri de destekle
+          let val = String(v.value);
+          if (def.line == null && v.handicap != null && v.handicap !== "") continue; // 1X2 vb. handikapsız olmalı
+          const m = /^(Over|Under) ([\d.]+)$/.exec(val); if (m) { if (def.line != null && m[2] !== def.line) continue; val = m[1]; }
+          const code = def.map[val]; if (!code) continue;
+          const odd = Number(v.odd);
+          set[code] = { odd, suspended: !!v.suspended || !(odd > 1) };
+        }
+        if (Object.keys(set).length === new Set(Object.values(def.map)).size) { markets[def.key] = set; break; }
+      }
+    }
+    return {
+      fixtureId: f.fixture?.id, status: LONG_TO_SHORT[f.fixture?.status?.long] ?? "LIVE", minute: f.fixture?.status?.elapsed ?? null,
+      h: f.teams?.home?.goals ?? null, a: f.teams?.away?.goals ?? null,
+      stopped: !!(f.status?.stopped || f.status?.blocked), finished: !!f.status?.finished, update: f.update, markets,
+    };
+  });
+}
+
 // Maç durum grupları
 export const FINAL_STATUS = ["FT", "AET", "PEN"];
 export const VOID_STATUS = ["PST", "CANC", "ABD", "AWD", "WO"];

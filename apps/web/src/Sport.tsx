@@ -8,14 +8,14 @@ import { ErrBox, I, Spinner, money, useStore } from "./lib";
  * Spor şeridi · Öne çıkanlar kaydırıcı · Canlı maçlar · Yaklaşan maçlar (lig bazlı katlanır)
  * Yapışkan kupon (Tekli / Kombine, hızlı bahis). Veri: /api/sb/* (kendi motorumuz).
  */
-type Sel = { id: number; code: string; name: string; odds: number };
+type Sel = { id: number; code: string; name: string; odds: number; suspended?: boolean };
 type Market = { id: number; key: string; name: string; selections: Sel[] };
 type Ev = {
   id: number; league: string; leagueId: number; country?: string; leagueLogo?: string; home: string; away: string; homeLogo?: string; awayLogo?: string;
-  startsAt: string; status: string; minute?: number | null; score?: { h: number; a: number; hh?: number | null; ha?: number | null } | null; featured?: boolean; markets: Market[];
+  startsAt: string; status: string; minute?: number | null; score?: { h: number; a: number; hh?: number | null; ha?: number | null } | null; featured?: boolean; live?: boolean; liveOpen?: boolean; liveStopped?: boolean; markets: Market[];
 };
 type League = { id: number; name: string; country?: string; logo?: string; count: number };
-type Pick = { selId: number; evId: number; match: string; market: string; pick: string; odds: number };
+type Pick = { selId: number; evId: number; match: string; market: string; pick: string; odds: number; live?: boolean; suspended?: boolean; changed?: "up" | "down" };
 
 // ---------- spor ikonları (özgün, stroke tabanlı) ----------
 const SPORT_SVG: Record<string, React.ReactNode> = {
@@ -56,7 +56,8 @@ const startsIn = (s: string) => {
   return `${Math.round(h / 24)} gün sonra`;
 };
 const ERR: Record<string, string> = {
-  INSUFFICIENT_BALANCE: "Yetersiz bakiye", EVENT_STARTED: "Maç başladı, oran kapandı", SELECTION_CLOSED: "Seçim kapandı", SELECTION_UNAVAILABLE: "Seçim artık mevcut değil",
+  INSUFFICIENT_BALANCE: "Yetersiz bakiye", ODDS_CHANGED: "Oranlar değişti — yeni oranları kontrol edip tekrar onayla", LIVE_SUSPENDED: "Canlı bahis bu maç için şu an kapalı (oranlar güncelleniyor)",
+  SELECTION_SUSPENDED: "Seçim askıya alındı", LIVE_MAX_STAKE_EXCEEDED: "Canlı bahiste azami tutar aşıldı", EVENT_STARTED: "Maç başladı, oran kapandı", SELECTION_CLOSED: "Seçim kapandı", SELECTION_UNAVAILABLE: "Seçim artık mevcut değil",
   MAX_STAKE_EXCEEDED: "Azami bahis tutarı aşıldı", MIN_STAKE: "Tutar asgari bahsin altında", SPORT_BLOCKED: "Spor bahsi hesabında kapalı", SAME_EVENT_IN_COMBO: "Kombinede aynı maçtan tek seçim olabilir",
   TOO_MANY_SELECTIONS: "Çok fazla seçim", SPORTSBOOK_DISABLED: "Spor bahisleri geçici olarak kapalı", INVALID_STAKE: "Geçerli bir tutar girin", UNAUTHORIZED: "Devam etmek için giriş yapın",
 };
@@ -84,7 +85,9 @@ export default function Sport() {
   const [toast, setToast] = useState<{ t: string; kind?: "ok" | "warn" } | null>(null);
   const [slipOpen, setSlipOpen] = useState(false);
   const [quick, setQuick] = useState(false);
-  const [limits, setLimits] = useState<{ minStake: number; maxStake: number; maxWin: number; maxSelections: number } | null>(null);
+  const [limits, setLimits] = useState<{ minStake: number; maxStake: number; maxWin: number; maxSelections: number; liveEnabled?: boolean; liveDelaySec?: number; liveMaxStake?: number } | null>(null);
+  const [acceptHigher, setAcceptHigher] = useState(() => { try { return localStorage.getItem("sb_accept") !== "none"; } catch { return true; } });
+  const [waitSec, setWaitSec] = useState(0);
   const [openEv, setOpenEv] = useState<number | null>(null);
   const [closed, setClosed] = useState<Record<string, boolean>>({});
   const [changed, setChanged] = useState<Record<number, "up" | "down">>({});
@@ -93,6 +96,14 @@ export default function Sport() {
   useEffect(() => { try { localStorage.setItem("sb_picks", JSON.stringify(picks)); } catch {} }, [picks]);
   useEffect(() => { if (picks.length > 1 && mode === "single" && picks.length === 0) setMode("combo"); }, [picks.length]);
 
+  // kupondaki oranları/askı durumunu güncel listeyle eşitle
+  const syncPicks = (evs: Ev[]) => setPicks((ps) => ps.map((p) => {
+    for (const e of evs) for (const m of e.markets) {
+      const s = m.selections.find((x) => x.id === p.selId);
+      if (s) return { ...p, odds: s.odds, suspended: !!s.suspended, changed: s.odds > p.odds + 0.004 ? "up" : s.odds < p.odds - 0.004 ? "down" : p.changed };
+    }
+    return p;
+  }));
   const load = (silent = false) => {
     if (!silent) { setErr(""); setEvents(null); }
     api(`/api/sb/events?limit=300${lg ? `&league=${lg}` : ""}`).then((evs: Ev[]) => {
@@ -106,15 +117,18 @@ export default function Sport() {
       if (Object.keys(ch).length) { setChanged(ch); setTimeout(() => setChanged({}), 6000); }
       setEvents(evs);
       // kupondaki oranları güncelle
-      setPicks((ps) => ps.map((p) => { for (const e of evs) for (const m of e.markets) { const s = m.selections.find((x) => x.id === p.selId); if (s) return { ...p, odds: s.odds }; } return p; }));
+      syncPicks(evs);
     }).catch((e) => { if (!silent) { setEvents([]); setErr(e.message); } });
   };
   useEffect(() => {
     api("/api/sb/leagues").then(setLeagues).catch(() => {});
     api("/api/sb/limits").then(setLimits).catch(() => {});
-    const lv = () => api("/api/sb/live").then(setLive).catch(() => {});
-    lv(); const t = setInterval(lv, 60_000); return () => clearInterval(t);
   }, []);
+  // canlı: bahis açıksa 5 sn'de bir, değilse dakikada bir (sadece skor)
+  useEffect(() => {
+    const lv = () => api("/api/sb/live").then((l: Ev[]) => { setLive(l); syncPicks(l); }).catch(() => {});
+    lv(); const t = setInterval(lv, limits?.liveEnabled ? 5_000 : 60_000); return () => clearInterval(t);
+  }, [limits?.liveEnabled]);
   useEffect(() => { load(); const t = setInterval(() => load(true), 90_000); return () => clearInterval(t); }, [lg]);
   useEffect(() => { const n = Number(sp.get("lig")) || 0; if (n !== lg) setLg(n); }, [sp]);
 
@@ -140,16 +154,30 @@ export default function Sport() {
     if (!me) { setAuthOpen(true); return false; }
     setBusy(true); setErr("");
     try {
-      const r: any = await api("/api/sb/bet", { method: "POST", json: { selectionIds: ids, stake: amount, mode: m } });
+      const pk = picks.filter((p) => ids.includes(p.selId));
+      const anyLive = pk.some((p) => p.live) || ids.some((id) => live.some((e) => e.markets.some((mm) => mm.selections.some((x) => x.id === id))));
+      let timer: any = null;
+      if (anyLive && limits?.liveDelaySec) { setWaitSec(limits.liveDelaySec); timer = setInterval(() => setWaitSec((w) => Math.max(0, w - 1)), 1000); }
+      const odds = Object.fromEntries(ids.map((id) => [String(id), pk.find((p) => p.selId === id)?.odds ?? findOdds(id)]).filter(([, v]) => v));
+      let r: any;
+      try { r = await api("/api/sb/bet", { method: "POST", json: { selectionIds: ids, stake: amount, mode: m, odds, acceptOdds: acceptHigher ? "higher" : "none" } }); }
+      finally { if (timer) clearInterval(timer); setWaitSec(0); }
       refreshMe();
       const b = r?.bonus;
       if (b && b.eligible === false) setToast({ t: `Kupon alındı (${r.couponId}) — bonus kurallarına uymadığı için çevrime sayılmayacak: ${(b.why ?? []).join(", ")}`, kind: "warn" });
       else setToast({ t: r?.couponId ? `Kupon alındı · ${r.couponId}` : `${r?.bets?.length ?? 1} tekli kupon alındı`, kind: "ok" });
       setTimeout(() => setToast(null), 4500);
       setBusy(false); return true;
-    } catch (e: any) { setErr(ERR[e.message] || e.message); setBusy(false); return false; }
+    } catch (e: any) {
+      // oran değiştiyse kupondaki oranları yenile — oyuncu tekrar onaylar
+      if (e.message === "ODDS_CHANGED" && e.detail?.odds) setPicks((ps) => ps.map((p) => { const n = e.detail.odds[p.selId]; return n ? { ...p, changed: n > p.odds ? "up" : n < p.odds ? "down" : p.changed, odds: n } : p; }));
+      if (e.message === "SELECTION_SUSPENDED" && e.detail?.selectionId) setPicks((ps) => ps.map((p) => (p.selId === e.detail.selectionId ? { ...p, suspended: true } : p)));
+      setErr(ERR[e.message] || e.message); setBusy(false); return false;
+    }
   }
+  function findOdds(id: number) { for (const e of [...(events ?? []), ...live]) for (const m of e.markets) { const x = m.selections.find((y) => y.id === id); if (x) return x.odds; } return 0; }
   function toggle(ev: Ev, m: Market, s: Sel) {
+    if (s.suspended) return;
     if (quick) { // hızlı bahis: tek tıkla tekli kupon
       const amt = parseFloat(stake.replace(",", ".")) || 0;
       if (!amt) { setSlipOpen(true); setErr("Hızlı bahis için önce kuponda tutar belirleyin"); return; }
@@ -158,7 +186,7 @@ export default function Sport() {
     setPicks((p) => {
       if (p.some((x) => x.selId === s.id)) return p.filter((x) => x.selId !== s.id);
       const noEv = p.filter((x) => x.evId !== ev.id);
-      return [...noEv, { selId: s.id, evId: ev.id, match: `${ev.home} - ${ev.away}`, market: m.name, pick: s.name, odds: s.odds }];
+      return [...noEv, { selId: s.id, evId: ev.id, match: `${ev.home} - ${ev.away}`, market: m.name, pick: s.name, odds: s.odds, live: !!ev.live }];
     });
     setErr("");
   }
@@ -172,6 +200,8 @@ export default function Sport() {
     if (limits && st < limits.minStake) { setErr(`Asgari bahis ${money(limits.minStake)}`); return; }
     if (limits && st > limits.maxStake) { setErr(`Azami bahis ${money(limits.maxStake)}`); return; }
     if (me && cost > balance(activeWallet)) { setErr("Yetersiz bakiye"); return; }
+    if (picks.some((p) => p.suspended)) { setErr("Askıdaki seçimleri kupondan çıkar"); return; }
+    if (picks.some((p) => p.live) && limits?.liveMaxStake && st > limits.liveMaxStake) { setErr(`Canlı bahiste azami ${money(limits.liveMaxStake)}`); return; }
     const ok = await placeNow(picks.map((p) => p.selId), effMode, st);
     if (ok) { setPicks([]); setSlipOpen(false); }
   }
@@ -179,7 +209,7 @@ export default function Sport() {
   // ---------- oran butonu ----------
   const odd = ({ ev, m, code, label, key }: { ev: Ev; m?: Market; code: string; label?: string; key?: any }) => {
     const s = sel(m, code);
-    if (!s || !m) return <div key={key ?? code} className="grid h-10 place-items-center rounded-md bg-card/60 text-dim"><I n="lock" className="size-3.5" /></div>;
+    if (!s || !m || s.suspended) return <div key={key ?? code} title={s?.suspended ? "Askıda" : ""} className="flex h-10 items-center justify-between rounded-md bg-card/60 px-2.5 text-dim">{label && s ? <span className="text-[12px] font-semibold">{label}</span> : <span />}<I n="lock" className="size-3.5" /></div>;
     const on = has(s.id); const c = changed[s.id];
     return (
       <button key={key ?? s.id} onClick={() => toggle(ev, m, s)} title={`${m.name}: ${s.name}`}
@@ -216,15 +246,22 @@ export default function Sport() {
                   <div className="flex items-start gap-2">
                     <SportIcon k="football" className="mt-0.5 size-4 shrink-0 text-primary" />
                     <span className="min-w-0 flex-1 truncate text-sm font-bold text-primary">{p.pick}</span>
-                    <span className="text-sm font-extrabold tabular-nums">{p.odds.toFixed(2)}</span>
+                    <span className={`flex items-center gap-1 text-sm font-extrabold tabular-nums ${p.changed === "up" ? "text-win" : p.changed === "down" ? "text-loss" : ""}`}>{p.changed === "up" ? "▲" : p.changed === "down" ? "▼" : ""}{p.odds.toFixed(2)}</span>
                   </div>
                   <div className="truncate pl-6 text-[13px] text-subtle">{p.match}</div>
-                  <div className="truncate pl-6 text-[13px] font-semibold text-muted">{p.market}</div>
+                  <div className="flex items-center gap-2 truncate pl-6 text-[13px] font-semibold text-muted">{p.market}
+                    {p.live && <span className="rounded bg-live px-1 text-[10px] font-extrabold text-white">CANLI</span>}
+                    {p.suspended && <span className="flex items-center gap-1 rounded bg-caution/15 px-1 text-[10px] font-extrabold text-caution"><I n="lock" className="size-3" />ASKIDA</span>}
+                  </div>
                 </div>
               </div>
             ))}
           </div>
           <div className="mt-3 border-t border-line px-3 pt-3 pb-3">
+            <label className="mb-2 flex cursor-pointer items-center gap-2 text-[12px] font-semibold text-subtle">
+              <input type="checkbox" className="accent-[#1fe88a]" checked={acceptHigher} onChange={(e) => { setAcceptHigher(e.target.checked); try { localStorage.setItem("sb_accept", e.target.checked ? "higher" : "none"); } catch {} }} />
+              Yükselen oranları otomatik kabul et
+            </label>
             {effMode === "combo" && <div className="mb-2 flex items-center justify-between text-[13px] text-subtle">Toplam oran <b className="text-base text-fg tabular-nums">{totalOdds.toFixed(2)}</b></div>}
             <div className="flex gap-2">
               <label className="flex h-11 min-w-0 flex-1 items-center gap-2 rounded-lg border border-line-strong bg-field px-2 focus-within:border-primary">
@@ -242,7 +279,7 @@ export default function Sport() {
             <div className="mt-2 flex gap-2">
               <button onClick={() => setPicks([])} className="grid h-[52px] w-11 shrink-0 place-items-center rounded-lg bg-card text-subtle hover:text-loss" aria-label="Kuponu temizle"><I n="trash" className="size-5" /></button>
               <button onClick={place} disabled={busy || !st} className="flex h-[52px] flex-1 flex-col items-center justify-center rounded-lg bg-primary text-primary-fg transition-colors hover:bg-primary-hover disabled:opacity-50">
-                <span className="text-[15px] font-extrabold leading-tight">{busy ? "Gönderiliyor…" : me ? `Bahis Yap · ${money(cost)}` : "Giriş Yap ve Oyna"}</span>
+                <span className="text-[15px] font-extrabold leading-tight">{busy ? (waitSec > 0 ? `Canlı bahis onaylanıyor… ${waitSec}` : "Gönderiliyor…") : me ? `Bahis Yap · ${money(cost)}` : "Giriş Yap ve Oyna"}</span>
                 <span className="text-[12px] font-bold opacity-75">Olası kazanç {money(potWin)}</span>
               </button>
             </div>
@@ -296,15 +333,15 @@ export default function Sport() {
               : <><span className="flex items-center gap-1"><I n="calendar" className="size-3" />{dayLabel(ev.startsAt)}</span><span className="mt-1 flex items-center gap-1"><I n="clock" className="size-3" />{hm(ev.startsAt)}</span></>}
           </div>
           <div className="grid grid-cols-3 gap-1.5">
-            {odd({ ev: ev, m: isLive ? undefined : m1, code: "HOME", label: "1" })}{odd({ ev: ev, m: isLive ? undefined : m1, code: "DRAW", label: "X" })}{odd({ ev: ev, m: isLive ? undefined : m1, code: "AWAY", label: "2" })}
+            {odd({ ev: ev, m: m1, code: "HOME", label: "1" })}{odd({ ev: ev, m: m1, code: "DRAW", label: "X" })}{odd({ ev: ev, m: m1, code: "AWAY", label: "2" })}
           </div>
           <div className="grid grid-cols-2 gap-1.5">
-            {odd({ ev: ev, m: isLive ? undefined : ou, code: "OVER", label: "Ü 2.5" })}{odd({ ev: ev, m: isLive ? undefined : ou, code: "UNDER", label: "A 2.5" })}
+            {odd({ ev: ev, m: ou, code: "OVER", label: "Ü 2.5" })}{odd({ ev: ev, m: ou, code: "UNDER", label: "A 2.5" })}
           </div>
           <div className="hidden grid-cols-2 gap-1.5 md:grid">
-            {odd({ ev: ev, m: isLive ? undefined : kg, code: "YES", label: "Var" })}{odd({ ev: ev, m: isLive ? undefined : kg, code: "NO", label: "Yok" })}
+            {odd({ ev: ev, m: kg, code: "YES", label: "Var" })}{odd({ ev: ev, m: kg, code: "NO", label: "Yok" })}
           </div>
-          <button onClick={() => setOpenEv(open ? null : ev.id)} disabled={isLive || more === 0}
+          <button onClick={() => setOpenEv(open ? null : ev.id)} disabled={more === 0}
             className={`h-10 rounded-md text-[12px] font-extrabold transition-colors disabled:opacity-40 ${open ? "bg-primary text-primary-fg" : "bg-card text-muted hover:bg-surface-hover hover:text-fg"}`}>
             {open ? <I n="up" className="mx-auto size-4" /> : `+${more}`}
           </button>
@@ -435,7 +472,7 @@ export default function Sport() {
             <span className="grid size-7 place-items-center rounded-full bg-live text-white"><I n="play" className="size-3.5" /></span>
             <h2 className="text-lg font-extrabold">Canlı Maçlar</h2>
             <span className="rounded bg-live/15 px-1.5 text-[12px] font-extrabold text-live">{live.length}</span>
-            <span className="ml-2 hidden text-[12px] font-semibold text-subtle sm:inline">Canlı skor · canlı bahis yakında</span>
+            <span className="ml-2 hidden text-[12px] font-semibold text-subtle sm:inline">{limits?.liveEnabled ? "Oranlar canlı güncelleniyor · kilitli oranlar askıda" : "Canlı skor · canlı bahis şu an kapalı"}</span>
           </div>
           <div className="mb-2 flex items-center gap-2 px-1 text-[13px] font-bold text-soft"><SportIcon k="football" className="size-4" />Futbol</div>
           {liveGroups.map(([id, evs]) => leagueBlock({ key: `l${id}`, id: `l${id}`, name: evs[0].league, country: evs[0].country, logo: evs[0].leagueLogo, evs: evs, isLive: true }))}

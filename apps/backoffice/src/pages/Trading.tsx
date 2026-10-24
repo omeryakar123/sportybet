@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
-import { Panel, Field, Modal, DataTable, dt, Err } from "../ui";
+import { Panel, Field, Modal, DataTable, dt, Err, Warn } from "../ui";
 
 /**
  * Trading — kendi sportsbook motorumuz (API-Football beslemeli).
@@ -81,7 +81,8 @@ function Config() {
   const [nl, setNl] = useState({ id: "", name: "" });
   useEffect(() => { api("/admin/sb/config").then(setCfg).catch((x) => setE(x.message)); api("/admin/sb/status").then(setStatus).catch(() => {}); }, []);
   if (!cfg) return <Panel title="Ayarlar"><Err e={e} />Yükleniyor…</Panel>;
-  async function save() { setE(""); setMsg(""); try { const r = await api("/admin/sb/config", { method: "PUT", json: { enabled: cfg.enabled, marginPct: Number(cfg.marginPct), maxStake: Number(cfg.maxStake), maxWin: Number(cfg.maxWin), maxSelections: Number(cfg.maxSelections), syncDays: Number(cfg.syncDays), leagues: cfg.leagues } }); setCfg(r); setMsg("Kaydedildi ✓"); } catch (x: any) { setE(x.message); } }
+  async function save() { setE(""); setMsg(""); try { const r = await api("/admin/sb/config", { method: "PUT", json: { enabled: cfg.enabled, marginPct: Number(cfg.marginPct), minStake: Number(cfg.minStake), maxStake: Number(cfg.maxStake), maxWin: Number(cfg.maxWin), maxSelections: Number(cfg.maxSelections), syncDays: Number(cfg.syncDays), leagues: cfg.leagues,
+    liveEnabled: !!cfg.liveEnabled, liveMarginPct: Number(cfg.liveMarginPct), liveIntervalSec: Number(cfg.liveIntervalSec), liveStaleSec: Number(cfg.liveStaleSec), liveDelaySec: Number(cfg.liveDelaySec), liveMaxStake: Number(cfg.liveMaxStake) } }); setCfg(r); setMsg("Kaydedildi ✓"); } catch (x: any) { setE(x.message); } }
   const addLeague = () => { if (!nl.id || !nl.name) return; setCfg({ ...cfg, leagues: [...cfg.leagues, { id: Number(nl.id), name: nl.name }] }); setNl({ id: "", name: "" }); };
 
   return (
@@ -97,12 +98,48 @@ function Config() {
         ) : <span className="text-bo-muted">Durum yükleniyor…</span>}
       </Panel>
 
+      <Panel title="Canlı Bahis" right={<button className="btn-ghost" onClick={() => api("/admin/sb/sync-live", { method: "POST" }).then(() => api("/admin/sb/status").then(setStatus)).catch((x) => setE(x.message))}>↻ Canlı oranları şimdi çek</button>}>
+        {(() => {
+          const lv = status?.live; const minI = lv?.minIntervalSec;
+          const lim = status?.feed?.requests?.limit_day ?? status?.usage?.limit;
+          const need = Math.ceil(86400 / Math.max(3, Number(cfg.liveIntervalSec) || 15)) + 60;
+          const tooSlow = minI === -1 || (minI != null && minI > Number(cfg.liveStaleSec || 45));
+          return (
+            <>
+              <div className="mb-3 grid grid-cols-2 gap-4 md:grid-cols-5">
+                <div><div className="text-xs text-bo-muted">Durum</div><div className={`font-bold ${cfg.liveEnabled && !tooSlow ? "text-bo-green" : "text-bo-red"}`}>{!cfg.liveEnabled ? "Kapalı" : tooSlow ? "Açık ama kota yetersiz → oranlar kilitli" : "Açık"}</div></div>
+                <div><div className="text-xs text-bo-muted">Son başarılı çekim</div><div className="font-bold">{lv?.lastOkAt ? new Date(lv.lastOkAt).toLocaleTimeString("tr-TR") : "—"}</div></div>
+                <div><div className="text-xs text-bo-muted">Feed'deki canlı maç / bizde eşleşen</div><div className="font-bold">{lv?.fixtures ?? 0} / {lv?.matched ?? 0}</div></div>
+                <div><div className="text-xs text-bo-muted">Kotanın izin verdiği en kısa aralık</div><div className="font-bold">{minI == null ? "—" : minI === -1 ? "Kota bitti" : `${minI} sn`}</div></div>
+                <div><div className="text-xs text-bo-muted">Atlama / hata</div><div className="font-bold text-bo-orange">{lv?.error ?? lv?.skipped ?? "—"}</div></div>
+              </div>
+              {tooSlow && <div className="mb-3 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-amber-800">
+                Günlük kota ({lim ?? "?"} istek) canlı oranları {cfg.liveStaleSec} sn içinde tazelemeye yetmiyor; bayat oranla bahis alınmaması için canlı marketler otomatik <b>kilitli</b> kalır.
+                Seçilen {cfg.liveIntervalSec} sn aralık için günde yaklaşık <b>{need.toLocaleString("tr-TR")}</b> istek gerekir — API-Football'da bu limiti karşılayan bir plana geçin.
+              </div>}
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+                <label className="flex items-center gap-2 pt-5"><input type="checkbox" checked={!!cfg.liveEnabled} onChange={(e) => setCfg({ ...cfg, liveEnabled: e.target.checked })} />Canlı bahis aktif</label>
+                <Field label="Canlı marj %"><input type="number" className="inp" value={cfg.liveMarginPct} onChange={(e) => setCfg({ ...cfg, liveMarginPct: e.target.value })} /></Field>
+                <Field label="Oran çekme aralığı (sn)"><input type="number" className="inp" value={cfg.liveIntervalSec} onChange={(e) => setCfg({ ...cfg, liveIntervalSec: e.target.value })} /></Field>
+                <Field label="Bayat oran kilidi (sn)"><input type="number" className="inp" value={cfg.liveStaleSec} onChange={(e) => setCfg({ ...cfg, liveStaleSec: e.target.value })} />
+                  <Warn show={Number(cfg.liveStaleSec) < Number(cfg.liveIntervalSec) * 2}>En az aralığın 2 katı olmalı</Warn></Field>
+                <Field label="Kupon onay gecikmesi (sn)"><input type="number" className="inp" value={cfg.liveDelaySec} onChange={(e) => setCfg({ ...cfg, liveDelaySec: e.target.value })} /></Field>
+                <Field label="Canlı azami bahis (₺)"><input type="number" className="inp" value={cfg.liveMaxStake} onChange={(e) => setCfg({ ...cfg, liveMaxStake: e.target.value })} />
+                  <Warn show={Number(cfg.liveMaxStake) > Number(cfg.maxStake)}>Genel azami bahisten büyük olamaz</Warn></Field>
+              </div>
+              <p className="mt-2 text-bo-muted">Canlı marketler: Maç Sonucu, Çifte Şans, Alt/Üst 1.5–2.5–3.5, KG, Beraberlikte İade, Tek/Çift. Feed bir seçimi askıya alırsa, maç durdurulursa ya da oran "bayat oran kilidi" süresinden eskiyse market kilitlenir. Canlı kupon, gecikme süresi sonunda oranlar düşmediyse kabul edilir.</p>
+            </>
+          );
+        })()}
+      </Panel>
+
       <Panel title="Sportsbook Ayarları" right={<button className="btn-green" onClick={save}>Kaydet</button>}>
         <Err e={e} /><span className="text-bo-green">{msg}</span>
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
           <label className="flex items-center gap-2"><input type="checkbox" checked={cfg.enabled} onChange={(e) => setCfg({ ...cfg, enabled: e.target.checked })} />Sportsbook aktif</label>
           <Field label="Marj %  (oranlardan düşülür)"><input type="number" className="inp" value={cfg.marginPct} onChange={(e) => setCfg({ ...cfg, marginPct: e.target.value })} /></Field>
           <Field label="İleri senkron (gün)"><input type="number" className="inp" value={cfg.syncDays} onChange={(e) => setCfg({ ...cfg, syncDays: e.target.value })} /></Field>
+          <Field label="Asgari bahis (₺)"><input type="number" className="inp" value={cfg.minStake} onChange={(e) => setCfg({ ...cfg, minStake: e.target.value })} /></Field>
           <Field label="Azami bahis (₺)"><input type="number" className="inp" value={cfg.maxStake} onChange={(e) => setCfg({ ...cfg, maxStake: e.target.value })} /></Field>
           <Field label="Azami kazanç (₺)"><input type="number" className="inp" value={cfg.maxWin} onChange={(e) => setCfg({ ...cfg, maxWin: e.target.value })} /></Field>
           <Field label="Kombinede azami maç"><input type="number" className="inp" value={cfg.maxSelections} onChange={(e) => setCfg({ ...cfg, maxSelections: e.target.value })} /></Field>

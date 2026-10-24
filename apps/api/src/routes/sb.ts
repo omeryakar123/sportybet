@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { WalletType } from "@prisma/client";
 import { db } from "../index.js";
-import { getConfig, setConfig, listEvents, listLive, listLeagues, serializeEvent, placeBet, syncFixtures, syncOdds, syncResults, settleEvent, SbError, MARKET_LIST, SPORT_LIST } from "../services/sb.js";
+import { getConfig, setConfig, listEvents, listLive, listLeagues, serializeEvent, placeBet, syncFixtures, syncOdds, syncResults, settleEvent, SbError, MARKET_LIST, SPORT_LIST, syncLive, liveStatus, liveMinInterval } from "../services/sb.js";
 import { feed, feedConfigured, feedUsage } from "../services/feed.js";
 
 // ---------- Oyuncu / site tarafı ----------
@@ -18,7 +18,7 @@ export async function sbSiteRoutes(app: FastifyInstance) {
     if (!ev) return reply.code(404).send({ error: "NOT_FOUND" });
     return serializeEvent(ev);
   });
-  app.get("/sb/limits", async () => { const c = await getConfig(db); return { minStake: c.minStake, maxStake: c.maxStake, maxWin: c.maxWin, maxSelections: c.maxSelections }; });
+  app.get("/sb/limits", async () => { const c = await getConfig(db); return { minStake: c.minStake, maxStake: c.maxStake, maxWin: c.maxWin, maxSelections: c.maxSelections, liveEnabled: c.liveEnabled, liveDelaySec: c.liveDelaySec, liveMaxStake: c.liveMaxStake, liveIntervalSec: c.liveIntervalSec }; });
 
   const auth = async (req: FastifyRequest, reply: FastifyReply) => {
     try { await req.jwtVerify(); } catch { reply.code(401).send({ error: "UNAUTHORIZED" }); return null; }
@@ -29,9 +29,12 @@ export async function sbSiteRoutes(app: FastifyInstance) {
 
   app.post("/sb/bet", async (req, reply) => {
     const pid = await auth(req, reply); if (!pid) return;
-    const b = z.object({ selectionIds: z.array(z.number()).min(1), stake: z.number().positive(), mode: z.enum(["combo", "single"]).optional(), wallet: z.nativeEnum(WalletType).optional() }).parse(req.body);
+    const b = z.object({
+      selectionIds: z.array(z.number()).min(1), stake: z.number().positive(), mode: z.enum(["combo", "single"]).optional(), wallet: z.nativeEnum(WalletType).optional(),
+      odds: z.record(z.number()).optional(), acceptOdds: z.enum(["none", "higher", "any"]).optional(),
+    }).parse(req.body);
     try { return await placeBet(db, pid, b); }
-    catch (e: any) { if (e instanceof SbError) return reply.code(400).send({ error: e.message }); throw e; }
+    catch (e: any) { if (e instanceof SbError) return reply.code(400).send({ error: e.message, detail: e.detail }); throw e; }
   });
 
   app.get("/sb/my-bets", async (req, reply) => {
@@ -46,7 +49,7 @@ export async function sbAdminRoutes(app: FastifyInstance) {
     const cfg = await getConfig(db);
     let feedStatus: any = null;
     if (feedConfigured()) feedStatus = await feed.status().catch((e: any) => ({ error: e.message, detail: e.detail }));
-    return { configured: feedConfigured(), usage: feedUsage(), config: cfg, feed: feedStatus };
+    return { configured: feedConfigured(), usage: feedUsage(), config: cfg, feed: feedStatus, live: { ...liveStatus(), minIntervalSec: ((x) => (x === null ? null : Number.isFinite(x) ? x : -1))(liveMinInterval()) } };
   });
   // Bonus kural editörü için seçenekler (spor / lig / market)
   app.get("/sb/catalog", async () => {
@@ -64,6 +67,9 @@ export async function sbAdminRoutes(app: FastifyInstance) {
       minStake: z.number().min(0).optional(), maxStake: z.number().positive().optional(), maxWin: z.number().positive().optional(),
       maxSelections: z.number().int().min(1).max(30).optional(), syncDays: z.number().int().min(1).max(7).optional(),
       oddsPerRun: z.number().int().min(1).max(50).optional(),
+      liveEnabled: z.boolean().optional(), liveMarginPct: z.number().min(0).max(30).optional(),
+      liveIntervalSec: z.number().int().min(3).max(600).optional(), liveStaleSec: z.number().int().min(6).max(1800).optional(),
+      liveDelaySec: z.number().int().min(0).max(30).optional(), liveMaxStake: z.number().positive().optional(),
       leagues: z.array(z.object({ id: z.number().int().positive(), name: z.string().min(1) })).optional(),
     }).parse(req.body);
     return setConfig(db, b);
@@ -106,4 +112,5 @@ export async function sbAdminRoutes(app: FastifyInstance) {
   // manuel senkron tetikleyicileri
   app.post("/sb/sync", async () => ({ fixtures: await syncFixtures(db), odds: await syncOdds(db) }));
   app.post("/sb/sync-results", async () => syncResults(db));
+  app.post("/sb/sync-live", async () => syncLive(db));
 }

@@ -81,6 +81,7 @@ export function Tabs<T extends string>({ tabs, value, onChange }: { tabs: readon
 }
 /** API hata kodlarının Türkçe karşılıkları (bilinmeyen kod olduğu gibi gösterilir) */
 export const ERR_TR: Record<string, string> = {
+  LIVE_MAX_GT_MAX_STAKE: "Canlı azami bahis, genel azami bahisten büyük olamaz", LIVE_STALE_LT_2X_INTERVAL: "Bayat oran kilidi, çekme aralığının en az 2 katı olmalı", MIN_STAKE_GT_MAX_STAKE: "Asgari bahis azami bahisten büyük olamaz", MAX_WIN_LT_MAX_STAKE: "Azami kazanç azami bahisten küçük olamaz",
   VALIDATION_ERROR: "Form alanlarını kontrol edin", NOT_FOUND: "Kayıt bulunamadı", ALREADY_EXISTS: "Bu kayıt zaten var", FORBIDDEN: "Bu işlem için yetkiniz yok",
   INSUFFICIENT_FUNDS: "Yetersiz bakiye", INSUFFICIENT_BALANCE: "Oyuncunun bakiyesi yetersiz", REASON_REQUIRED: "Sebep yazmak zorunlu (en az 5 karakter)",
   ALREADY_PROCESSED: "Bu talep zaten işlenmiş", ONLY_PAID_CAN_BE_REVERSED: "Sadece ödenmiş talepler geri alınabilir", ONLY_PAID_CAN_BE_CORRECTED: "Sadece ödenmiş talepler düzeltilebilir",

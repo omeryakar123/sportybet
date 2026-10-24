@@ -6,12 +6,12 @@
  *  - bonus cüzdanıyla oynanan kuponlar ilgili PlayerBonus'a bağlanır; kurallara uyuyorsa çevrime sayılır
  */
 import { Prisma, PrismaClient, BetState, BetType, TxType, WalletType, PlayerBonusState } from "@prisma/client";
-import { feed, feedConfigured, feedBudget, feedUsage, FINAL_STATUS, VOID_STATUS } from "./feed.js";
+import { feed, feedConfigured, feedBudget, feedUsage, liveOdds, FINAL_STATUS, VOID_STATUS } from "./feed.js";
 import { move } from "./wallet.js";
 import { addWagering } from "./bonus.js";
 
 const D = (v: Prisma.Decimal.Value) => new Prisma.Decimal(v);
-export class SbError extends Error {}
+export class SbError extends Error { detail?: any; constructor(m: string, detail?: any) { super(m); this.detail = detail; } }
 
 const CFG_KEY = "sportsbook_config";
 export type SbConfig = {
@@ -24,9 +24,17 @@ export type SbConfig = {
   maxSelections: number;    // kombinede azami maç
   syncDays: number;         // kaç günü ileri senkronla
   oddsPerRun: number;       // oran senkronunda tek seferde en fazla kaç maç (kota)
+  // ---- CANLI BAHİS ----
+  liveEnabled: boolean;     // canlı bahis açık mı
+  liveMarginPct: number;    // canlı oranlara uygulanan marj (%)
+  liveIntervalSec: number;  // canlı oran çekme aralığı (sn) — kota izin verdiği ölçüde
+  liveStaleSec: number;     // bu süreden eski canlı oran = kilitli
+  liveDelaySec: number;     // canlı kupon onay gecikmesi (sn)
+  liveMaxStake: number;     // canlı kupon başına azami yatırım
 };
 const DEFAULTS: SbConfig = {
   enabled: true, marginPct: 6, minStake: 10, maxStake: 50000, maxWin: 500000, maxSelections: 12, syncDays: 2, oddsPerRun: 8,
+  liveEnabled: false, liveMarginPct: 8, liveIntervalSec: 15, liveStaleSec: 45, liveDelaySec: 6, liveMaxStake: 10000,
   leagues: [
     { id: 203, name: "Süper Lig" }, { id: 39, name: "Premier League" }, { id: 140, name: "La Liga" },
     { id: 135, name: "Serie A" }, { id: 78, name: "Bundesliga" }, { id: 61, name: "Ligue 1" },
@@ -43,6 +51,8 @@ export async function setConfig(db: PrismaClient, patch: Partial<SbConfig>) {
   const next = { ...cur, ...patch };
   if (next.minStake > next.maxStake) throw new SbError("MIN_STAKE_GT_MAX_STAKE");
   if (next.maxWin < next.maxStake) throw new SbError("MAX_WIN_LT_MAX_STAKE");
+  if (next.liveMaxStake > next.maxStake) throw new SbError("LIVE_MAX_GT_MAX_STAKE");
+  if (next.liveStaleSec < next.liveIntervalSec * 2) throw new SbError("LIVE_STALE_LT_2X_INTERVAL");
   await db.cmsSetting.upsert({ where: { siteId_key: { siteId: 1, key: CFG_KEY } }, update: { value: next as any }, create: { siteId: 1, key: CFG_KEY, value: next as any } });
   return next;
 }
@@ -201,6 +211,68 @@ export async function syncResults(db: PrismaClient) {
   return { checked: pending.length, settled };
 }
 
+// ---------- CANLI SENKRON ----------
+const IN_PLAY_WINDOW = 3.5 * 3600_000; // başlangıçtan bu kadar süre sonrasına kadar canlı say
+let liveStat = { lastRunAt: null as Date | null, lastOkAt: null as Date | null, fixtures: 0, matched: 0, error: null as string | null, skipped: null as string | null };
+export const liveStatus = () => liveStat;
+
+/** Kotaya göre çalıştırılabilecek en kısa aralık (sn). Bilinmiyorsa null. */
+export function liveMinInterval() {
+  const u = feedUsage();
+  if (!u.limit || u.remaining == null) return null;
+  const now = new Date(); const end = new Date(now); end.setUTCHours(24, 0, 0, 0);
+  const secLeft = Math.max(60, (end.getTime() - now.getTime()) / 1000);
+  const usable = Math.max(0, u.remaining - 30); // 30 istek program/sonuç için ayrılır
+  return usable <= 0 ? Infinity : Math.ceil(secLeft / usable);
+}
+
+/** /odds/live → bizim canlı maçlarımıza oran + skor + dakika yazar. Gelmeyen/askıdaki seçimler kilitlenir. */
+export async function syncLive(db: PrismaClient) {
+  const cfg = await getConfig(db);
+  liveStat.lastRunAt = new Date(); liveStat.skipped = null;
+  if (!cfg.enabled || !cfg.liveEnabled || !feedConfigured()) { liveStat.skipped = "DISABLED"; return liveStat; }
+  const ours = await db.sbEvent.findMany({ where: { settledAt: null, startsAt: { lt: new Date(), gt: new Date(Date.now() - IN_PLAY_WINDOW) } }, select: { id: true, fixtureId: true, home: true, away: true } });
+  if (!ours.length) { liveStat.skipped = "NO_LIVE_EVENTS"; return liveStat; }
+  if (!feedBudget(30)) { liveStat.skipped = "QUOTA_LOW"; return liveStat; }
+  let list: Awaited<ReturnType<typeof liveOdds>>;
+  try { list = await liveOdds(); liveStat.error = null; } catch (e: any) { liveStat.error = `${e.message} ${JSON.stringify(e.detail ?? "")}`; return liveStat; }
+  const byFx = new Map(list.map((f) => [f.fixtureId, f]));
+  let matched = 0;
+  for (const ev of ours) {
+    const f = byFx.get(ev.fixtureId);
+    if (!f) continue;
+    matched++;
+    const now = new Date();
+    await db.$transaction(async (tx) => {
+      await tx.sbEvent.update({ where: { id: ev.id }, data: { status: f.finished ? "FT" : f.status, minute: f.minute, homeGoals: f.h, awayGoals: f.a, liveStopped: f.stopped || f.finished, liveUpdatedAt: now } });
+      // önce bu maçın tüm seçimlerini kilitle; feed'de gelen ve askıda olmayanları aç
+      await tx.sbSelection.updateMany({ where: { market: { eventId: ev.id } }, data: { suspended: true } });
+      for (const [key, set] of Object.entries(f.markets)) {
+        const def = MARKETS[key]; if (!def) continue;
+        const market = await tx.sbMarket.upsert({ where: { eventId_key: { eventId: ev.id, key } }, update: {}, create: { eventId: ev.id, key, name: def.name, sortOrder: def.order } });
+        for (const sDef of def.sels(ev)) {
+          const v = set[sDef.code]; if (!v) continue;
+          const odd = v.odd > 1 ? withMargin(v.odd, cfg.liveMarginPct) : 1.01;
+          await tx.sbSelection.upsert({
+            where: { marketId_code: { marketId: market.id, code: sDef.code } },
+            update: { baseOdds: v.odd > 1 ? v.odd : 1, odds: odd, suspended: v.suspended },
+            create: { marketId: market.id, code: sDef.code, name: sDef.name, baseOdds: v.odd > 1 ? v.odd : 1, odds: odd, suspended: v.suspended },
+          });
+        }
+      }
+    });
+  }
+  liveStat = { ...liveStat, lastOkAt: new Date(), fixtures: list.length, matched };
+  return liveStat;
+}
+
+/** Canlı bahsin şu an bu maç için açık olup olmadığı */
+export function liveOpen(cfg: SbConfig, ev: { liveUpdatedAt: Date | null; liveStopped: boolean; status: string }) {
+  if (!cfg.liveEnabled || ev.liveStopped || !ev.liveUpdatedAt) return false;
+  if (FINAL_STATUS.includes(ev.status) || VOID_STATUS.includes(ev.status)) return false;
+  return Date.now() - new Date(ev.liveUpdatedAt).getTime() <= cfg.liveStaleSec * 1000;
+}
+
 /** Maçı sonuçlandır: seçim sonuçlarını yaz, etkilenen kuponları öde. void=iade. */
 export async function settleEvent(db: PrismaClient, eventId: number, h: number, a: number, isVoid: boolean, hh: number | null = null, ha: number | null = null) {
   const markets = await db.sbMarket.findMany({ where: { eventId }, include: { selections: true } });
@@ -299,7 +371,8 @@ export function matchBonusRules(rules: any, betType: BetType, sels: { marketKey:
 }
 
 // ---------- KUPON ----------
-export async function placeBet(db: PrismaClient, playerId: number, body: { selectionIds: number[]; stake: number; mode?: "combo" | "single"; wallet?: WalletType }) {
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+export async function placeBet(db: PrismaClient, playerId: number, body: { selectionIds: number[]; stake: number; mode?: "combo" | "single"; wallet?: WalletType; odds?: Record<string, number>; acceptOdds?: "none" | "higher" | "any" }) {
   const cfg = await getConfig(db);
   if (!cfg.enabled) throw new SbError("SPORTSBOOK_DISABLED");
   const stake = Math.round(Number(body.stake) * 100) / 100;
@@ -310,16 +383,50 @@ export async function placeBet(db: PrismaClient, playerId: number, body: { selec
   if (!ids.length) throw new SbError("NO_SELECTION");
   if (ids.length > cfg.maxSelections) throw new SbError("TOO_MANY_SELECTIONS");
 
-  const sels = await db.sbSelection.findMany({ where: { id: { in: ids } }, include: { market: { include: { event: true } } } });
+  const loadSels = () => db.sbSelection.findMany({ where: { id: { in: ids } }, include: { market: { include: { event: true } } } });
+  let sels = await loadSels();
   if (sels.length !== ids.length) throw new SbError("SELECTION_UNAVAILABLE");
-  for (const s of sels) {
-    const ev = s.market.event;
-    if (!s.market.isOpen || !ev.isOpen || ev.settledAt) throw new SbError("SELECTION_CLOSED");
-    if ((ev.status !== "NS" && ev.status !== "TBD") || new Date(ev.startsAt).getTime() <= Date.now()) throw new SbError("EVENT_STARTED");
-  }
+  const isLiveSel = (s: (typeof sels)[number]) => new Date(s.market.event.startsAt).getTime() <= Date.now() || (s.market.event.status !== "NS" && s.market.event.status !== "TBD");
+  const check = (list: typeof sels) => {
+    for (const s of list) {
+      const ev = s.market.event;
+      if (!s.market.isOpen || !ev.isOpen || ev.settledAt) throw new SbError("SELECTION_CLOSED");
+      if (isLiveSel(s)) {
+        if (!cfg.liveEnabled) throw new SbError("EVENT_STARTED");
+        if (!liveOpen(cfg, ev)) throw new SbError("LIVE_SUSPENDED");
+        if (s.suspended) throw new SbError("SELECTION_SUSPENDED", { selectionId: s.id });
+      }
+    }
+  };
+  check(sels);
+  const hasLive = sels.some(isLiveSel);
+  if (hasLive && stake > cfg.liveMaxStake) throw new SbError("LIVE_MAX_STAKE_EXCEEDED", { max: cfg.liveMaxStake });
   const mode = body.mode ?? "combo";
   const player = await db.player.findUniqueOrThrow({ where: { id: playerId } });
   if (player.status !== "OPEN" || player.isSportBlocked) throw new SbError("SPORT_BLOCKED");
+
+  // Oran kontrolü: oyuncunun gördüğü oran ≠ güncel oran → politika
+  const accept = body.acceptOdds ?? "higher";
+  const verifyOdds = (list: typeof sels) => {
+    if (!body.odds) return;
+    const changed = list.filter((s) => {
+      const seen = Number(body.odds![String(s.id)]); const cur = Number(s.odds);
+      if (!seen || Math.abs(seen - cur) < 0.005) return false;
+      return accept === "any" ? false : accept === "higher" ? cur < seen : true;
+    });
+    if (changed.length) throw new SbError("ODDS_CHANGED", { odds: Object.fromEntries(list.map((s) => [s.id, Number(s.odds)])), changed: changed.map((s) => s.id) });
+  };
+  verifyOdds(sels);
+  // Canlı: gecikme sonrası tekrar doğrula (gol/kırmızı kart anında kupon kaçırmayı engeller)
+  if (hasLive && cfg.liveDelaySec > 0) {
+    const snap = new Map(sels.map((s) => [s.id, Number(s.odds)]));
+    await sleep(cfg.liveDelaySec * 1000);
+    sels = await loadSels();
+    check(sels);
+    const dropped = sels.filter((s) => Number(s.odds) < (snap.get(s.id) ?? 0) - 0.005 && accept !== "any");
+    if (dropped.length) throw new SbError("ODDS_CHANGED", { odds: Object.fromEntries(sels.map((s) => [s.id, Number(s.odds)])), changed: dropped.map((s) => s.id) });
+    verifyOdds(sels);
+  }
   const wallet = body.wallet ?? (player.activeWallet === "BONUS" ? WalletType.BONUS : WalletType.MAIN);
   // Bonus cüzdanıyla oynanıyorsa aktif bonusu bağla
   const pb = wallet === WalletType.BONUS
@@ -353,11 +460,14 @@ async function createBet(db: PrismaClient, playerId: number, wallet: WalletType,
         playerId, type, stake, totalOdds: D(totalOdds.toFixed(3)), potentialWin: D(potential.toFixed(2)),
         stakeFromMain: wallet === WalletType.MAIN ? stake : 0, stakeFromBonus: wallet === WalletType.BONUS ? stake : 0,
         state: BetState.ACTIVE, source: "Web", playerBonusId, bonusEligible,
+        isLive: sels.some((s: any) => new Date(s.market.event.startsAt).getTime() <= Date.now()),
         selections: {
           create: sels.map((s) => ({
             providerEventId: String(s.market.event.fixtureId), sport: s.market.event.sport, region: s.market.event.country, competition: s.market.event.league,
             matchName: `${s.market.event.home} - ${s.market.event.away}`, matchStart: s.market.event.startsAt,
             market: s.market.name, selection: s.name, odds: s.odds, state: BetState.ACTIVE, sbSelectionId: s.id,
+            isLive: new Date(s.market.event.startsAt).getTime() <= Date.now(),
+            info: new Date(s.market.event.startsAt).getTime() <= Date.now() ? `Canlı ${s.market.event.minute ?? ""}' ${s.market.event.homeGoals ?? 0}-${s.market.event.awayGoals ?? 0}` : null,
           })),
         },
       },
@@ -384,25 +494,30 @@ export async function listEvents(db: PrismaClient, opts: { leagueId?: number; li
     },
     orderBy: [{ featured: "desc" }, { startsAt: "asc" }], take: opts.limit ?? 120, include: mInclude,
   });
-  return events.map(serializeEvent);
+  return events.map((e) => serializeEvent(e));
 }
 /** Başlamış ama bitmemiş maçlar (canlı skor gösterimi — canlı bahis faz 2) */
 export async function listLive(db: PrismaClient) {
-  const events = await db.sbEvent.findMany({ where: { settledAt: null, startsAt: { lt: new Date() }, status: { notIn: ["NS", "TBD", ...FINAL_STATUS, ...VOID_STATUS] } }, orderBy: { startsAt: "asc" }, take: 50, include: mInclude });
-  return events.map(serializeEvent);
+  const cfg = await getConfig(db);
+  const events = await db.sbEvent.findMany({
+    where: { settledAt: null, isOpen: true, startsAt: { lt: new Date(), gt: new Date(Date.now() - IN_PLAY_WINDOW) }, status: { notIn: [...FINAL_STATUS, ...VOID_STATUS] } },
+    orderBy: { startsAt: "asc" }, take: 60, include: mInclude,
+  });
+  return events.map((ev) => serializeEvent(ev, { live: true, open: liveOpen(cfg, ev) }));
 }
 export async function listLeagues(db: PrismaClient) {
   const rows = await db.sbEvent.groupBy({ by: ["leagueId", "league", "country", "leagueLogo"], where: { isOpen: true, settledAt: null, startsAt: { gt: new Date() } }, _count: true });
   return rows.map((r) => ({ id: r.leagueId, name: r.league, country: r.country, logo: r.leagueLogo, count: r._count })).sort((a, b) => b.count - a.count);
 }
-export function serializeEvent(ev: any) {
+export function serializeEvent(ev: any, live?: { live: boolean; open: boolean }) {
   return {
+    live: live?.live ?? false, liveOpen: live?.open ?? false, liveStopped: ev.liveStopped ?? false, liveUpdatedAt: ev.liveUpdatedAt ?? null,
     id: ev.id, fixtureId: ev.fixtureId, league: ev.league, leagueId: ev.leagueId, country: ev.country, leagueLogo: ev.leagueLogo,
     home: ev.home, away: ev.away, homeLogo: ev.homeLogo, awayLogo: ev.awayLogo, startsAt: ev.startsAt, status: ev.status, minute: ev.minute,
     score: ev.homeGoals == null ? null : { h: ev.homeGoals, a: ev.awayGoals, hh: ev.htHomeGoals, ha: ev.htAwayGoals }, featured: ev.featured,
     markets: (ev.markets ?? []).map((m: any) => ({
       id: m.id, key: m.key, name: m.name,
-      selections: [...m.selections].sort((a: any, b: any) => a.id - b.id).map((s: any) => ({ id: s.id, code: s.code, name: s.name, odds: Number(s.odds) })),
+      selections: [...m.selections].sort((a: any, b: any) => a.id - b.id).map((s: any) => ({ id: s.id, code: s.code, name: s.name, odds: Number(s.odds), suspended: live?.live ? (!live.open || !!s.suspended) : false })),
     })),
   };
 }
