@@ -9,6 +9,7 @@ import { Prisma, PrismaClient, BetState, BetType, TxType, WalletType, PlayerBonu
 import { feed, feedConfigured, feedBudget, feedUsage, liveOdds, FINAL_STATUS, VOID_STATUS } from "./feed.js";
 import { move } from "./wallet.js";
 import { addWagering } from "./bonus.js";
+import { quoteBuilder } from "./betbuilder.js";
 
 const D = (v: Prisma.Decimal.Value) => new Prisma.Decimal(v);
 export class SbError extends Error { detail?: any; constructor(m: string, detail?: any) { super(m); this.detail = detail; } }
@@ -31,10 +32,15 @@ export type SbConfig = {
   liveStaleSec: number;     // bu süreden eski canlı oran = kilitli
   liveDelaySec: number;     // canlı kupon onay gecikmesi (sn)
   liveMaxStake: number;     // canlı kupon başına azami yatırım
+  // ---- BET BUILDER ----
+  bbEnabled: boolean;       // aynı maçtan birden fazla seçim (birleşik oran)
+  bbMarginPct: number;      // bet builder oranına ek marj (%)
+  bbMaxLegs: number;        // bir maçta en fazla seçim
 };
 const DEFAULTS: SbConfig = {
   enabled: true, marginPct: 6, minStake: 10, maxStake: 50000, maxWin: 500000, maxSelections: 12, syncDays: 2, oddsPerRun: 8,
   liveEnabled: false, liveMarginPct: 8, liveIntervalSec: 15, liveStaleSec: 45, liveDelaySec: 6, liveMaxStake: 10000,
+  bbEnabled: true, bbMarginPct: 5, bbMaxLegs: 6,
   leagues: [
     { id: 203, name: "Süper Lig" }, { id: 39, name: "Premier League" }, { id: 140, name: "La Liga" },
     { id: 135, name: "Serie A" }, { id: 78, name: "Bundesliga" }, { id: 61, name: "Ligue 1" },
@@ -307,12 +313,16 @@ async function settleBetsForSelections(db: PrismaClient, sbSelectionIds: number[
       const sels = await tx.sbSelection.findMany({ where: { id: { in: ids } } });
       const byId = new Map(sels.map((s) => [s.id, s]));
       let anyPending = false, anyLost = false, effOdds = 1;
+      const groups = new Map<string, { odds: number; res: string[] }>();
       for (const bs of bet.selections) {
         const res = bs.sbSelectionId ? byId.get(bs.sbSelectionId)?.result : null;
         if (!res) { anyPending = true; break; }
         if (res === "LOST") anyLost = true;
-        else if (res === "WON") effOdds *= Number(bs.odds); // VOID → 1.0
+        if (bs.bbGroup) { const g = groups.get(bs.bbGroup) ?? { odds: Number(bs.bbOdds ?? 1), res: [] }; g.res.push(res); groups.set(bs.bbGroup, g); continue; }
+        if (res === "WON") effOdds *= Number(bs.odds); // VOID → 1.0
       }
+      // Bet Builder grubu: hepsi kazandıysa birleşik oran; iade olan seçim varsa grup iade (1.0)
+      for (const g of groups.values()) if (g.res.every((r) => r === "WON")) effOdds *= g.odds;
       if (anyPending) return;
 
       // Ödeme cüzdanı: bonusla oynandıysa → bonus hâlâ aktifse BONUS, tamamlandıysa MAIN
@@ -372,7 +382,7 @@ export function matchBonusRules(rules: any, betType: BetType, sels: { marketKey:
 
 // ---------- KUPON ----------
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-export async function placeBet(db: PrismaClient, playerId: number, body: { selectionIds: number[]; stake: number; mode?: "combo" | "single"; wallet?: WalletType; odds?: Record<string, number>; acceptOdds?: "none" | "higher" | "any" }) {
+export async function placeBet(db: PrismaClient, playerId: number, body: { selectionIds: number[]; stake: number; mode?: "combo" | "single"; wallet?: WalletType; odds?: Record<string, number>; bbOdds?: Record<string, number>; acceptOdds?: "none" | "higher" | "any" }) {
   const cfg = await getConfig(db);
   if (!cfg.enabled) throw new SbError("SPORTSBOOK_DISABLED");
   const stake = Math.round(Number(body.stake) * 100) / 100;
@@ -433,27 +443,55 @@ export async function placeBet(db: PrismaClient, playerId: number, body: { selec
     ? await db.playerBonus.findFirst({ where: { playerId, state: PlayerBonusState.ACTIVE }, include: { bonus: true } })
     : null;
 
+  // ---- Bet Builder: aynı maçtaki birden fazla seçim → tek ayak (birleşik oran) ----
+  const bbOf = new Map<number, { key: string; odds: number }>(); // selectionId → grup
+  const byEvent = new Map<number, typeof sels>();
+  for (const s of sels) { const k = s.market.eventId; if (!byEvent.has(k)) byEvent.set(k, []); byEvent.get(k)!.push(s); }
+  for (const [eventId, g] of byEvent) {
+    if (g.length < 2) continue;
+    if (!cfg.bbEnabled) throw new SbError("SAME_EVENT_IN_COMBO");
+    if (g.some(isLiveSel)) throw new SbError("BB_LIVE_NOT_SUPPORTED");
+    const q = await builderQuote(db, cfg, eventId, g.map((s) => ({ marketKey: s.market.key, code: s.code, odds: Number(s.odds) })));
+    if (!q.ok) throw new SbError(q.error, q.detail);
+    const key = `bb-${eventId}`;
+    for (const s of g) bbOf.set(s.id, { key, odds: q.odds });
+  }
+  // oyuncunun gördüğü bet builder oranı düştüyse onay iste
+  if (body.bbOdds) for (const [eventId, seen] of Object.entries(body.bbOdds)) {
+    const g = [...bbOf.values()].find((x) => x.key === `bb-${eventId}`);
+    if (g && Number(seen) - g.odds > 0.005 && accept !== "any") throw new SbError("ODDS_CHANGED", { odds: Object.fromEntries(sels.map((s) => [s.id, Number(s.odds)])), bbOdds: { [eventId]: g.odds }, changed: [] });
+  }
+  /** kupon toplam oranı: bet builder grupları tek ayak sayılır */
+  const groupOdds = (group: typeof sels) => {
+    const seen = new Set<string>(); let t = 1;
+    for (const s of group) { const b = bbOf.get(s.id); if (b) { if (!seen.has(b.key)) { seen.add(b.key); t *= b.odds; } } else t *= Number(s.odds); }
+    return t;
+  };
+
   const plan = (group: typeof sels, type: BetType) => {
-    const totalOdds = group.reduce((a, s) => a * Number(s.odds), 1);
+    const totalOdds = groupOdds(group);
     const check = pb ? matchBonusRules(pb.bonus.rules, type, group.map((s) => ({ marketKey: s.market.key, leagueId: s.market.event.leagueId, league: s.market.event.league, sport: s.market.event.sport, odds: Number(s.odds) }))) : null;
     return { group, type, totalOdds, potential: Math.min(stake * totalOdds, cfg.maxWin), eligible: check ? check.ok : null, why: check?.why ?? [] };
   };
 
   if (mode === "combo") {
-    if (new Set(sels.map((s) => s.market.eventId)).size !== sels.length) throw new SbError("SAME_EVENT_IN_COMBO");
     const p = plan(sels, sels.length > 1 ? BetType.MULTIPLE : BetType.SINGLE);
-    const bet = await createBet(db, player.id, wallet, p.group, stake, p.totalOdds, p.potential, p.type, pb?.id ?? null, p.eligible);
+    const bet = await createBet(db, player.id, wallet, p.group, stake, p.totalOdds, p.potential, p.type, pb?.id ?? null, p.eligible, bbOf);
     return { ...bet, bonus: pb ? { playerBonusId: pb.id, name: pb.bonus.name, eligible: p.eligible, why: p.why } : null };
   }
+  // tekli: her maç ayrı kupon (bet builder grubu tek kupon olur)
   const out = [];
-  for (const s of sels) {
-    const p = plan([s], BetType.SINGLE);
-    out.push(await createBet(db, player.id, wallet, p.group, stake, p.totalOdds, p.potential, BetType.SINGLE, pb?.id ?? null, p.eligible));
+  for (const [, g] of byEvent) {
+    const groups = g.length > 1 ? [g] : g.map((s) => [s]);
+    for (const grp of groups) {
+      const p = plan(grp, grp.length > 1 ? BetType.MULTIPLE : BetType.SINGLE);
+      out.push(await createBet(db, player.id, wallet, p.group, stake, p.totalOdds, p.potential, p.type, pb?.id ?? null, p.eligible, bbOf));
+    }
   }
   return { bets: out };
 }
 
-async function createBet(db: PrismaClient, playerId: number, wallet: WalletType, sels: any[], stake: number, totalOdds: number, potential: number, type: BetType, playerBonusId: number | null, bonusEligible: boolean | null) {
+async function createBet(db: PrismaClient, playerId: number, wallet: WalletType, sels: any[], stake: number, totalOdds: number, potential: number, type: BetType, playerBonusId: number | null, bonusEligible: boolean | null, bbOf?: Map<number, { key: string; odds: number }>) {
   return db.$transaction(async (tx) => {
     const bet = await tx.bet.create({
       data: {
@@ -466,6 +504,7 @@ async function createBet(db: PrismaClient, playerId: number, wallet: WalletType,
             providerEventId: String(s.market.event.fixtureId), sport: s.market.event.sport, region: s.market.event.country, competition: s.market.event.league,
             matchName: `${s.market.event.home} - ${s.market.event.away}`, matchStart: s.market.event.startsAt,
             market: s.market.name, selection: s.name, odds: s.odds, state: BetState.ACTIVE, sbSelectionId: s.id,
+            ...(bbOf?.get(s.id) ? { bbGroup: bbOf.get(s.id)!.key, bbOdds: D(bbOf.get(s.id)!.odds.toFixed(3)) } : {}),
             isLive: new Date(s.market.event.startsAt).getTime() <= Date.now(),
             info: new Date(s.market.event.startsAt).getTime() <= Date.now() ? `Canlı ${s.market.event.minute ?? ""}' ${s.market.event.homeGoals ?? 0}-${s.market.event.awayGoals ?? 0}` : null,
           })),
@@ -520,4 +559,13 @@ export function serializeEvent(ev: any, live?: { live: boolean; open: boolean })
       selections: [...m.selections].sort((a: any, b: any) => a.id - b.id).map((s: any) => ({ id: s.id, code: s.code, name: s.name, odds: Number(s.odds), suspended: live?.live ? (!live.open || !!s.suspended) : false })),
     })),
   };
+}
+
+// ---------- BET BUILDER FİYATI ----------
+/** Maçın açık marketlerinden bet builder oranı */
+export async function builderQuote(db: PrismaClient, cfg: SbConfig, eventId: number, legs: { marketKey: string; code: string; odds: number }[]) {
+  const markets = await db.sbMarket.findMany({ where: { eventId, isOpen: true }, include: { selections: true } });
+  const mk: Record<string, Record<string, number>> = {};
+  for (const m of markets) mk[m.key] = Object.fromEntries(m.selections.map((x) => [x.code, Number(x.odds)]));
+  return quoteBuilder(legs, mk, { marginPct: cfg.bbMarginPct ?? 5, maxLegs: cfg.bbMaxLegs ?? 6 });
 }

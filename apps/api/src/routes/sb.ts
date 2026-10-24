@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { WalletType } from "@prisma/client";
 import { db } from "../index.js";
-import { getConfig, setConfig, listEvents, listLive, listLeagues, serializeEvent, placeBet, syncFixtures, syncOdds, syncResults, settleEvent, SbError, MARKET_LIST, SPORT_LIST, syncLive, liveStatus, liveMinInterval, liveOpen } from "../services/sb.js";
+import { getConfig, setConfig, builderQuote, listEvents, listLive, listLeagues, serializeEvent, placeBet, syncFixtures, syncOdds, syncResults, settleEvent, SbError, MARKET_LIST, SPORT_LIST, syncLive, liveStatus, liveMinInterval, liveOpen } from "../services/sb.js";
 import { feed, feedConfigured, feedUsage, feedBudget, fixtureDetail } from "../services/feed.js";
 import { smFindFixture, smTracker, smToken, smStatus, smResetToken } from "../services/sportmonks.js";
 import { setSetting } from "../services/sites.js";
@@ -50,7 +50,22 @@ export async function sbSiteRoutes(app: FastifyInstance) {
       return { available: true, ...(await smTracker(db, fid)) };
     } catch (e: any) { return { available: false, reason: e.message }; }
   });
-  app.get("/sb/limits", async () => { const c = await getConfig(db); return { minStake: c.minStake, maxStake: c.maxStake, maxWin: c.maxWin, maxSelections: c.maxSelections, liveEnabled: c.liveEnabled, liveDelaySec: c.liveDelaySec, liveMaxStake: c.liveMaxStake, liveIntervalSec: c.liveIntervalSec }; });
+  // Bet Builder fiyatı: aynı maçtan seçimler → birleşik oran (çelişki / aynı market / gereksiz seçimde hata)
+  app.post("/sb/builder/price", async (req) => {
+    const { selectionIds } = z.object({ selectionIds: z.array(z.number()).min(1).max(20) }).parse(req.body);
+    const cfg = await getConfig(db);
+    const sels = await db.sbSelection.findMany({ where: { id: { in: selectionIds } }, include: { market: true } });
+    const byEv = new Map<number, typeof sels>();
+    for (const s of sels) { if (!byEv.has(s.market.eventId)) byEv.set(s.market.eventId, []); byEv.get(s.market.eventId)!.push(s); }
+    const out: Record<string, any> = {};
+    for (const [eventId, g] of byEv) {
+      if (g.length < 2) continue;
+      if (!cfg.bbEnabled) { out[eventId] = { ok: false, error: "SAME_EVENT_IN_COMBO" }; continue; }
+      out[eventId] = await builderQuote(db, cfg, eventId, g.map((s) => ({ marketKey: s.market.key, code: s.code, odds: Number(s.odds) })));
+    }
+    return { enabled: cfg.bbEnabled, groups: out };
+  });
+  app.get("/sb/limits", async () => { const c = await getConfig(db); return { minStake: c.minStake, maxStake: c.maxStake, maxWin: c.maxWin, maxSelections: c.maxSelections, liveEnabled: c.liveEnabled, liveDelaySec: c.liveDelaySec, liveMaxStake: c.liveMaxStake, liveIntervalSec: c.liveIntervalSec, bbEnabled: c.bbEnabled, bbMaxLegs: c.bbMaxLegs }; });
 
   const auth = async (req: FastifyRequest, reply: FastifyReply) => {
     try { await req.jwtVerify(); } catch { reply.code(401).send({ error: "UNAUTHORIZED" }); return null; }
@@ -63,7 +78,7 @@ export async function sbSiteRoutes(app: FastifyInstance) {
     const pid = await auth(req, reply); if (!pid) return;
     const b = z.object({
       selectionIds: z.array(z.number()).min(1), stake: z.number().positive(), mode: z.enum(["combo", "single"]).optional(), wallet: z.nativeEnum(WalletType).optional(),
-      odds: z.record(z.number()).optional(), acceptOdds: z.enum(["none", "higher", "any"]).optional(),
+      odds: z.record(z.number()).optional(), bbOdds: z.record(z.number()).optional(), acceptOdds: z.enum(["none", "higher", "any"]).optional(),
     }).parse(req.body);
     try { return await placeBet(db, pid, b); }
     catch (e: any) { if (e instanceof SbError) return reply.code(400).send({ error: e.message, detail: e.detail }); throw e; }
@@ -102,6 +117,7 @@ export async function sbAdminRoutes(app: FastifyInstance) {
       liveEnabled: z.boolean().optional(), liveMarginPct: z.number().min(0).max(30).optional(),
       liveIntervalSec: z.number().int().min(3).max(600).optional(), liveStaleSec: z.number().int().min(6).max(1800).optional(),
       liveDelaySec: z.number().int().min(0).max(30).optional(), liveMaxStake: z.number().positive().optional(),
+      bbEnabled: z.boolean().optional(), bbMarginPct: z.number().min(0).max(30).optional(), bbMaxLegs: z.number().int().min(2).max(12).optional(),
       leagues: z.array(z.object({ id: z.number().int().positive(), name: z.string().min(1) })).optional(),
     }).parse(req.body);
     return setConfig(db, b);

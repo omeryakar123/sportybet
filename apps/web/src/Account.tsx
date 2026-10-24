@@ -241,7 +241,7 @@ export function MyCoupons() {
               <div key={b.id} className="overflow-hidden rounded-2xl bg-card">
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-white/[.05] px-4 py-2.5 text-sm">
                   <span className={`rounded-sm px-2 py-0.5 text-[12px] font-extrabold ${cls}`}>{lbl}</span>
-                  <span className="font-bold">{b.type === "MULTIPLE" ? "Kombine" : "Tekli"}</span>
+                  <span className="font-bold">{(b.selections ?? []).length > 1 && new Set((b.selections ?? []).map((s: any) => s.bbGroup ?? s.id)).size === 1 ? "Bet Builder" : b.type === "MULTIPLE" ? "Kombine" : "Tekli"}</span>
                   {b.couponId && <span className="flex items-center gap-1 text-xs font-semibold text-dim">ID: {b.couponId}<button onClick={() => navigator.clipboard?.writeText(b.couponId)} className="text-dim hover:text-fg"><I n="copy" className="size-3" /></button></span>}
                   {Number(b.stakeFromBonus) > 0 && <span className="rounded-sm bg-primary/15 px-1.5 text-[10px] font-extrabold text-primary">Bonus</span>}
                   <span className="ml-auto text-xs font-semibold text-subtle">{dt(b.createdAt)}</span>
@@ -254,7 +254,7 @@ export function MyCoupons() {
                         <div className="truncate font-bold">{s.selection} <span className="font-semibold text-subtle">· {s.market}</span></div>
                         <div className="truncate text-xs font-medium text-subtle">{s.matchName} · {dt(s.matchStart)}{s.info ? ` · ${s.info}` : ""}</div>
                       </div>
-                      <span className="shrink-0 font-extrabold text-odds">{Number(s.odds).toFixed(2)}</span>
+                      {s.bbGroup ? <span className="shrink-0 rounded bg-primary/15 px-1.5 text-[10px] font-extrabold text-primary">BB {Number(s.bbOdds).toFixed(2)}</span> : <span className="shrink-0 font-extrabold text-odds">{Number(s.odds).toFixed(2)}</span>}
                     </div>
                   ))}
                   {(b.selections ?? []).length === 0 && <div className="py-2 text-xs font-medium text-subtle">Kupon detayı yükleniyor…</div>}

@@ -17,7 +17,8 @@ type Ev = {
   startsAt: string; status: string; minute?: number | null; score?: { h: number; a: number; hh?: number | null; ha?: number | null } | null; featured?: boolean; live?: boolean; liveOpen?: boolean; liveStopped?: boolean; markets: Market[];
 };
 type League = { id: number; name: string; country?: string; logo?: string; count: number };
-type Pick = { selId: number; evId: number; match: string; market: string; pick: string; odds: number; live?: boolean; suspended?: boolean; changed?: "up" | "down" };
+type Pick = { selId: number; evId: number; mId?: number; match: string; market: string; pick: string; odds: number; live?: boolean; suspended?: boolean; changed?: "up" | "down" };
+type BbQuote = { ok: boolean; odds?: number; product?: number; error?: string; detail?: any };
 
 // ---------- spor ikonları (özgün, stroke tabanlı) ----------
 const SPORT_SVG: Record<string, React.ReactNode> = {
@@ -74,6 +75,14 @@ const ERR: Record<string, string> = {
   TOO_MANY_SELECTIONS: "Kombinede çok fazla seçim var. Bazılarını çıkar.",
   SPORTSBOOK_DISABLED: "Spor bahisleri şu an kapalı. Biraz sonra tekrar dene.",
   UNAUTHORIZED: "Oturumun kapandı. Devam etmek için giriş yap.",
+  BB_CONTRADICTION: "Bu seçimler aynı maçta birlikte gerçekleşemez. Birini çıkar.",
+  BB_SAME_MARKET: "Aynı marketten iki seçim yapılamaz.",
+  BB_REDUNDANT: "Bir seçim diğerini zaten kapsıyor (ör. 1 ve 1-X). Fazla olanı çıkar.",
+  BB_LIVE_NOT_SUPPORTED: "Bet Builder yalnızca maç öncesi oynanabilir. Canlı maçta tek seçim yap.",
+  BB_MARKET_NOT_ALLOWED: "Beraberlikte İade marketi Bet Builder'a eklenemez.",
+  BB_MAX_LEGS: "Bir maçta en fazla izin verilen sayıda seçim yapabilirsin.",
+  BB_NO_PRICE: "Bu maç için Bet Builder oranı hesaplanamıyor.",
+  BB_MIN_LEGS: "Bet Builder için aynı maçtan en az 2 seçim gerekir.",
 };
 
 function TeamLogo({ src, name, size = "size-4" }: { src?: string; name: string; size?: string }) {
@@ -114,7 +123,8 @@ export default function Sport() {
   useEffect(() => { if (!undo) return; const t = setTimeout(() => setUndo(null), 7000); return () => clearTimeout(t); }, [undo]);
   const [slipOpen, setSlipOpen] = useState(() => { try { return new URLSearchParams(window.location.search).get("kupon") === "1"; } catch { return false; } });
   const [quick, setQuick] = useState(false);
-  const [limits, setLimits] = useState<{ minStake: number; maxStake: number; maxWin: number; maxSelections: number; liveEnabled?: boolean; liveDelaySec?: number; liveMaxStake?: number } | null>(null);
+  const [limits, setLimits] = useState<{ minStake: number; maxStake: number; maxWin: number; maxSelections: number; liveEnabled?: boolean; liveDelaySec?: number; liveMaxStake?: number; bbEnabled?: boolean; bbMaxLegs?: number } | null>(null);
+  const [bb, setBb] = useState<Record<string, BbQuote>>({});
   const [acceptHigher, setAcceptHigher] = useState(() => { try { return localStorage.getItem("sb_accept") !== "none"; } catch { return true; } });
   const [waitSec, setWaitSec] = useState(0);
   const [openEv, setOpenEv] = useState<number | null>(null);
@@ -210,7 +220,8 @@ export default function Sport() {
       if (anyLive && limits?.liveDelaySec) { setWaitSec(limits.liveDelaySec); timer = setInterval(() => setWaitSec((w) => Math.max(0, w - 1)), 1000); }
       const odds = Object.fromEntries(ids.map((id) => [String(id), pk.find((p) => p.selId === id)?.odds ?? findOdds(id)]).filter(([, v]) => v));
       let r: any;
-      try { r = await api("/api/sb/bet", { method: "POST", json: { selectionIds: ids, stake: amount, mode: m, odds, acceptOdds: acceptHigher ? "higher" : "none" } }); }
+      const bbOdds = Object.fromEntries(Object.entries(bb).filter(([, q]) => q.ok).map(([k, q]) => [k, q.odds!]));
+      try { r = await api("/api/sb/bet", { method: "POST", json: { selectionIds: ids, stake: amount, mode: m, odds, bbOdds, acceptOdds: acceptHigher ? "higher" : "none" } }); }
       finally { if (timer) clearInterval(timer); setWaitSec(0); }
       refreshMe();
       const b = r?.bonus;
@@ -221,11 +232,12 @@ export default function Sport() {
       } else {
         const pk2 = picks.filter((p) => ids.includes(p.selId));
         const pot = m === "combo" ? Number(r?.potentialWin ?? 0) : (r?.bets ?? []).reduce((a: number, x: any) => a + Number(x.potentialWin ?? 0), 0);
-        setPlaced({ couponId: r?.couponId, count: m === "combo" ? 1 : (r?.bets?.length ?? 1), stake: m === "combo" ? amount : amount * ids.length, potential: pot, picks: pk2, warn });
+        setPlaced({ couponId: r?.couponId, count: m === "combo" ? 1 : (r?.bets?.length ?? 1), stake: m === "combo" ? amount : amount * (r?.bets?.length ?? 1), potential: pot, picks: pk2, warn });
       }
       setBusy(false); return true;
     } catch (e: any) {
       // oran değiştiyse kupondaki oranları yenile — oyuncu tekrar onaylar
+      if (e.message === "ODDS_CHANGED" && e.detail?.bbOdds) setBb((b) => { const n = { ...b }; for (const [k, v] of Object.entries(e.detail.bbOdds)) n[k] = { ...(n[k] ?? { ok: true }), ok: true, odds: Number(v) }; return n; });
       if (e.message === "ODDS_CHANGED" && e.detail?.odds) setPicks((ps) => ps.map((p) => { const n = e.detail.odds[p.selId]; return n ? { ...p, changed: n > p.odds ? "up" : n < p.odds ? "down" : p.changed, odds: n } : p; }));
       if (e.message === "SELECTION_SUSPENDED" && e.detail?.selectionId) setPicks((ps) => ps.map((p) => (p.selId === e.detail.selectionId ? { ...p, suspended: true } : p)));
       setErr(ERR[e.message] || e.message); setBusy(false); return false;
@@ -242,16 +254,34 @@ export default function Sport() {
     setPlaced(null); setUndo(null);
     setPicks((p) => {
       if (p.some((x) => x.selId === s.id)) return p.filter((x) => x.selId !== s.id);
-      const noEv = p.filter((x) => x.evId !== ev.id);
-      return [...noEv, { selId: s.id, evId: ev.id, match: `${ev.home} - ${ev.away}`, market: m.name, pick: s.name, odds: s.odds, live: !!ev.live }];
+      // Bet Builder: maç öncesi aynı maçtan farklı marketler birlikte kalır; aynı marketin başka seçeneği (çaprazı) öncekinin yerine geçer
+      const builder = limits?.bbEnabled !== false && !ev.live;
+      const keep = p.filter((x) => (builder ? !(x.evId === ev.id && (x.mId === m.id || (!x.mId && x.market === m.name) || x.live)) : x.evId !== ev.id));
+      return [...keep, { selId: s.id, evId: ev.id, mId: m.id, match: `${ev.home} - ${ev.away}`, market: m.name, pick: s.name, odds: s.odds, live: !!ev.live }];
     });
     setErr("");
   }
-  const totalOdds = picks.reduce((a, p) => a * p.odds, 1);
+  // kupon ayakları: aynı maçtan 2+ seçim = bir Bet Builder ayağı
+  const legs = useMemo(() => {
+    const m = new Map<number, Pick[]>(); picks.forEach((p) => { if (!m.has(p.evId)) m.set(p.evId, []); m.get(p.evId)!.push(p); });
+    return [...m.entries()].map(([evId, ps]) => ({ evId, picks: ps, bb: ps.length > 1, odds: ps.length > 1 ? (bb[evId]?.ok ? bb[evId].odds! : ps.reduce((a, x) => a * x.odds, 1)) : ps[0].odds, quote: ps.length > 1 ? bb[evId] : undefined }));
+  }, [picks, bb]);
+  const bbKey = legs.filter((l) => l.bb).map((l) => l.picks.map((p) => p.selId).sort().join(",")).join("|");
+  useEffect(() => {
+    const ids = legs.filter((l) => l.bb).flatMap((l) => l.picks.map((p) => p.selId));
+    if (!ids.length) { setBb({}); return; }
+    let alive = true;
+    api("/api/sb/builder/price", { method: "POST", json: { selectionIds: ids } }).then((r) => alive && setBb(r.groups ?? {})).catch(() => {});
+    return () => { alive = false; };
+  }, [bbKey]);
+  const bbBad = legs.find((l) => l.bb && l.quote && !l.quote.ok);
+  const bbPending = legs.some((l) => l.bb && !l.quote);
+  const totalOdds = legs.reduce((a, l) => a * l.odds, 1);
   const st = parseFloat(stake.replace(",", ".")) || 0;
-  const effMode = picks.length < 2 ? "single" : mode;
-  const potWin = effMode === "combo" ? Math.min(st * totalOdds, limits?.maxWin ?? Infinity) : picks.reduce((a, p) => a + st * p.odds, 0);
-  const cost = effMode === "combo" ? st : st * picks.length;
+  const effMode = legs.length < 2 ? (legs.length === 1 && legs[0].bb ? "combo" : "single") : mode;
+  const nBets = effMode === "combo" ? 1 : legs.length;
+  const potWin = effMode === "combo" ? Math.min(st * totalOdds, limits?.maxWin ?? Infinity) : legs.reduce((a, l) => a + Math.min(st * l.odds, limits?.maxWin ?? Infinity), 0);
+  const cost = st * nBets;
   const activeWallet = me?.activeWallet === "BONUS" ? "BONUS" : "MAIN";
   const suspendedPicks = picks.filter((p) => p.suspended);
   const shortBy = me ? Math.max(0, Math.round((cost - balance(activeWallet)) * 100) / 100) : 0;
@@ -261,6 +291,8 @@ export default function Sport() {
     if (me && cost > balance(activeWallet)) { setErr("Yetersiz bakiye"); return; }
     if (picks.some((p) => p.suspended)) { setErr("Askıdaki seçimlerle kupon oynanamaz. Önce onları çıkar."); return; }
     if (picks.some((p) => p.live) && limits?.liveMaxStake && st > limits.liveMaxStake) { setErr(`Canlı bahiste en fazla ${money(limits.liveMaxStake)} oynayabilirsin.`); return; }
+    if (bbBad) { setErr(ERR[bbBad.quote!.error!] ?? "Bu Bet Builder seçimleri birlikte oynanamaz."); return; }
+    if (bbPending) { setErr("Bet Builder oranı hesaplanıyor, bir saniye bekle."); return; }
     const ok = await placeNow(picks.map((p) => p.selId), effMode, st);
     if (ok) { setPicks([]); setSlipOpen(true); }
   }
@@ -316,12 +348,30 @@ export default function Sport() {
         <>
           <div className="grid grid-cols-2 gap-2 px-3 pt-3">
             {(["single", "combo"] as const).map((x) => (
-              <button key={x} disabled={x === "combo" && picks.length < 2} onClick={() => setMode(x)}
+              <button key={x} disabled={x === "combo" ? legs.length < 2 && !(legs.length === 1 && legs[0].bb) : legs.length === 1 && legs[0].bb} onClick={() => setMode(x)}
                 className={`h-10 rounded-lg border text-sm font-bold transition-colors disabled:opacity-40 ${effMode === x ? "border-primary text-primary" : "border-transparent bg-card text-subtle hover:text-fg"}`}>{x === "single" ? "Tekli" : "Kombine"}</button>
             ))}
           </div>
           <div className="sb-scroll mt-3 min-h-0 flex-1 space-y-1.5 overflow-y-auto px-3">
-            {picks.map((p) => (
+            {legs.filter((l) => l.bb).map((l) => (
+              <div key={`bb-${l.evId}`} className={`animate-slip-item overflow-hidden rounded-lg bg-card ${l.quote && !l.quote.ok ? "ring-1 ring-loss/60" : ""}`}>
+                <div className="flex items-center gap-2 border-b border-white/[.05] px-3 py-2">
+                  <span className="rounded-md bg-primary px-1.5 py-0.5 text-[10px] font-extrabold text-primary-fg">BET BUILDER</span>
+                  <span className="min-w-0 flex-1 truncate text-[13px] font-bold">{l.picks[0].match}</span>
+                  <span className="num text-[17px] font-bold">{l.quote?.ok ? l.quote.odds!.toFixed(2) : l.quote ? "—" : "…"}</span>
+                </div>
+                {l.picks.map((p) => (
+                  <div key={p.selId} className="flex items-center gap-2 px-3 py-1.5">
+                    <span className="size-1.5 shrink-0 rounded-full bg-primary" />
+                    <span className="min-w-0 flex-1 truncate text-[13px]"><b className="text-primary">{p.pick}</b> <span className="text-subtle">· {p.market}</span></span>
+                    <button onClick={() => setPicks((x) => x.filter((y) => y.selId !== p.selId))} className="grid size-6 place-items-center rounded text-subtle hover:text-loss" aria-label="Seçimi kaldır"><I n="x" className="size-3.5" /></button>
+                  </div>
+                ))}
+                {l.quote?.ok && l.quote.product && l.quote.product > l.quote.odds! + 0.005 && <div className="px-3 pb-2 text-[11px] text-subtle">Seçimler birbirine bağlı olduğu için oran {l.quote.product.toFixed(2)} yerine {l.quote.odds!.toFixed(2)}</div>}
+                {l.quote && !l.quote.ok && <div className="flex items-center gap-1.5 bg-loss/10 px-3 py-2 text-[12px] font-bold text-loss"><I n="lock" className="size-3.5" />{ERR[l.quote.error!] ?? "Bu seçimler birlikte oynanamaz."}</div>}
+              </div>
+            ))}
+            {legs.filter((l) => !l.bb).flatMap((l) => l.picks).map((p) => (
               <div key={p.selId} className="animate-slip-item flex overflow-hidden rounded-lg bg-card">
                 <button onClick={() => setPicks((x) => x.filter((y) => y.selId !== p.selId))} className="grid w-9 shrink-0 place-items-center bg-card-2 text-subtle hover:text-loss" aria-label="Kaldır"><I n="x" className="size-4" /></button>
                 <div className="min-w-0 flex-1 px-3 py-2.5">
@@ -352,7 +402,7 @@ export default function Sport() {
               </label>
               {[50, 200, 500].map((v) => <button key={v} onClick={() => setStake(String(v))} className="h-11 w-14 rounded-lg bg-card text-sm font-bold text-muted hover:bg-surface-hover hover:text-fg">{v}</button>)}
             </div>
-            {effMode === "single" && picks.length > 1 && <div className="mt-1.5 text-[12px] text-subtle">Her seçime {money(st)} · toplam {money(cost)}</div>}
+            {effMode === "single" && nBets > 1 && <div className="mt-1.5 text-[12px] text-subtle">{nBets} kupon · her birine {money(st)} · toplam {money(cost)}</div>}
             {me && <div className="mt-2 flex items-center justify-between text-[12px] text-subtle">
               <span>{activeWallet === "BONUS" ? <b className="text-caution">Bonus cüzdanı</b> : "Ana Para"} · {money(balance(activeWallet))}</span>
               {limits && <span>Min {money(limits.minStake)} · Maks {money(limits.maxStake)}</span>}
@@ -389,7 +439,7 @@ export default function Sport() {
         <span className="relative"><I n="ticket" className="size-6" />{picks.length > 0 && <span key={picks.length} className="animate-bump absolute -right-2 -top-2 grid size-[18px] place-items-center rounded-full bg-page text-[10px] font-extrabold text-fg">{picks.length}</span>}</span>
         <span className="ml-1 text-[15px] font-extrabold">Kupon</span>
         <I n={slipOpen ? "down" : "up"} className="size-4" />
-        {picks.length > 1 && effMode === "combo" && <span className="ml-1 rounded bg-black/15 px-1.5 text-[12px] font-extrabold tabular-nums">{totalOdds.toFixed(2)}</span>}
+        {effMode === "combo" && <span className="ml-1 rounded bg-black/15 px-1.5 text-[12px] font-extrabold tabular-nums">{totalOdds.toFixed(2)}</span>}
       </button>
       <label className="flex cursor-pointer items-center gap-2 text-[13px] font-extrabold" title="Açıkken orana tek dokunuş, kupondaki tutarla tekli bahis yapar">
         Hızlı Bahis

@@ -82,7 +82,7 @@ function Config() {
   useEffect(() => { api("/admin/sb/config").then(setCfg).catch((x) => setE(x.message)); api("/admin/sb/status").then(setStatus).catch(() => {}); }, []);
   if (!cfg) return <Panel title="Ayarlar"><Err e={e} />Yükleniyor…</Panel>;
   async function save() { setE(""); setMsg(""); try { const r = await api("/admin/sb/config", { method: "PUT", json: { enabled: cfg.enabled, marginPct: Number(cfg.marginPct), minStake: Number(cfg.minStake), maxStake: Number(cfg.maxStake), maxWin: Number(cfg.maxWin), maxSelections: Number(cfg.maxSelections), syncDays: Number(cfg.syncDays), leagues: cfg.leagues,
-    liveEnabled: !!cfg.liveEnabled, liveMarginPct: Number(cfg.liveMarginPct), liveIntervalSec: Number(cfg.liveIntervalSec), liveStaleSec: Number(cfg.liveStaleSec), liveDelaySec: Number(cfg.liveDelaySec), liveMaxStake: Number(cfg.liveMaxStake) } }); setCfg(r); setMsg("Kaydedildi ✓"); } catch (x: any) { setE(x.message); } }
+    liveEnabled: !!cfg.liveEnabled, liveMarginPct: Number(cfg.liveMarginPct), liveIntervalSec: Number(cfg.liveIntervalSec), liveStaleSec: Number(cfg.liveStaleSec), liveDelaySec: Number(cfg.liveDelaySec), liveMaxStake: Number(cfg.liveMaxStake), bbEnabled: !!cfg.bbEnabled, bbMarginPct: Number(cfg.bbMarginPct ?? 5), bbMaxLegs: Number(cfg.bbMaxLegs ?? 6) } }); setCfg(r); setMsg("Kaydedildi ✓"); } catch (x: any) { setE(x.message); } }
   const addLeague = () => { if (!nl.id || !nl.name) return; setCfg({ ...cfg, leagues: [...cfg.leagues, { id: Number(nl.id), name: nl.name }] }); setNl({ id: "", name: "" }); };
 
   return (
@@ -144,6 +144,15 @@ function Config() {
           <Field label="Azami bahis (₺)"><input type="number" className="inp" value={cfg.maxStake} onChange={(e) => setCfg({ ...cfg, maxStake: e.target.value })} /></Field>
           <Field label="Azami kazanç (₺)"><input type="number" className="inp" value={cfg.maxWin} onChange={(e) => setCfg({ ...cfg, maxWin: e.target.value })} /></Field>
           <Field label="Kombinede azami maç"><input type="number" className="inp" value={cfg.maxSelections} onChange={(e) => setCfg({ ...cfg, maxSelections: e.target.value })} /></Field>
+        </div>
+        <div className="mt-4 rounded border border-bo-line p-3">
+          <div className="mb-2 font-semibold">Bet Builder (aynı maçtan birden fazla seçim)</div>
+          <p className="mb-2 text-xs text-bo-muted">Oran, maçın 1X2 ve 2.5 Alt/Üst oranlarından kurulan skor modeliyle hesaplanır; birbirini dışlayan (çelişen) seçimler ve aynı marketten iki seçim engellenir. Birleşik oran hiçbir zaman düz çarpımdan yüksek olmaz. Sadece maç öncesi.</p>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+            <label className="flex items-center gap-2"><input type="checkbox" checked={cfg.bbEnabled ?? true} onChange={(e) => setCfg({ ...cfg, bbEnabled: e.target.checked })} />Bet Builder aktif</label>
+            <Field label="Ek marj % (birleşik orana)"><input type="number" className="inp" value={cfg.bbMarginPct ?? 5} onChange={(e) => setCfg({ ...cfg, bbMarginPct: e.target.value })} /></Field>
+            <Field label="Bir maçta en fazla seçim"><input type="number" className="inp" value={cfg.bbMaxLegs ?? 6} onChange={(e) => setCfg({ ...cfg, bbMaxLegs: e.target.value })} /></Field>
+          </div>
         </div>
         <div className="mt-4">
           <div className="mb-2 font-semibold">Ligler (API-Football lig id'leri)</div>

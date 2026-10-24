@@ -256,6 +256,8 @@ model BetSelection {
   isLive        Boolean  @default(false)
   info          String?  // skor / dakika bilgisi
   sbSelectionId Int?     // kendi sportsbook motorumuzdaki seçim (settlement eşleşmesi)
+  bbGroup       String?  // Bet Builder: aynı maçtaki birleşik seçimler aynı grup anahtarını taşır
+  bbOdds        Decimal? @db.Decimal(12, 3) // grubun birleşik oranı (tek ayak gibi çarpılır)
   bet           Bet      @relation(fields: [betId], references: [id])
 
   @@index([sbSelectionId])

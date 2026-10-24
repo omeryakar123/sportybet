@@ -527,6 +527,7 @@ export default function MatchDetail(props: Props) {
       ) : (
         <>
           {ev.live && !ev.liveOpen && <div className="mb-3 flex items-center gap-2 rounded-xl border border-caution/30 bg-caution/10 px-4 py-3 text-[13px] font-semibold text-caution"><I n="lock" className="size-4" />Canlı oranlar şu an askıda — güncellendiğinde otomatik açılır.</div>}
+          {!ev.live && !final && <div className="mb-3 flex items-center gap-2 rounded-xl bg-card-blue px-4 py-3 text-[13px] font-medium text-muted"><span className="rounded-md bg-primary px-1.5 py-0.5 text-[10px] font-extrabold text-primary-fg">BET BUILDER</span>Bu maçtan farklı marketlerden birden fazla seçim ekle, tek oranla oyna.</div>}
           <div className="no-scrollbar mb-3 flex gap-2 overflow-x-auto">
             {groups.map((g) => <button key={g.key} onClick={() => setTab(g.key)} className={`h-10 shrink-0 rounded-lg border px-5 text-sm font-bold transition-colors ${cur?.key === g.key ? "border-primary text-primary" : "border-transparent bg-panel text-subtle hover:text-fg"}`}>{g.label}</button>)}
           </div>
