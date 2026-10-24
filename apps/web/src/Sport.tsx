@@ -189,7 +189,7 @@ export default function Sport() {
   }, [events, q, when, sport]);
   const featured = useMemo(() => {
     const f = filtered.filter((e) => e.featured);
-    return (f.length >= 4 ? f : [...f, ...filtered.filter((e) => !e.featured && mk(e, "1x2"))]).slice(0, 10);
+    return (f.length >= 8 ? f : [...f, ...filtered.filter((e) => !e.featured && mk(e, "1x2"))]).slice(0, 16);
   }, [filtered]);
   const grouped = useMemo(() => {
     const g = new Map<string, { lg: { id: number; name: string; country?: string; logo?: string }; evs: Ev[] }>();
@@ -512,7 +512,7 @@ export default function Sport() {
           : <Spinner />
       ) : (<>
       {/* SPOR ŞERİDİ */}
-      <div className="relative mb-3 rounded-xl bg-panel">
+      <div className="relative mb-3">
         <div className="sb-scroll flex gap-1 overflow-x-auto px-2 py-2">
           {SPORTS.map((s) => {
             const n = s.active ? (events?.length ?? 0) : 0;
@@ -584,11 +584,11 @@ export default function Sport() {
               <button onClick={() => scrollBy(620)} className="grid size-8 place-items-center rounded-lg bg-panel text-muted hover:text-fg"><I n="right" className="size-4" /></button>
             </div>
           </div>
-          <div ref={scroller} className="no-scrollbar flex snap-x gap-3 overflow-x-auto">
+          <div ref={scroller} className="no-scrollbar grid snap-x auto-cols-[290px] grid-flow-col gap-3 overflow-x-auto lg:grid-rows-2">
             {featured.map((ev) => {
               const m1 = mk(ev, "1x2");
               return (
-                <div key={ev.id} className="w-[290px] shrink-0 snap-start rounded-xl bg-panel p-3">
+                <div key={ev.id} className="snap-start rounded-xl bg-panel p-3">
                   <div className="mb-2.5 flex items-center gap-2 text-[12px] font-semibold text-soft">
                     <SportIcon k="football" className="size-4" /><span className="min-w-0 flex-1 truncate">{ev.league}</span>
                     <span className="flex shrink-0 items-center gap-1 text-subtle"><I n="clock" className="size-3.5" />{startsIn(ev.startsAt)}</span>

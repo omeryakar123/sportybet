@@ -45,7 +45,7 @@ function SideCard({ title, children, open: o = true }: { title: string; children
   const [open, setOpen] = useState(o);
   return (
     <div className="mt-3 rounded-xl bg-panel">
-      <button onClick={() => setOpen(!open)} className="flex h-10 w-full items-center gap-2 px-3 text-[12px] font-semibold text-soft">
+      <button onClick={() => setOpen(!open)} className="flex h-10 w-full items-center gap-2 px-3 text-[11px] font-extrabold uppercase tracking-wide text-soft">
         <span className="flex-1 text-left">{title}</span>
         <span className={`grid size-5 place-items-center rounded-full ${open ? "bg-primary/15 text-primary" : "bg-card text-subtle"}`}><I n={open ? "minus" : "plus"} className="size-3" /></span>
       </button>
@@ -63,7 +63,7 @@ function SidebarBody() {
       <div className="grid grid-cols-2 gap-1.5">
         {TILES.map((t) => (
           <NavLink key={t.to} to={t.to} end={t.exact} onClick={() => setSidebarOpen(false)}
-            className={({ isActive }) => `flex h-[58px] flex-col items-center justify-center gap-1 rounded-lg text-[12px] font-bold transition-colors ${isActive ? "bg-primary text-primary-fg" : "bg-panel text-muted hover:bg-card hover:text-fg"}`}>
+            className={({ isActive }) => `flex h-[52px] flex-col items-center justify-center gap-1 rounded-lg text-[10px] font-extrabold uppercase tracking-wide transition-colors ${isActive ? "bg-primary text-primary-fg" : "bg-panel text-muted hover:bg-card hover:text-fg"}`}>
             <I n={t.icon} className="size-5" />{t.label}
           </NavLink>
         ))}
@@ -192,14 +192,11 @@ function UserMenu() {
   );
 }
 
-const NavPill = ({ to, icon, label }: { to: string; icon: string; label: string }) => {
-  const { chatOpen } = useStore();
-  return (
-  <NavLink to={to} title={label} aria-label={label} className={({ isActive }) => `relative inline-flex h-[42px] shrink-0 items-center justify-center gap-2 rounded-lg px-4 text-sm font-bold whitespace-nowrap transition-colors ${isActive ? "text-primary after:absolute after:inset-x-3 after:-bottom-[11px] after:h-[3px] after:rounded-full after:bg-primary" : "text-muted hover:text-fg"}`}>
-    <I n={icon} className="size-4" /><span className={chatOpen ? "hidden 2xl:inline" : "hidden lg:inline"}>{label}</span>
+const NavPill = ({ to, icon, label }: { to: string; icon: string; label: string }) => (
+  <NavLink to={to} title={label} className={({ isActive }) => `inline-flex h-9 shrink-0 items-center gap-2 rounded-lg px-3.5 text-[13px] font-bold whitespace-nowrap transition-colors ${isActive ? "bg-primary/10 text-primary" : "text-subtle hover:text-fg"}`}>
+    <I n={icon} className="size-4 lg:hidden" /><span className="hidden lg:inline">{label}</span>
   </NavLink>
-  );
-};
+);
 
 function Header() {
   const { me, setAuthOpen, setSidebarOpen, chatOpen, setChatOpen } = useStore();
