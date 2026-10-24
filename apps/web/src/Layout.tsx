@@ -175,7 +175,7 @@ function UserMenu() {
     <div ref={ref} className="relative">
       <button onClick={() => setOpen(!open)} className="flex h-[42px] cursor-pointer items-center gap-2 rounded-lg pr-1 pl-1 text-sm font-bold transition-colors hover:bg-card md:pr-3">
         <Avatar src={me.avatar} name={me.username} className="size-[36px] ring-2 ring-primary/40" />
-        <span className="hidden max-w-[110px] flex-col items-start leading-tight md:flex"><span className="truncate">{me.username}</span><span className="text-[11px] font-semibold text-primary">{me.isVerified ? "Doğrulandı" : "Profil"}</span></span>
+        <span className="hidden max-w-[110px] flex-col items-start leading-tight 2xl:flex"><span className="truncate">{me.username}</span><span className="text-[11px] font-semibold text-primary">{me.isVerified ? "Doğrulandı" : "Profil"}</span></span>
       </button>
       {open && (
         <div className="animate-slip-item absolute right-0 top-[calc(100%+8px)] z-50 w-60 rounded-xl border border-line bg-panel py-1.5 shadow-[0_18px_50px_rgba(0,0,0,.5)]">
@@ -194,7 +194,7 @@ function UserMenu() {
 
 const NavPill = ({ to, icon, label }: { to: string; icon: string; label: string }) => (
   <NavLink to={to} className={({ isActive }) => `relative inline-flex h-[42px] shrink-0 items-center justify-center gap-2 rounded-lg px-4 text-sm font-bold whitespace-nowrap transition-colors ${isActive ? "text-primary after:absolute after:inset-x-3 after:-bottom-[11px] after:h-[3px] after:rounded-full after:bg-primary" : "text-muted hover:text-fg"}`}>
-    <I n={icon} className="size-4" /><span className="hidden md:inline">{label}</span>
+    <I n={icon} className="size-4" /><span className="hidden min-[1500px]:inline">{label}</span>
   </NavLink>
 );
 
