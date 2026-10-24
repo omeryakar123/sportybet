@@ -5,37 +5,6 @@ import { I, useStore } from "./lib";
 import { MarketCard } from "./predictions";
 
 /* ---------- özgün dekoratif çizimler ---------- */
-const BallArt = ({ className }: { className?: string }) => (
-  <svg viewBox="0 0 200 200" aria-hidden className={className}>
-    <defs>
-      <radialGradient id="h-ball" cx="0.36" cy="0.3" r="0.85"><stop offset="0" stopColor="#ffffff" /><stop offset=".7" stopColor="#d9e2ef" /><stop offset="1" stopColor="#9fb0c6" /></radialGradient>
-      <radialGradient id="h-glow" cx=".5" cy=".5" r=".5"><stop offset="0" stopColor="#1fe88a" stopOpacity=".55" /><stop offset="1" stopColor="#1fe88a" stopOpacity="0" /></radialGradient>
-    </defs>
-    <circle cx="100" cy="100" r="100" fill="url(#h-glow)" />
-    <circle cx="100" cy="100" r="70" fill="url(#h-ball)" />
-    <polygon points="100,72 126,91 116,121 84,121 74,91" fill="#0f1923" />
-    <g stroke="#0f1923" strokeWidth="4" fill="none" strokeLinecap="round"><path d="M100 72V34M126 91l34-10M116 121l20 30M84 121l-20 30M74 91 40 81" /></g>
-  </svg>
-);
-const LiveArt = ({ className }: { className?: string }) => (
-  <svg viewBox="0 0 200 200" aria-hidden className={className}>
-    <defs><radialGradient id="h-live" cx=".5" cy=".5" r=".5"><stop offset="0" stopColor="#ff3b4f" stopOpacity=".55" /><stop offset="1" stopColor="#ff3b4f" stopOpacity="0" /></radialGradient></defs>
-    <circle cx="100" cy="100" r="100" fill="url(#h-live)" />
-    <rect x="38" y="58" width="124" height="84" rx="14" fill="#1a2734" stroke="#ff3b4f" strokeWidth="5" />
-    <path d="M88 82v36l30-18Z" fill="#ff3b4f" />
-    <circle cx="150" cy="62" r="12" fill="#ff3b4f" /><circle cx="150" cy="62" r="5" fill="#fff" />
-  </svg>
-);
-const VoteArt = ({ className }: { className?: string }) => (
-  <svg viewBox="0 0 200 200" aria-hidden className={className}>
-    <defs><radialGradient id="h-vote" cx=".5" cy=".5" r=".5"><stop offset="0" stopColor="#19e3d1" stopOpacity=".5" /><stop offset="1" stopColor="#19e3d1" stopOpacity="0" /></radialGradient></defs>
-    <circle cx="100" cy="100" r="100" fill="url(#h-vote)" />
-    <rect x="44" y="96" width="112" height="70" rx="10" fill="#bff5da" /><rect x="44" y="96" width="112" height="20" rx="10" fill="#dffbec" />
-    <rect x="86" y="102" width="28" height="8" rx="4" fill="#174a35" />
-    <rect x="70" y="40" width="60" height="58" rx="6" fill="#fff" transform="rotate(-8 100 70)" />
-    <path d="m84 70 10 10 20-22" stroke="#1fb57a" strokeWidth="7" fill="none" strokeLinecap="round" strokeLinejoin="round" transform="rotate(-8 100 70)" />
-  </svg>
-);
 
 function useNow() { const [n, setN] = useState(Date.now()); useEffect(() => { const t = setInterval(() => setN(Date.now()), 1000); return () => clearInterval(t); }, []); return n; }
 function Countdown({ to }: { to: string }) {
@@ -164,32 +133,46 @@ export default function Home() {
   const [live, setLive] = useState<any[]>([]);
   const [total, setTotal] = useState<{ ev: number; pred: number }>({ ev: 0, pred: 0 });
   const [q, setQ] = useState(""); const [open, setOpen] = useState<number | null>(0);
+  const [leagues, setLeagues] = useState<any[]>([]);
   useEffect(() => {
     api("/api/predictions?homepage=true&limit=12").then((r) => { const d = r.data?.length ? r.data : null; if (d) setMarkets(d); else api("/api/predictions?limit=12").then((r2) => setMarkets(r2.data ?? [])).catch(() => {}); setTotal((t) => ({ ...t, pred: r.pagination?.total ?? (r.data?.length ?? 0) })); }).catch(() => {});
     api("/api/sb/events?limit=60").then((r) => { const a = Array.isArray(r) ? r : []; setEvents(a); setTotal((t) => ({ ...t, ev: a.length })); }).catch(() => {});
     api("/api/sb/live").then((r) => setLive(Array.isArray(r) ? r : [])).catch(() => {});
+    api("/api/sb/leagues").then((r) => setLeagues(Array.isArray(r) ? r : [])).catch(() => {});
   }, []);
   const featured = [...events.filter((e) => e.featured), ...events.filter((e) => !e.featured)].slice(0, 12);
-  const cards = [
-    { to: "/spor", top: `${total.ev}+ Maç`, title: "Spor", Art: BallArt, bg: "from-[#122a22] to-[#0f1923]" },
-    { to: "/spor", top: `${live.length} canlı maç`, title: "Canlı", Art: LiveArt, bg: "from-[#2a1620] to-[#0f1923]" },
-    { to: "/tahminler", top: `${total.pred || markets.length} piyasa`, title: "Tahminler", Art: VoteArt, bg: "from-[#112a2c] to-[#0f1923]" },
-  ];
   return (
     <div className="animate-sports-fade">
       <Hero ev={featured[0]} />
 
-      {/* kategori kartları */}
+      {/* kategori kartları — her biri kendi canlı verisini gösterir */}
       <section className="mt-4 grid gap-3 sm:grid-cols-3">
-        {cards.map(({ to, top, title, Art, bg }) => (
-          <Link key={title} to={to} className={`group relative flex h-[104px] items-center overflow-hidden rounded-2xl bg-gradient-to-r ${bg} px-5 ring-1 ring-line/70 transition-shadow hover:ring-primary/50 sm:h-[120px]`}>
-            <div className="relative z-10">
-              <div className="text-[13px] font-bold text-soft">{top}</div>
-              <div className="title mt-1 text-[30px]">{title}</div>
+        <Link to="/spor" className="group surface flex h-[112px] items-center gap-4 rounded-2xl px-5 transition-[box-shadow] hover:ring-1 hover:ring-primary/40">
+          <div className="min-w-0 flex-1"><div className="title text-[30px]">Spor</div><div className="mt-1 text-[13px] font-semibold text-subtle">{total.ev} maç bültende</div></div>
+          <div className="flex -space-x-2.5">
+            {leagues.slice(0, 4).map((l) => <span key={l.id} className="grid size-11 place-items-center rounded-full bg-[#0f1923] ring-2 ring-[#15212e]">{l.logo ? <img src={l.logo} alt="" className="size-7 object-contain" /> : <I n="ball" className="size-5 text-soft" />}</span>)}
+          </div>
+          <I n="right" className="size-5 text-subtle transition-transform group-hover:translate-x-0.5" />
+        </Link>
+        <Link to="/spor" className="group surface flex h-[112px] items-center gap-4 rounded-2xl px-5 transition-[box-shadow] hover:ring-1 hover:ring-live/50">
+          <div className="min-w-0 flex-1"><div className="title text-[30px]">Canlı</div><div className="mt-1 text-[13px] font-semibold text-subtle">{live.length ? "maç şu an oynanıyor" : "şu an canlı maç yok"}</div></div>
+          <div className="flex items-center gap-2"><span className={`size-2.5 rounded-full bg-live ${live.length ? "live-dot" : "opacity-40"}`} /><span className="num text-[52px] font-bold leading-none">{live.length}</span></div>
+          <I n="right" className="size-5 text-subtle transition-transform group-hover:translate-x-0.5" />
+        </Link>
+        <Link to="/tahminler" className="group surface flex h-[112px] items-center gap-4 rounded-2xl px-5 transition-[box-shadow] hover:ring-1 hover:ring-accent/50">
+          <div className="min-w-0 flex-1">
+            <div className="title text-[30px]">Tahminler</div>
+            <div className="mt-1 text-[13px] font-semibold text-subtle">{total.pred || markets.length} açık piyasa</div>
+          </div>
+          {markets[0]?.outcomes?.length >= 2 && (() => { const y = Math.round(markets[0].outcomes[0].probability ?? 50); return (
+            <div className="w-28 shrink-0" title={markets[0].question}>
+              <div className="flex justify-between text-[11px] font-bold"><span className="text-win">{markets[0].outcomes[0].name} %{y}</span><span className="text-loss">%{100 - y}</span></div>
+              <div className="mt-1 flex h-2 overflow-hidden rounded-full bg-loss/70"><div className="bg-win" style={{ width: `${y}%` }} /></div>
+              <div className="mt-1 truncate text-[11px] text-dim">{markets[0].question}</div>
             </div>
-            <Art className="absolute -right-6 top-1/2 h-[150px] -translate-y-1/2 transition-transform duration-300 group-hover:scale-105 sm:h-[170px]" />
-          </Link>
-        ))}
+          ); })()}
+          <I n="right" className="size-5 text-subtle transition-transform group-hover:translate-x-0.5" />
+        </Link>
       </section>
 
       {/* arama */}
