@@ -197,10 +197,10 @@ const Empty = ({ t }: { t: string }) => <div className="px-4 py-8 text-center te
 // ---------- market kartları ----------
 function OddBtn({ ev, m, s, label, row, props }: { ev: DEv; m: DMarket; s: DSel; label: string; row?: boolean; props: Props }) {
   const on = props.isPicked(s.id); const c = props.changed[s.id];
-  if (s.suspended) return <div className={`flex h-12 items-center justify-between rounded-lg bg-card/60 px-3 text-[14px] text-dim ${row ? "" : ""}`}><span className="truncate">{label}</span><I n="lock" className="size-4" /></div>;
+  if (s.suspended) return <div className="flex h-12 w-full items-center justify-between rounded-lg bg-card/60 px-3 text-[14px] text-dim"><span className="truncate">{label}</span><I n="lock" className="size-4" /></div>;
   return (
     <button onClick={() => props.onPick(ev, m, s)}
-      className={`flex h-12 items-center justify-between gap-2 rounded-lg px-3 text-[14px] font-semibold transition-all ${on ? "bg-primary text-primary-fg glow-green" : "bg-card text-muted hover:bg-surface-hover hover:text-fg"}`}>
+      className={`flex h-12 w-full items-center justify-between gap-2 rounded-lg px-3 text-[14px] font-semibold transition-all ${on ? "bg-primary text-primary-fg glow-green" : "bg-card text-muted hover:bg-surface-hover hover:text-fg"}`}>
       <span className="truncate text-left">{label}</span>
       <span className={`flex items-center gap-1 font-extrabold tabular-nums ${on ? "" : c === "up" ? "text-win" : c === "down" ? "text-loss" : "text-fg"}`}>{!on && c === "up" ? "▲" : !on && c === "down" ? "▼" : ""}{s.odds.toFixed(2)}</span>
     </button>
