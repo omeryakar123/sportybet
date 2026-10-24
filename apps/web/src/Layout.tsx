@@ -11,8 +11,25 @@ function Logo({ className = "h-9", mobile }: { className?: string; mobile?: bool
   const { settings } = useStore();
   const src = asset((mobile && settings.logoMobileUrl) || settings.logoUrl);
   // Şimdilik logo kullanılmıyor — yalnızca CMS'ten bir logo yüklenirse gösterilir.
+  if (!src) return <LogoMark className={className} text={!mobile} />;
   if (src) return <img src={src} alt={settings.siteName ?? ""} className={`${className} w-auto max-w-[220px] object-contain object-left`} draggable={false} />;
   return null;
+}
+
+/** Varsayılan logo (CMS'ten logo yüklenmediyse): kendi işaretimiz + site adı. Ana sayfaya dönüş noktası. */
+function LogoMark({ className = "h-9", text = true }: { className?: string; text?: boolean }) {
+  const { settings } = useStore();
+  const name = settings.siteName ?? "SportyBet";
+  return (
+    <span className={`inline-flex items-center gap-2 ${className}`} aria-label={name}>
+      <svg viewBox="0 0 40 40" className="h-full w-auto shrink-0" aria-hidden>
+        <defs><linearGradient id="lm" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#6dffb7" /><stop offset="1" stopColor="#00c86a" /></linearGradient></defs>
+        <rect x="2" y="2" width="36" height="36" rx="11" fill="url(#lm)" />
+        <path d="M26.5 12.5c-1.6-1.4-3.9-2.2-6.4-2.2-4.2 0-7 2.2-7 5.4 0 3.1 2.4 4.3 6.2 5.1 2.6.6 3.5 1 3.5 2 0 1-1.1 1.7-2.9 1.7-2 0-3.9-.8-5.4-2.2l-2.6 3.3c2 1.9 4.9 3 8 3 4.6 0 7.4-2.3 7.4-5.6 0-3.1-2.2-4.4-6.3-5.3-2.6-.5-3.4-.9-3.4-1.8 0-.9.9-1.5 2.5-1.5 1.7 0 3.3.6 4.6 1.6Z" fill="#06090e" />
+      </svg>
+      {text && <span className="text-[19px] font-extrabold tracking-tight text-white">{name}</span>}
+    </span>
+  );
 }
 
 // ---------------- Sidebar ----------------
@@ -181,8 +198,8 @@ function WalletChip() {
             </button>
           ))}
           <div className="mt-2 grid grid-cols-2 gap-2">
-            <Link to="/para-yatir" onClick={() => setOpen(false)} className="btn btn-primary">Para yatır</Link>
-            <Link to="/para-cek" onClick={() => setOpen(false)} className="btn btn-secondary">Para çek</Link>
+            <button onClick={() => { setOpen(false); setWalletOpen("deposit"); }} className="btn btn-primary">Para yatır</button>
+            <button onClick={() => { setOpen(false); setWalletOpen("withdraw"); }} className="btn btn-secondary">Para çek</button>
           </div>
         </div>
       )}
@@ -346,6 +363,16 @@ function Footer() {
 }
 
 // ---------------- Mobil alt menü ----------------
+/** gamdom alt menü ikonları: dolgulu, 24×22 */
+const BN_ICONS: Record<string, React.ReactNode> = {
+  menu: <path d="M3 5.5A1.5 1.5 0 0 1 4.5 4h15a1.5 1.5 0 0 1 0 3h-15A1.5 1.5 0 0 1 3 5.5Zm0 6.5A1.5 1.5 0 0 1 4.5 10.5h15a1.5 1.5 0 0 1 0 3h-15A1.5 1.5 0 0 1 3 12Zm1.5 5h15a1.5 1.5 0 0 1 0 3h-15a1.5 1.5 0 0 1 0-3Z" />,
+  search: <path fillRule="evenodd" d="M10.5 3a7.5 7.5 0 0 1 5.96 12.05l4.1 4.1a1.5 1.5 0 0 1-2.12 2.12l-4.1-4.1A7.5 7.5 0 1 1 10.5 3Zm0 3a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9Z" />,
+  vote: <path fillRule="evenodd" d="M6 2h12a3 3 0 0 1 3 3v14a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V5a3 3 0 0 1 3-3Zm1.5 14a1.5 1.5 0 0 0 3 0v-3a1.5 1.5 0 0 0-3 0v3Zm4.5 0a1.5 1.5 0 0 0 3 0V8a1.5 1.5 0 0 0-3 0v8Zm4.5 0a1.5 1.5 0 0 0 3 0v-5a1.5 1.5 0 0 0-3 0v5Z" />,
+  ball: <path fillRule="evenodd" d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20Zm0 5.2-3.3 2.4 1.26 3.9h4.08l1.26-3.9L12 7.2Zm-1.2-3.05A8 8 0 0 0 5.6 7.3l1.95.25 2.75-2-.5-1.4ZM4 12.4a8 8 0 0 0 1.7 4.6l1-1.7-1.05-3.25L4 12.4Zm4 6.6a8 8 0 0 0 8 0l-.85-1.75h-6.3L8 19Zm10.3-2a8 8 0 0 0 1.7-4.6l-1.65-.35-1.05 3.25 1 1.7Zm.1-9.7a8 8 0 0 0-5.2-3.15l-.5 1.4 2.75 2 1.95-.25Z" />,
+  rewards: <path d="M4 10h7v11H6a2 2 0 0 1-2-2v-9Zm9 0h7v9a2 2 0 0 1-2 2h-5V10ZM3 7a2 2 0 0 1 2-2h2.2A3 3 0 0 1 12 2.6 3 3 0 0 1 16.8 5H19a2 2 0 0 1 2 2v1.5H3V7Zm6-1.5a1 1 0 0 0 0 2h2v-1a1 1 0 0 0-1-1H9Zm6 0a1 1 0 0 0-1 1v1h1a1 1 0 0 0 0-2Z" />,
+  chat: <path fillRule="evenodd" d="M12 3c5.25 0 9.5 3.7 9.5 8.25S17.25 19.5 12 19.5c-1 0-1.97-.13-2.88-.38L4.6 21a.75.75 0 0 1-1-.9l1.13-3.38A7.9 7.9 0 0 1 2.5 11.25C2.5 6.7 6.75 3 12 3Zm-4 7a1.25 1.25 0 1 0 0 2.5A1.25 1.25 0 0 0 8 10Zm4 0a1.25 1.25 0 1 0 0 2.5 1.25 1.25 0 0 0 0-2.5Zm4 0a1.25 1.25 0 1 0 0 2.5A1.25 1.25 0 0 0 16 10Z" />,
+};
+const BNI = ({ n }: { n: string }) => <svg viewBox="0 0 24 24" className="h-[22px] w-6" fill="currentColor" aria-hidden>{BN_ICONS[n]}</svg>;
 function BottomNav() {
   const { sidebarOpen, setSidebarOpen, chatOpen, setChatOpen } = useStore();
   const nav = useNavigate();
@@ -353,14 +380,14 @@ function BottomNav() {
   const cls = (a: boolean) => `flex flex-col items-center justify-center gap-1 text-[12px] font-medium transition-colors ${a ? "text-white" : "text-subtle hover:text-fg"}`;
   return (
     <nav className="relative z-40 grid h-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom))] shrink-0 grid-cols-6 bg-page px-1 pb-[env(safe-area-inset-bottom)] lg:hidden">
-      <button onClick={() => { setChatOpen(false); setSidebarOpen(!sidebarOpen); }} className={cls(sidebarOpen)}><I n="menu" className="size-6" />Menü</button>
-      <button onClick={() => { setChatOpen(false); nav("/spor"); setTimeout(() => (document.getElementById("sb-search") as HTMLInputElement | null)?.focus(), 350); }} className={cls(false)}><I n="search" className="size-6" />Ara</button>
+      <button onClick={() => { setChatOpen(false); setSidebarOpen(!sidebarOpen); }} className={cls(sidebarOpen)}><BNI n="menu" />Menü</button>
+      <button onClick={() => { setChatOpen(false); nav("/spor"); setTimeout(() => (document.getElementById("sb-search") as HTMLInputElement | null)?.focus(), 350); }} className={cls(false)}><BNI n="search" />Ara</button>
       {items.map(([to, icon, label]) => (
         <NavLink key={to} to={to} onClick={() => { setChatOpen(false); setSidebarOpen(false); }} className={({ isActive }) => cls(isActive && !chatOpen && !sidebarOpen)}>
-          <><I n={icon} className="size-6" />{label}</>
+          <><BNI n={icon} />{label}</>
         </NavLink>
       ))}
-      <button onClick={() => { setSidebarOpen(false); setChatOpen(!chatOpen); }} className={cls(chatOpen)}><I n="chat" className="size-6" />Sohbet</button>
+      <button onClick={() => { setSidebarOpen(false); setChatOpen(!chatOpen); }} className={cls(chatOpen)}><BNI n="chat" />Sohbet</button>
     </nav>
   );
 }

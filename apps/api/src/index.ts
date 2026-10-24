@@ -80,6 +80,14 @@ await seedAdmin();
     for (const r of rows) await db.cmsBanner.create({ data: { ...r, siteId: s.id, platform: "all", language: "tr", isPublished: true } as any });
     await setSetting(db, "migr_cms_home_v1", { at: new Date().toISOString() }, s.id);
   }
+  // Sportmonks ücretsiz planındaki ligler (canlı takip verisi gelsin diye) bültene bir kez eklenir — Trading'den çıkarılabilir
+  if (!(await getSetting(db, "migr_sm_free_leagues_v1", s.id))) {
+    const { getConfig, setConfig } = await import("./services/sb.js");
+    const c = await getConfig(db);
+    const add = [{ id: 179, name: "İskoçya Premiership" }, { id: 119, name: "Danimarka Superliga" }].filter((l) => !c.leagues.some((x) => x.id === l.id));
+    if (add.length) await setConfig(db, { leagues: [...c.leagues, ...add] }).catch((e) => app.log.error(e, "sm leagues"));
+    await setSetting(db, "migr_sm_free_leagues_v1", { at: new Date().toISOString() }, s.id);
+  }
   if (cu && !cu.config) await db.paymentSystem.update({ where: { id: cu.id }, data: { config: { network: "TRC20", depositAddress: "", requireTxid: true } } });
 }
 setInterval(() => settleRains(db).catch((e) => app.log.error(e, "rain")), 5_000); // süresi dolan sohbet yağmurlarını dağıt

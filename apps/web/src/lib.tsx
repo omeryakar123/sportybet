@@ -3,6 +3,15 @@ import { api, getToken, setToken, asset } from "./api";
 
 // ---------- biçimleme ----------
 export const money = (v: any) => "₺" + Number(v ?? 0).toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+/** Türkçe tutar girişi: "1.250,50" · "1250.5" · "1.000" → sayı */
+export function parseAmount(raw: string): number {
+  let t = String(raw ?? "").trim().replace(/[^0-9.,]/g, "");
+  if (!t) return 0;
+  if (t.includes(",")) t = t.replace(/\./g, "").replace(",", "."); // virgül ondalık, noktalar binlik
+  else if ((t.match(/\./g) ?? []).length > 1 || /^\d{1,3}\.\d{3}$/.test(t)) t = t.replace(/\./g, ""); // "1.000" / "1.250.000" binlik
+  const n = Number(t);
+  return Number.isFinite(n) ? Math.floor(n * 100) / 100 : 0;
+}
 export const money0 = (v: any) => "₺" + Number(v ?? 0).toLocaleString("tr-TR", { maximumFractionDigits: 0 });
 export const pct = (p: any) => `${Math.round(Number(p ?? 0))} %`;
 export const dt = (v: any) => (v ? new Date(v).toLocaleString("tr-TR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "");
@@ -96,7 +105,7 @@ type Store = {
   sidebarOpen: boolean; setSidebarOpen: (v: boolean) => void;
   chatOpen: boolean; setChatOpen: (v: boolean) => void;
   profileId: number | null; openProfile: (id: number | null) => void;
-  walletOpen: false | "menu" | "promo" | "tip"; setWalletOpen: (v: false | "menu" | "promo" | "tip") => void;
+  walletOpen: false | "menu" | "promo" | "tip" | "deposit" | "withdraw"; setWalletOpen: (v: false | "menu" | "promo" | "tip" | "deposit" | "withdraw") => void;
   tipTo: string; setTipTo: (u: string) => void;
   balance: (t: "MAIN" | "BONUS") => number;
   setWallet: (w: "MAIN" | "BONUS") => Promise<void>;
@@ -114,7 +123,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [chatOpen, setChatOpenS] = useState(() => { try { return window.innerWidth >= 1280 && localStorage.getItem("chat_open") !== "0"; } catch { return false; } });
   const setChatOpen = (v: boolean) => { setChatOpenS(v); try { localStorage.setItem("chat_open", v ? "1" : "0"); } catch {} };
   const [profileId, openProfile] = useState<number | null>(null);
-  const [walletOpen, setWalletOpen] = useState<false | "menu" | "promo" | "tip">(false);
+  const [walletOpen, setWalletOpen] = useState<false | "menu" | "promo" | "tip" | "deposit" | "withdraw">(false);
   const [tipTo, setTipTo] = useState("");
   // Ağ/deploy hatasında oturumu düşürme — yalnızca gerçek yetki hatasında çıkış
   const refreshMe = async () => { if (!getToken()) return setMe(null); try { setMe(await api("/api/me")); } catch (e: any) { if (e?.message === "UNAUTHORIZED" || !getToken()) setMe(null); else setTimeout(() => { if (getToken()) api("/api/me").then(setMe).catch(() => {}); }, 4000); } };
@@ -176,6 +185,10 @@ export function ErrBox({ e }: { e?: string }) {
     RAIN_ACCOUNT_TOO_NEW: "Yağmura katılmak için hesabın en az 24 saatlik olmalı", RAIN_DISABLED: "Yağmur şu an kapalı", RAIN_NOT_ALLOWED: "Yağmura katılamazsın",
     TIP_MIN: "Bahşiş minimumun altında", TIP_MAX: "Bahşiş maksimumun üstünde", TIP_SELF: "Kendine bahşiş gönderemezsin", USER_NOT_FOUND: "Bu kullanıcı adıyla bir oyuncu yok. Adı kontrol et.", RECIPIENT_UNAVAILABLE: "Bu kullanıcıya gönderilemez",
     TIP_DEPOSIT_REQUIRED: "Bahşiş göndermek için en az bir yatırım gerekli", TIP_DAILY_LIMIT: "Günlük bahşiş limitine ulaştın", TIP_DISABLED: "Bahşiş şu an kapalı", INVALID_AMOUNT: "Geçersiz tutar",
+    TXID_REQUIRED: "Gönderimin işlem numarasını (TXID) gir; cüzdan uygulamandaki işlem detayında yazar.", TXID_USED: "Bu işlem numarası (TXID) ile daha önce talep oluşturulmuş.",
+    OPEN_DEPOSIT_LIMIT: "Onay bekleyen 3 yatırım talebin var. Onlar sonuçlanınca yenisini oluşturabilirsin.", BONUS_MIN_DEPOSIT: "Seçtiğin bonus için yatırım tutarı alt sınırın altında.",
+    MISSING_FIELD: "Çekim bilgilerinde eksik alan var. Tüm alanları doldur.", PAYMENT_SYSTEM_NOT_AVAILABLE: "Bu ödeme yöntemi şu an kullanılamıyor. Başka bir yöntem seç.",
+    BONUS_NOT_AVAILABLE: "Bu bonus şu an alınamıyor.", CANNOT_CANCEL: "Bu talep işleme alındığı için iptal edilemez.", ALREADY_PROCESSED: "Bu talep zaten sonuçlandı.",
     PLAYER_EXCLUDED_FROM_BONUSES: "Hesabın bonus kampanyalarına kapalı.", ACCOUNT_BLOCKED: "Hesabın işlemlere kapalı. Destek ekibiyle iletişime geç.", NOT_ENOUGH_DEPOSITS: "Bu kod için gereken yatırım şartını henüz karşılamadın.",
   };
   const msg = TR[e] ?? (/^[A-Z_]+$/.test(e) ? "İşlem tamamlanamadı. Biraz sonra tekrar dene; sorun sürerse destek ekibine yaz." : /fetch|network|HTTP 5/i.test(e) ? "Bağlantı kurulamadı. İnternetini kontrol edip tekrar dene." : e);

@@ -15,7 +15,7 @@ type PlayerJwt = { playerId: number; kind: "player" };
 export async function siteRoutes(app: FastifyInstance) {
   app.setErrorHandler((err: any, _req, reply) => {
     if (err instanceof z.ZodError) return reply.code(400).send({ error: "VALIDATION_ERROR", detail: err.flatten() });
-    if (err instanceof BizError || /^[A-Z_]+$/.test(err.message)) return reply.code(400).send({ error: err.message });
+    if (err instanceof BizError || /^[A-Z_]+$/.test(err.message)) return reply.code(400).send({ error: err.message, detail: (err as any).detail });
     app.log.error(err);
     return reply.code(500).send({ error: "INTERNAL_ERROR" });
   });

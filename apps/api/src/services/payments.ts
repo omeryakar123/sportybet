@@ -24,20 +24,37 @@ async function checkSystem(db: PrismaClient, siteId: number, name: string, type:
   return ps;
 }
 
-export async function createWithdrawal(db: PrismaClient, playerId: number, b: { paymentSystem: string; amount: number; info?: Record<string, unknown> }) {
-  const amount = D(b.amount);
+/** Tutar: pozitif, en fazla 2 ondalık (kuruş) */
+function cleanAmount(v: number) {
+  if (!Number.isFinite(v)) throw new BizError("INVALID_AMOUNT");
+  const amount = D(v).toDecimalPlaces(2, Prisma.Decimal.ROUND_DOWN);
   if (amount.lte(0)) throw new BizError("INVALID_AMOUNT");
+  return amount;
+}
+const MAX_OPEN_DEPOSITS = 3;
+
+export async function createWithdrawal(db: PrismaClient, playerId: number, b: { paymentSystem: string; amount: number; info?: Record<string, unknown> }) {
+  const amount = cleanAmount(b.amount);
   const player = await db.player.findUniqueOrThrow({ where: { id: playerId } });
   if (player.status !== "OPEN") throw new BizError("ACCOUNT_BLOCKED");
-  await checkSystem(db, player.siteId, b.paymentSystem, PaymentType.WITHDRAWAL, amount);
+  const ps = await checkSystem(db, player.siteId, b.paymentSystem, PaymentType.WITHDRAWAL, amount);
+  // yöntemin istediği alanlar (IBAN, cüzdan adresi…) sunucuda da zorunlu
+  const info: Record<string, string> = {};
+  for (const f of (Array.isArray(ps.fields) ? ps.fields : []) as any[]) {
+    const v = String((b.info ?? {})[f.key] ?? "").trim();
+    if (!v) { const e = new BizError("MISSING_FIELD"); e.detail = { field: f.label ?? f.key }; throw e; }
+    info[f.key] = v.slice(0, 200);
+  }
   const blocking = await db.playerBonus.findFirst({ where: { playerId, state: PlayerBonusState.ACTIVE, bonus: { allowWithdrawal: false } }, include: { bonus: true } });
   if (blocking) throw new BizError("ACTIVE_BONUS_BLOCKS_WITHDRAWAL");
-  const open = await db.paymentRequest.count({ where: { playerId, type: PaymentType.WITHDRAWAL, state: { in: [PaymentState.NEW, PaymentState.PENDING] } } });
-  if (open > 0) throw new BizError("OPEN_WITHDRAWAL_EXISTS");
 
   return db.$transaction(async (tx) => {
+    // aynı anda iki talep yarışını engelle: oyuncu satırını kilitle, sonra açık talep kontrolü
+    await tx.$queryRaw`SELECT id FROM "Player" WHERE id = ${playerId} FOR UPDATE`;
+    const open = await tx.paymentRequest.count({ where: { playerId, type: PaymentType.WITHDRAWAL, state: { in: [PaymentState.NEW, PaymentState.PENDING] } } });
+    if (open > 0) throw new BizError("OPEN_WITHDRAWAL_EXISTS");
     const req = await tx.paymentRequest.create({
-      data: { playerId, type: PaymentType.WITHDRAWAL, amount, paymentSystem: b.paymentSystem, info: (b.info ?? {}) as any, currency: player.currency },
+      data: { playerId, type: PaymentType.WITHDRAWAL, amount, paymentSystem: b.paymentSystem, info: info as any, currency: player.currency },
     });
     try {
       await move(tx, { playerId, wallet: WalletType.MAIN, type: TxType.WITHDRAWAL, amount: amount.neg(), paymentSystem: b.paymentSystem, reference: `pay:${req.id}`, note: "Çekim talebi (bloke)" });
@@ -50,17 +67,28 @@ export async function createWithdrawal(db: PrismaClient, playerId: number, b: { 
 }
 
 export async function createDeposit(db: PrismaClient, playerId: number, b: { paymentSystem: string; amount: number; bonusId?: number; info?: Record<string, unknown> }) {
-  const amount = D(b.amount);
-  if (amount.lte(0)) throw new BizError("INVALID_AMOUNT");
+  const amount = cleanAmount(b.amount);
   const player = await db.player.findUniqueOrThrow({ where: { id: playerId } });
   if (player.status !== "OPEN") throw new BizError("ACCOUNT_BLOCKED");
-  await checkSystem(db, player.siteId, b.paymentSystem, PaymentType.DEPOSIT, amount);
+  const ps = await checkSystem(db, player.siteId, b.paymentSystem, PaymentType.DEPOSIT, amount);
+  const cfg = (ps.config ?? {}) as any;
+  const txid = String((b.info ?? {}).txid ?? "").trim();
+  if (cfg.requireTxid && txid.length < 8) throw new BizError("TXID_REQUIRED");
+  if (txid) {
+    const used = await db.paymentRequest.findFirst({ where: { type: PaymentType.DEPOSIT, state: { not: PaymentState.REJECTED }, info: { path: ["txid"], equals: txid } } });
+    if (used) throw new BizError("TXID_USED");
+  }
   if (b.bonusId) {
     const bonus = await db.bonus.findUnique({ where: { id: b.bonusId } });
     if (!bonus || !bonus.isActive || bonus.type !== BonusType.DEPOSIT || bonus.siteId !== player.siteId) throw new BizError("BONUS_NOT_AVAILABLE");
+    if (player.excludedFromBonuses) throw new BizError("PLAYER_EXCLUDED_FROM_BONUSES");
+    if (await db.playerBonus.findFirst({ where: { playerId, state: PlayerBonusState.ACTIVE } })) throw new BizError("ACTIVE_BONUS_EXISTS");
+    if (bonus.minAmount && amount.lt(bonus.minAmount)) { const e = new BizError("BONUS_MIN_DEPOSIT"); e.detail = { min: Number(bonus.minAmount) }; throw e; }
   }
+  const open = await db.paymentRequest.count({ where: { playerId, type: PaymentType.DEPOSIT, state: { in: [PaymentState.NEW, PaymentState.PENDING] } } });
+  if (open >= MAX_OPEN_DEPOSITS) throw new BizError("OPEN_DEPOSIT_LIMIT");
   return db.paymentRequest.create({
-    data: { playerId, type: PaymentType.DEPOSIT, amount, paymentSystem: b.paymentSystem, bonusId: b.bonusId, info: (b.info ?? {}) as any, currency: player.currency },
+    data: { playerId, type: PaymentType.DEPOSIT, amount, paymentSystem: b.paymentSystem, bonusId: b.bonusId, info: (txid ? { txid, network: cfg.network ?? null } : {}) as any, currency: player.currency },
   });
 }
 

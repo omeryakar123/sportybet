@@ -416,7 +416,7 @@ export default function Sport() {
                   <span className="text-[12px] font-bold opacity-75">Askıdaki seçimlerle kupon oynanamaz</span>
                 </button>
               ) : me && shortBy > 0 ? (
-                <button onClick={() => setWalletOpen("menu")} className="flex h-[52px] flex-1 flex-col items-center justify-center rounded-lg bg-white/[.08] text-fg ring-1 ring-primary/50 transition-colors hover:bg-white/[.12]">
+                <button onClick={() => setWalletOpen("deposit")} className="flex h-[52px] flex-1 flex-col items-center justify-center rounded-lg bg-white/[.08] text-fg ring-1 ring-primary/50 transition-colors hover:bg-white/[.12]">
                   <span className="text-[15px] font-extrabold leading-tight">Para yatır</span>
                   <span className="text-[12px] font-bold text-subtle">Bu kupon için {money(shortBy)} eksik</span>
                 </button>
@@ -628,9 +628,9 @@ export default function Sport() {
       {/* ÖNE ÇIKANLAR */}
       {featured.length > 0 && !q && when === "all" && lg === 0 && sport === "football" && (
         <section className="mb-7">
-          <div className="mb-3 flex items-center gap-2">
-            <span className="grid size-7 place-items-center rounded-full bg-primary/15 text-primary"><I n="flame" className="size-4" /></span>
-            <h2 className="title text-[22px]">Öne Çıkanlar</h2>
+          <div className="mb-3 flex items-center gap-3">
+            <img src="/img/ic-flame.svg" alt="" className="size-8" />
+            <h2 className="h-sec">Öne Çıkanlar</h2>
             <div className="ml-auto hidden gap-1.5 sm:flex">
               <button onClick={() => scrollBy(-620)} className="grid size-8 place-items-center rounded-lg bg-panel text-muted hover:text-fg"><I n="left" className="size-4" /></button>
               <button onClick={() => scrollBy(620)} className="grid size-8 place-items-center rounded-lg bg-panel text-muted hover:text-fg"><I n="right" className="size-4" /></button>
@@ -667,9 +667,9 @@ export default function Sport() {
       {/* CANLI MAÇLAR */}
       {liveGroups.length > 0 && !q && sport === "football" && (
         <section id="canli" className="mb-7 scroll-mt-20">
-          <div className="mb-3 flex items-center gap-2">
-            <span className="grid size-7 place-items-center rounded-full bg-live text-white"><I n="play" className="size-3.5" /></span>
-            <h2 className="title text-[22px]">Canlı Maçlar</h2>
+          <div className="mb-3 flex items-center gap-3">
+            <img src="/img/ic-live.svg" alt="" className="size-8" />
+            <h2 className="h-sec">Canlı Maçlar</h2>
             <span className="rounded bg-live/15 px-1.5 text-[12px] font-extrabold text-live">{live.length}</span>
             <span className="ml-2 hidden text-[12px] font-semibold text-subtle sm:inline">{limits?.liveEnabled ? "Oranlar canlı güncelleniyor · kilitli oranlar askıda" : "Canlı skor · canlı bahis şu an kapalı"}</span>
           </div>
@@ -681,8 +681,8 @@ export default function Sport() {
       {/* YAKLAŞAN */}
       {sport === "football" && <section>
         <div className="mb-3 flex items-center gap-2">
-          <span className="grid size-7 place-items-center rounded-full bg-primary/15 text-primary"><I n="calendar" className="size-4" /></span>
-          <h2 className="title text-[22px]">{q ? `“${q}” için sonuçlar` : "Yaklaşan Maçlar"}</h2>
+          <img src="/img/ic-ball.svg" alt="" className="size-8" />
+          <h2 className="h-sec">{q ? `“${q}” için sonuçlar` : "Yaklaşan Maçlar"}</h2>
           {events && <span className="rounded bg-card px-1.5 text-[12px] font-bold text-soft">{filtered.length}</span>}
           {lg > 0 && <button onClick={() => pickLeague(0)} className="ml-auto flex items-center gap-1 rounded-lg bg-card px-2.5 py-1 text-[12px] font-bold text-muted hover:text-fg">Filtreyi kaldır <I n="x" className="size-3.5" /></button>}
         </div>

@@ -7,9 +7,9 @@
 <filter id="glow"><feGaussianBlur stdDeviation="40"/></filter>
 </defs>
 <rect width="1200" height="1000" fill="url(#bg)"/>
-<g opacity=".18" stroke="#fff3b0" stroke-width="3" fill="none"><path d="M600 560 L0 120 M600 560 L1200 120 M600 560 L180 0 M600 560 L1020 0 M600 560 L420 0 M600 560 L780 0"/></g>
-<ellipse cx="600" cy="560" rx="380" ry="160" fill="#ffd400" opacity=".55" filter="url(#glow)"/>
-<g transform="translate(600 470)">
+<g opacity=".18" stroke="#fff3b0" stroke-width="3" fill="none"><path d="M600 500 L0 120 M600 500 L1200 120 M600 500 L180 0 M600 500 L1020 0 M600 500 L420 0 M600 500 L780 0"/></g>
+<ellipse cx="600" cy="500" rx="340" ry="140" fill="#ffd400" opacity=".5" filter="url(#glow)"/>
+<g transform="translate(600 400) scale(.78)">
 <path d="M-330 160 L-300 -150 L-170 -40 L0 -230 L170 -40 L300 -150 L330 160 Z" fill="url(#g1)" stroke="#fff6a8" stroke-width="6" stroke-linejoin="round"/>
 <path d="M-300 -150 L-170 -40 L-210 120 Z" fill="url(#g3)" opacity=".9"/>
 <path d="M300 -150 L170 -40 L210 120 Z" fill="url(#g3)" opacity=".9"/>

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { api } from "./api";
 import { Avatar, ErrBox, FlagTR, I, IconTile, money, useStore } from "./lib";
 import { Sheet, StatCard } from "./g";
+import { DepositPanel, WithdrawPanel } from "./Wallet";
 
 /* ============================================================
  * SOHBET — 3 sn'de bir yeni mesajlar (after=id), yağmur kartı, susturma bildirimi.
@@ -209,13 +210,13 @@ export function WalletModal() {
   const active = me.activeWallet === "BONUS" ? "BONUS" : "MAIN";
   /** gamdom cüzdan satırı: 51px, #0f151b, 24px renkli ikon + 16/700 + ok */
   const ROWS: [string, string, string, () => void][] = [
-    ["deposit", "#00ff86", "Para Yatır", () => go("/para-yatir")],
-    ["withdraw", "#279aff", "Para Çek", () => go("/para-cek")],
+    ["deposit", "#00ff86", "Para Yatır", () => setWalletOpen("deposit")],
+    ["withdraw", "#279aff", "Para Çek", () => setWalletOpen("withdraw")],
     ["promo", "#ffd900", "Kod Kullan", () => setWalletOpen("promo")],
     ["tip", "#ff7ab6", "Bahşiş Gönder", () => setWalletOpen("tip")],
     ["history", "#818e9d", "İşlem Geçmişi", () => go("/hesap/islemler")],
   ];
-  const title = walletOpen === "menu" ? "Cüzdan" : walletOpen === "promo" ? "Kod Kullan" : "Bahşiş Gönder";
+  const title = walletOpen === "menu" ? "Cüzdan" : walletOpen === "promo" ? "Kod Kullan" : walletOpen === "deposit" ? "Para Yatır" : walletOpen === "withdraw" ? "Para Çek" : "Bahşiş Gönder";
   return (
     <Sheet open onClose={close} title={<span className="flex items-center gap-2">{walletOpen !== "menu" && back}{title}</span>}
       head={walletOpen === "menu" ? (
@@ -246,6 +247,8 @@ export function WalletModal() {
           ))}
         </div>
       )}
+      {walletOpen === "deposit" && <DepositPanel />}
+      {walletOpen === "withdraw" && <WithdrawPanel />}
       {walletOpen === "promo" && (
         <div className="space-y-3 pt-1">
           <label className="block"><span className="mb-2 block text-[12px] font-medium text-subtle">Promosyon veya hediye kodu</span>
