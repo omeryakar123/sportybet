@@ -342,10 +342,10 @@ export default function Layout() {
     <div className="min-h-dvh lg:pl-[var(--sidebar-w)]">
       <Sidebar />
       <Header />
-      <main className={bare ? "" : `mx-auto px-3 pt-4 pb-24 sm:px-4 lg:pb-10 ${loc.pathname === "/spor" ? "max-w-[1480px]" : "max-w-[1286px] pt-[22px]"}`}>
+      <main className={bare ? "" : `mx-auto px-3 pt-4 pb-24 sm:px-4 lg:pb-10 ${loc.pathname.startsWith("/spor") ? "max-w-[1480px]" : "max-w-[1286px] pt-[22px]"}`}>
         <Outlet />
       </main>
-      {loc.pathname !== "/spor" && <Footer />}
+      {!loc.pathname.startsWith("/spor") && <Footer />}
       <BottomNav />
       <AuthModal />
     </div>

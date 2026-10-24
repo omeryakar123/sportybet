@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import MatchDetail, { type DInfo } from "./MatchDetail";
 import { api } from "./api";
 import { ErrBox, I, Spinner, money, useStore } from "./lib";
 
@@ -71,6 +72,12 @@ function TeamLogo({ src, name, size = "size-4" }: { src?: string; name: string; 
 // ======================================================================
 export default function Sport() {
   const { me, setAuthOpen, balance, refreshMe } = useStore();
+  const { id: evParam } = useParams();
+  const nav = useNavigate();
+  const [det, setDet] = useState<Ev | null>(null);
+  const [detErr, setDetErr] = useState("");
+  const [info, setInfo] = useState<DInfo | null>(null);
+  const goMatch = (id: number) => nav(`/spor/mac/${id}`);
   const [sp, setSp] = useSearchParams();
   const [leagues, setLeagues] = useState<League[]>([]);
   const [events, setEvents] = useState<Ev[] | null>(null);
@@ -129,7 +136,19 @@ export default function Sport() {
     const lv = () => api("/api/sb/live").then((l: Ev[]) => { setLive(l); syncPicks(l); }).catch(() => {});
     lv(); const t = setInterval(lv, limits?.liveEnabled ? 5_000 : 60_000); return () => clearInterval(t);
   }, [limits?.liveEnabled]);
-  useEffect(() => { load(); const t = setInterval(() => load(true), 90_000); return () => clearInterval(t); }, [lg]);
+  useEffect(() => { if (!evParam) load(); const t = setInterval(() => { if (!evParam) load(true); }, 90_000); return () => clearInterval(t); }, [lg, evParam]);
+  // maç detayı: canlıda 5 sn, maç öncesi 30 sn'de bir oran; olay/istatistik canlıda 2 dk'da bir
+  useEffect(() => {
+    if (!evParam) { setDet(null); setInfo(null); return; }
+    let alive = true; setDet(null); setDetErr(""); setInfo(null); window.scrollTo(0, 0);
+    let isLive = false;
+    const f = () => api(`/api/sb/event/${evParam}`).then((e: Ev) => { if (!alive) return; isLive = !!e.live; setDet(e); syncPicks([e]); }).catch((x) => alive && setDetErr(x.message));
+    const g = () => api(`/api/sb/event/${evParam}/detail`).then((d: DInfo) => alive && setInfo(d)).catch(() => {});
+    f(); g();
+    const t1 = setInterval(() => { if (isLive || Date.now() % 30000 < 5000) f(); }, 5000);
+    const t2 = setInterval(() => { if (isLive) g(); }, 120_000);
+    return () => { alive = false; clearInterval(t1); clearInterval(t2); };
+  }, [evParam]);
   useEffect(() => { const n = Number(sp.get("lig")) || 0; if (n !== lg) setLg(n); }, [sp]);
 
   const pickLeague = (id: number) => { setLg(id); const n = new URLSearchParams(sp); id ? n.set("lig", String(id)) : n.delete("lig"); setSp(n, { replace: true }); };
@@ -315,11 +334,11 @@ export default function Sport() {
       <div key={key ?? ev.id} className="border-t border-line/70 first:border-t-0">
         <div className="grid grid-cols-1 items-center gap-2 px-3 py-2.5 md:grid-cols-[minmax(180px,1fr)_84px_minmax(210px,1.2fr)_minmax(140px,.8fr)_minmax(140px,.8fr)_44px]">
           <div className="flex min-w-0 items-center gap-2">
-            <div className="min-w-0 flex-1 space-y-1">
+            <div onClick={() => goMatch(ev.id)} role="link" title="Maç detayı ve tüm oranlar" className="min-w-0 flex-1 cursor-pointer space-y-1 hover:[&_span.team]:text-primary">
               {[[ev.home, ev.homeLogo, ev.score?.h], [ev.away, ev.awayLogo, ev.score?.a]].map(([n, l, g], i) => (
                 <div key={i} className="flex items-center gap-2">
                   <TeamLogo src={l as string} name={n as string} />
-                  <span className="truncate text-[13px] font-semibold">{n as string}</span>
+                  <span className="team truncate text-[13px] font-semibold transition-colors">{n as string}</span>
                   {isLive && <span className="ml-auto grid h-5 min-w-5 place-items-center rounded bg-card px-1 text-[12px] font-extrabold text-primary tabular-nums">{(g as number) ?? 0}</span>}
                 </div>
               ))}
@@ -341,9 +360,9 @@ export default function Sport() {
           <div className="hidden grid-cols-2 gap-1.5 md:grid">
             {odd({ ev: ev, m: kg, code: "YES", label: "Var" })}{odd({ ev: ev, m: kg, code: "NO", label: "Yok" })}
           </div>
-          <button onClick={() => setOpenEv(open ? null : ev.id)} disabled={more === 0}
+          <button onClick={() => goMatch(ev.id)} disabled={false} title="Tüm oranlar"
             className={`h-10 rounded-md text-[12px] font-extrabold transition-colors disabled:opacity-40 ${open ? "bg-primary text-primary-fg" : "bg-card text-muted hover:bg-surface-hover hover:text-fg"}`}>
-            {open ? <I n="up" className="mx-auto size-4" /> : `+${more}`}
+            {more > 0 ? `+${more}` : <I n="right" className="mx-auto size-4" />}
           </button>
         </div>
         {open && eventMarkets({ ev: ev })}
@@ -395,6 +414,11 @@ export default function Sport() {
     <div className="pb-[calc(var(--bottom-nav-h)+64px)] lg:pb-20">
       {toast && <div className={`fixed left-1/2 top-[calc(var(--header-h)+12px)] z-[70] max-w-[92vw] -translate-x-1/2 rounded-xl px-5 py-3 text-sm font-bold shadow-2xl ${toast.kind === "warn" ? "bg-caution text-[#2a1d00]" : "bg-primary text-primary-fg"}`}>{toast.t}</div>}
 
+      {evParam ? (
+        det ? <MatchDetail ev={det as any} info={info} onBack={() => (window.history.length > 1 ? nav(-1) : nav("/spor"))} isPicked={has} onPick={(e, m, x) => toggle(e as any, m as any, x as any)} changed={changed} />
+          : detErr ? <div className="rounded-xl bg-panel p-12 text-center"><p className="font-bold">Maç bulunamadı</p><button onClick={() => nav("/spor")} className="mt-3 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-fg">Spor sayfasına dön</button></div>
+          : <Spinner />
+      ) : (<>
       {/* SPOR ŞERİDİ */}
       <div className="relative mb-3 rounded-xl bg-panel">
         <div className="sb-scroll flex gap-1 overflow-x-auto px-2 py-2">
@@ -446,7 +470,7 @@ export default function Sport() {
                     <SportIcon k="football" className="size-4" /><span className="min-w-0 flex-1 truncate">{ev.league}</span>
                     <span className="flex shrink-0 items-center gap-1 text-subtle"><I n="clock" className="size-3.5" />{startsIn(ev.startsAt)}</span>
                   </div>
-                  <div className="mb-2.5 rounded-lg bg-card px-3 py-2.5">
+                  <div onClick={() => goMatch(ev.id)} role="link" className="mb-2.5 cursor-pointer rounded-lg bg-card px-3 py-2.5 transition-colors hover:bg-surface-hover">
                     {[[ev.home, ev.homeLogo, dayLabel(ev.startsAt), "calendar"], [ev.away, ev.awayLogo, hm(ev.startsAt), "clock"]].map(([n, l, t, ic]) => (
                       <div key={n} className="flex items-center gap-2 py-0.5">
                         <TeamLogo src={l} name={n} size="size-5" />
@@ -500,6 +524,8 @@ export default function Sport() {
           </>
         )}
       </section>
+
+      </>)}
 
       {/* YAPIŞKAN KUPON — masaüstü sağ alt, mobil alt menünün üstünde */}
       <div className="fixed inset-x-0 bottom-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom))] z-40 lg:inset-x-auto lg:right-5 lg:bottom-5 lg:w-[370px]">

@@ -102,6 +102,33 @@ export const feed = {
   },
 };
 
+// ---------- MAÇ DETAYI (olaylar, istatistik, kadro) — tek çağrı ----------
+export type FixtureDetail = {
+  venue: string | null; referee: string | null; round: string | null;
+  events: { min: number; extra: number | null; side: "home" | "away"; type: string; detail: string; player: string | null; assist: string | null }[];
+  stats: { type: string; home: string | number | null; away: string | number | null }[];
+  lineups: { side: "home" | "away"; formation: string | null; coach: string | null; xi: { name: string; number: number | null; pos: string | null }[]; subs: { name: string; number: number | null }[] }[];
+};
+export async function fixtureDetail(fixtureId: number): Promise<FixtureDetail | null> {
+  const r: any[] = await call(`/fixtures?id=${fixtureId}`);
+  const f = r?.[0]; if (!f) return null;
+  const homeId = f.teams?.home?.id;
+  const side = (tid: number) => (tid === homeId ? "home" : "away") as "home" | "away";
+  const st = (f.statistics ?? []) as any[];
+  const hs = st.find((x) => x.team?.id === homeId)?.statistics ?? [], as_ = st.find((x) => x.team?.id !== homeId)?.statistics ?? [];
+  return {
+    venue: f.fixture?.venue?.name ? `${f.fixture.venue.name}${f.fixture.venue.city ? ", " + f.fixture.venue.city : ""}` : null,
+    referee: f.fixture?.referee ?? null, round: f.league?.round ?? null,
+    events: (f.events ?? []).map((e: any) => ({ min: e.time?.elapsed ?? 0, extra: e.time?.extra ?? null, side: side(e.team?.id), type: e.type, detail: e.detail, player: e.player?.name ?? null, assist: e.assist?.name ?? null })),
+    stats: hs.map((h: any) => ({ type: h.type, home: h.value, away: as_.find((a: any) => a.type === h.type)?.value ?? null })),
+    lineups: (f.lineups ?? []).map((l: any) => ({
+      side: side(l.team?.id), formation: l.formation ?? null, coach: l.coach?.name ?? null,
+      xi: (l.startXI ?? []).map((p: any) => ({ name: p.player?.name, number: p.player?.number ?? null, pos: p.player?.pos ?? null })),
+      subs: (l.substitutes ?? []).map((p: any) => ({ name: p.player?.name, number: p.player?.number ?? null })),
+    })),
+  };
+}
+
 // ---------- CANLI (in-play) ----------
 // Tek çağrı (/odds/live) tüm canlı maçları döndürür → kota maç sayısından bağımsız.
 export type LiveSel = { odd: number; suspended: boolean };

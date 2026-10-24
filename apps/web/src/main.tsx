@@ -18,6 +18,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         <Route element={<Layout />}>
           <Route index element={<Home />} />
           <Route path="spor" element={<Sport />} />
+          <Route path="spor/mac/:id" element={<Sport />} />
           <Route path="tahminler" element={<PredictionsPage />} />
           <Route path="tahminler/:slug" element={<PredictionDetail />} />
           <Route path="liderlik" element={<Leaderboard />} />

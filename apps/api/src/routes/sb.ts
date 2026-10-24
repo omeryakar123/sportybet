@@ -2,8 +2,11 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { WalletType } from "@prisma/client";
 import { db } from "../index.js";
-import { getConfig, setConfig, listEvents, listLive, listLeagues, serializeEvent, placeBet, syncFixtures, syncOdds, syncResults, settleEvent, SbError, MARKET_LIST, SPORT_LIST, syncLive, liveStatus, liveMinInterval } from "../services/sb.js";
-import { feed, feedConfigured, feedUsage } from "../services/feed.js";
+import { getConfig, setConfig, listEvents, listLive, listLeagues, serializeEvent, placeBet, syncFixtures, syncOdds, syncResults, settleEvent, SbError, MARKET_LIST, SPORT_LIST, syncLive, liveStatus, liveMinInterval, liveOpen } from "../services/sb.js";
+import { feed, feedConfigured, feedUsage, feedBudget, fixtureDetail } from "../services/feed.js";
+
+// Maç detayı önbelleği (kota koruması): canlıda 2 dk, maç öncesi 6 saat, biten maç 24 saat
+const detailCache = new Map<number, { at: number; ttl: number; data: any }>();
 
 // ---------- Oyuncu / site tarafı ----------
 export async function sbSiteRoutes(app: FastifyInstance) {
@@ -16,7 +19,23 @@ export async function sbSiteRoutes(app: FastifyInstance) {
   app.get("/sb/event/:id", async (req, reply) => {
     const ev = await db.sbEvent.findUnique({ where: { id: Number((req.params as any).id) }, include: { markets: { where: { isOpen: true }, include: { selections: true }, orderBy: { sortOrder: "asc" } } } });
     if (!ev) return reply.code(404).send({ error: "NOT_FOUND" });
-    return serializeEvent(ev);
+    const started = new Date(ev.startsAt).getTime() <= Date.now() && !ev.settledAt;
+    const cfg = await getConfig(db);
+    return serializeEvent(ev, started ? { live: true, open: liveOpen(cfg, ev) } : undefined);
+  });
+  app.get("/sb/event/:id/detail", async (req, reply) => {
+    const ev = await db.sbEvent.findUnique({ where: { id: Number((req.params as any).id) } });
+    if (!ev) return reply.code(404).send({ error: "NOT_FOUND" });
+    const c = detailCache.get(ev.id);
+    if (c && Date.now() - c.at < c.ttl) return c.data;
+    if (!feedConfigured() || !feedBudget(40)) return c?.data ?? { events: [], stats: [], lineups: [], venue: null, referee: null, round: null, unavailable: true };
+    try {
+      const data = await fixtureDetail(ev.fixtureId);
+      const started = new Date(ev.startsAt).getTime() <= Date.now();
+      const ttl = ev.settledAt ? 24 * 3600_000 : started ? 120_000 : 6 * 3600_000;
+      detailCache.set(ev.id, { at: Date.now(), ttl, data });
+      return data;
+    } catch { return c?.data ?? { events: [], stats: [], lineups: [], unavailable: true }; }
   });
   app.get("/sb/limits", async () => { const c = await getConfig(db); return { minStake: c.minStake, maxStake: c.maxStake, maxWin: c.maxWin, maxSelections: c.maxSelections, liveEnabled: c.liveEnabled, liveDelaySec: c.liveDelaySec, liveMaxStake: c.liveMaxStake, liveIntervalSec: c.liveIntervalSec }; });
 
