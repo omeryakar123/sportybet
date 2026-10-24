@@ -98,6 +98,7 @@ function Config() {
         ) : <span className="text-bo-muted">Durum yükleniyor…</span>}
       </Panel>
 
+      <SportmonksPanel />
       <Panel title="Canlı Bahis" right={<button className="btn-ghost" onClick={() => api("/admin/sb/sync-live", { method: "POST" }).then(() => api("/admin/sb/status").then(setStatus)).catch((x) => setE(x.message))}>↻ Canlı oranları şimdi çek</button>}>
         {(() => {
           const lv = status?.live; const minI = lv?.minIntervalSec;
@@ -160,5 +161,36 @@ function Config() {
         </div>
       </Panel>
     </>
+  );
+}
+
+/** Sportmonks: maç sayfası canlı takip (saha olayları, kadro sahası + reytingler, istatistik, anlatım, top konumu) */
+function SportmonksPanel() {
+  const [st, setSt] = useState<any>(null); const [tok, setTok] = useState(""); const [e, setE] = useState(""); const [msg, setMsg] = useState("");
+  const load = () => api("/admin/sb/sportmonks").then(setSt).catch((x) => setE(x.message));
+  useEffect(() => { load(); }, []);
+  async function save() { setE(""); setMsg(""); try { await api("/admin/sb/sportmonks", { method: "PUT", json: { token: tok } }); setTok(""); setMsg("Kaydedildi ✓"); load(); } catch (x: any) { setE(x.message); } }
+  const DEN: Record<string, string> = { ballcoordinates: "Top konumu", pressure: "Baskı göstergesi", xgfixture: "xG", trends: "Trendler", predictions: "Tahminler", inplayodds: "Canlı oranlar" };
+  return (
+    <Panel title="Canlı Takip (Sportmonks)">
+      {st ? (
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+          <div><div className="text-xs text-bo-muted">Bağlantı</div><div className={st.configured ? "font-bold text-bo-green" : "font-bold text-bo-red"}>{st.configured ? `Bağlı (…${st.tail}${st.fromEnv ? ", ortam değişkeni" : ""})` : "Anahtar yok"}</div></div>
+          <div><div className="text-xs text-bo-muted">Son başarılı istek</div><div className="font-bold">{st.lastOkAt ? dt(st.lastOkAt) : "—"}</div></div>
+          <div><div className="text-xs text-bo-muted">İstek (açılıştan beri)</div><div className="font-bold">{st.calls}</div></div>
+          <div><div className="text-xs text-bo-muted">Planda olmayan veriler</div><div className="font-bold">{st.denied?.length ? st.denied.map((d: string) => DEN[d] ?? d).join(", ") : "—"}</div></div>
+        </div>
+      ) : <span className="text-bo-muted">Yükleniyor…</span>}
+      <Warn show={st?.lastError}>{`Son hata: ${st?.lastError}`}</Warn>
+      <p className="mt-3 text-xs text-bo-muted">Maç sayfasında Ayrıntılar (canlı saha), Kadrolar (reytingli saha dizilişi), İstatistikler ve Anlatım sekmelerini besler. Maçlar tarih + takım adıyla otomatik eşleşir; yalnızca Sportmonks planındaki liglerde çalışır. Anahtar SPORTMONKS_TOKEN ortam değişkeniyle de verilebilir.</p>
+      {!st?.fromEnv && (
+        <div className="mt-3 flex gap-2">
+          <input className="inp w-96" type="password" autoComplete="off" placeholder={st?.configured ? "Yeni anahtarla değiştir" : "Sportmonks API anahtarı"} value={tok} onChange={(x) => setTok(x.target.value)} />
+          <button className="btn-blue" disabled={tok.trim().length < 20} onClick={save}>Kaydet</button>
+          <span className="self-center text-bo-green">{msg}</span>
+        </div>
+      )}
+      <Err e={e} />
+    </Panel>
   );
 }

@@ -4,6 +4,8 @@ import { WalletType } from "@prisma/client";
 import { db } from "../index.js";
 import { getConfig, setConfig, listEvents, listLive, listLeagues, serializeEvent, placeBet, syncFixtures, syncOdds, syncResults, settleEvent, SbError, MARKET_LIST, SPORT_LIST, syncLive, liveStatus, liveMinInterval, liveOpen } from "../services/sb.js";
 import { feed, feedConfigured, feedUsage, feedBudget, fixtureDetail } from "../services/feed.js";
+import { smFindFixture, smTracker, smToken, smStatus, smResetToken } from "../services/sportmonks.js";
+import { setSetting } from "../services/sites.js";
 
 // Maç detayı önbelleği (kota koruması): canlıda 2 dk, maç öncesi 6 saat, biten maç 24 saat
 const detailCache = new Map<number, { at: number; ttl: number; data: any }>();
@@ -36,6 +38,17 @@ export async function sbSiteRoutes(app: FastifyInstance) {
       detailCache.set(ev.id, { at: Date.now(), ttl, data });
       return data;
     } catch { return c?.data ?? { events: [], stats: [], lineups: [], unavailable: true }; }
+  });
+  // Sportmonks canlı takip (saha olayları, anlatım, kadro + reyting, istatistik, top konumu) — yapılandırılmamışsa { available:false }
+  app.get("/sb/event/:id/tracker", async (req, reply) => {
+    const ev = await db.sbEvent.findUnique({ where: { id: Number((req.params as any).id) } });
+    if (!ev) return reply.code(404).send({ error: "NOT_FOUND" });
+    if (!(await smToken(db))) return { available: false, reason: "NOT_CONFIGURED" };
+    try {
+      const fid = await smFindFixture(db, { id: ev.id, home: ev.home, away: ev.away, startsAt: ev.startsAt });
+      if (!fid) return { available: false, reason: "NO_MATCH" };
+      return { available: true, ...(await smTracker(db, fid)) };
+    } catch (e: any) { return { available: false, reason: e.message }; }
   });
   app.get("/sb/limits", async () => { const c = await getConfig(db); return { minStake: c.minStake, maxStake: c.maxStake, maxWin: c.maxWin, maxSelections: c.maxSelections, liveEnabled: c.liveEnabled, liveDelaySec: c.liveDelaySec, liveMaxStake: c.liveMaxStake, liveIntervalSec: c.liveIntervalSec }; });
 
@@ -132,4 +145,12 @@ export async function sbAdminRoutes(app: FastifyInstance) {
   app.post("/sb/sync", async () => ({ fixtures: await syncFixtures(db), odds: await syncOdds(db) }));
   app.post("/sb/sync-results", async () => syncResults(db));
   app.post("/sb/sync-live", async () => syncLive(db));
+  // Sportmonks bağlantısı: durum + anahtar kaydetme (anahtar geri döndürülmez, yalnız son 4 hanesi)
+  app.get("/sb/sportmonks", async () => { const t = await smToken(db); return { configured: !!t, fromEnv: !!process.env.SPORTMONKS_TOKEN, tail: t ? t.slice(-4) : null, lastOkAt: smStatus.lastOkAt, lastError: smStatus.lastError, denied: smStatus.denied(), calls: smStatus.calls }; });
+  app.put("/sb/sportmonks", async (req) => {
+    const { token } = z.object({ token: z.string().max(200) }).parse(req.body);
+    await setSetting(db, "sportmonks_token", { token: token.trim() });
+    smResetToken();
+    return { ok: true };
+  });
 }
