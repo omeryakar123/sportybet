@@ -142,7 +142,7 @@ export default function Sport() {
     if (!evParam) { setDet(null); setInfo(null); return; }
     let alive = true; setDet(null); setDetErr(""); setInfo(null); window.scrollTo(0, 0);
     let isLive = false;
-    const f = () => api(`/api/sb/event/${evParam}`).then((e: Ev) => { if (!alive) return; isLive = !!e.live; setDet(e); syncPicks([e]); }).catch((x) => alive && setDetErr(x.message));
+    const f = () => api(`/api/sb/event/${evParam}`).then((e: Ev) => { if (!alive) return; isLive = !!e.live; setDet(e); syncPicks([e]); }).catch((x) => { if (!alive) return; if (x.message === "NOT_FOUND") setDetErr(x.message); else setTimeout(() => alive && f(), 3000); });
     const g = () => api(`/api/sb/event/${evParam}/detail`).then((d: DInfo) => alive && setInfo(d)).catch(() => {});
     f(); g();
     const t1 = setInterval(() => { if (isLive || Date.now() % 30000 < 5000) f(); }, 5000);
