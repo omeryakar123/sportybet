@@ -73,6 +73,7 @@ export async function createDeposit(db: PrismaClient, playerId: number, b: { pay
   const ps = await checkSystem(db, player.siteId, b.paymentSystem, PaymentType.DEPOSIT, amount);
   const cfg = (ps.config ?? {}) as any;
   const txid = String((b.info ?? {}).txid ?? "").trim();
+  if (cfg.requireTxid && !String(cfg.depositAddress ?? "").trim()) throw new BizError("DEPOSIT_ADDRESS_MISSING");
   if (cfg.requireTxid && txid.length < 8) throw new BizError("TXID_REQUIRED");
   if (txid) {
     const used = await db.paymentRequest.findFirst({ where: { type: PaymentType.DEPOSIT, state: { not: PaymentState.REJECTED }, info: { path: ["txid"], equals: txid } } });

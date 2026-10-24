@@ -57,7 +57,7 @@ function AmountInput({ value, onChange, chips, max }: { value: string; onChange:
   );
 }
 
-function MyRequests({ type, refresh, onCancelled }: { type: "DEPOSIT" | "WITHDRAWAL"; refresh: number; onCancelled: () => void }) {
+function MyRequests({ type, refresh, onCancelled, systems = [] }: { type: "DEPOSIT" | "WITHDRAWAL"; refresh: number; onCancelled: () => void; systems?: any[] }) {
   const [rows, setRows] = useState<any[] | null>(null); const [err, setErr] = useState(""); const [busy, setBusy] = useState<string | null>(null);
   useEffect(() => { api("/api/me/payments").then((r) => setRows((Array.isArray(r) ? r : []).filter((x: any) => x.type === type).slice(0, 6))).catch(() => setRows([])); }, [refresh, type]);
   async function cancel(id: string) { setErr(""); setBusy(id); try { await api(`/api/payments/${id}/cancel`, { method: "POST", json: {} }); onCancelled(); } catch (x: any) { setErr(x.message); } setBusy(null); }
@@ -73,7 +73,7 @@ function MyRequests({ type, refresh, onCancelled }: { type: "DEPOSIT" | "WITHDRA
             <div key={r.id} className="rounded-[10px] bg-card px-3.5 py-3">
               <div className="flex items-center gap-3 text-[14px]">
                 <span className="font-bold tabular-nums">{money(r.amount)}</span>
-                <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-subtle">{r.paymentSystem} · {dt(r.createdAt)}</span>
+                <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-subtle">{systems.find((x) => x.name === r.paymentSystem)?.displayName ?? r.paymentSystem} · {dt(r.createdAt)}</span>
                 <span className={`shrink-0 text-[12px] font-bold uppercase ${cls}`}>{lbl}</span>
               </div>
               {r.state === "REJECTED" && r.rejectReason && <p className="mt-1 text-[12px] font-medium text-loss">Sebep: {r.rejectReason}</p>}
@@ -110,17 +110,18 @@ export function DepositPanel({ preBonus }: { preBonus?: number }) {
   }, [me?.id]);
   if (!systems) return <Spinner />;
   if (done) return <Done title="Yatırım talebin alındı" text={`${money(done.amount)} · ${done.system}. Onaylanınca bakiyene anında yüklenir; durumunu aşağıdan takip edebilirsin.`} onAgain={() => { setDone(null); setRefresh((x) => x + 1); }} />;
-  if (!sys) return <><MethodList systems={systems} onPick={(s) => { setSys(s); setErr(""); setTxid(""); }} /><MyRequests type="DEPOSIT" refresh={refresh} onCancelled={() => setRefresh((x) => x + 1)} /></>;
+  if (!sys) return <><MethodList systems={systems} onPick={(s) => { setSys(s); setErr(""); setTxid(""); }} /><MyRequests type="DEPOSIT" refresh={refresh} systems={systems} onCancelled={() => setRefresh((x) => x + 1)} /></>;
 
   const crypto = sys.config?.depositAddress ? sys.config : null;
-  const needTxid = !!crypto?.requireTxid;
+  const needTxid = !!sys.config?.requireTxid;
+  const noAddress = needTxid && !crypto; // kripto yöntemi ama adres backoffice'te girilmemiş
   const amt = parseAmount(amount);
   const min = Number(sys.minAmount ?? 0), max = sys.maxAmount ? Number(sys.maxAmount) : null;
   const bonus = bonuses.find((b) => b.id === bonusId);
   const bonusMin = bonus?.minAmount ? Number(bonus.minAmount) : 0;
   const bonusAmt = bonus ? Math.min((amt * Number(bonus.percent ?? 0)) / 100, bonus.maxAmount ? Number(bonus.maxAmount) : Infinity) : 0;
   const problem = !amt ? "" : amt < min ? `En az ${money(min)} yatırabilirsin.` : max != null && amt > max ? `En fazla ${money(max)} yatırabilirsin.` : bonus && hasActiveBonus ? "Aktif bir bonusun varken yeni yatırım bonusu seçemezsin." : bonus && amt < bonusMin ? `Bu bonus için en az ${money(bonusMin)} yatırmalısın.` : needTxid && txid.trim().length > 0 && txid.trim().length < 8 ? "İşlem numarası (TXID) çok kısa." : "";
-  const ready = amt > 0 && !problem && (!needTxid || txid.trim().length >= 8);
+  const ready = amt > 0 && !problem && !noAddress && (!needTxid || txid.trim().length >= 8);
   const chips = [min > 250 ? min : 250, 500, 1000, 5000].filter((v, i, a) => a.indexOf(v) === i && (max == null || v <= max));
   async function submit() {
     setBusy(true); setErr("");
@@ -133,11 +134,11 @@ export function DepositPanel({ preBonus }: { preBonus?: number }) {
   return (
     <div className="space-y-4">
       <button onClick={() => setSys(null)} className="flex w-full items-center gap-3 rounded-[10px] bg-panel px-3 py-2.5 text-left hover:bg-card">
-        <I n="left" className="size-5 text-subtle" />
         {sys.logoUrl ? <img src={asset(sys.logoUrl)} alt="" className="h-6 w-9 rounded object-contain" /> : <I n="wallet" className="size-5 text-primary" />}
         <span className="flex-1 text-[15px] font-bold">{sys.displayName}</span><span className="text-[12px] font-medium text-subtle">Değiştir</span>
       </button>
       {sys.instructions && <p className="rounded-[10px] bg-card px-3.5 py-3 text-[13px] font-medium text-muted">{sys.instructions}</p>}
+      {noAddress && <p className="rounded-[10px] bg-caution/10 px-3.5 py-3 text-[13px] font-bold text-caution">Bu yöntemin yatırım adresi şu an tanımlı değil. Başka bir yöntem seç ya da canlı destekten adres iste.</p>}
       {crypto && (
         <div className="rounded-2xl bg-card p-4">
           <Label right={<button onClick={async () => { try { await navigator.clipboard.writeText(crypto.depositAddress); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch {} }} className="text-[12px] font-bold text-primary">{copied ? "Kopyalandı ✓" : "Kopyala"}</button>}>
@@ -182,7 +183,7 @@ export function DepositPanel({ preBonus }: { preBonus?: number }) {
       {problem && <p className="text-[13px] font-bold text-caution">{problem}</p>}
       <ErrBox e={err} />
       <Btn className="w-full" disabled={busy || !ready} onClick={submit}>{busy ? "Gönderiliyor…" : amt ? `${money(amt)} yatırım talebi oluştur` : "Tutarı gir"}</Btn>
-      <MyRequests type="DEPOSIT" refresh={refresh} onCancelled={() => setRefresh((x) => x + 1)} />
+      <MyRequests type="DEPOSIT" refresh={refresh} systems={systems} onCancelled={() => setRefresh((x) => x + 1)} />
     </div>
   );
 }
@@ -210,7 +211,7 @@ export function WithdrawPanel() {
     ? <div className="rounded-[10px] bg-caution/10 px-3.5 py-3 text-[13px] font-bold text-caution">Aktif bonusun var: {activeBonus.bonus.name}. Çevrim tamamlanmadan (%{Math.round(activeBonus.progress)}) çekim yapılamaz. <Link to="/hesap/bonuslarim" className="underline">Bonuslarım</Link></div>
     : openReq ? <div className="rounded-[10px] bg-caution/10 px-3.5 py-3 text-[13px] font-bold text-caution">Bekleyen bir çekim talebin var ({money(openReq.amount)}). Sonuçlanınca yeni talep oluşturabilirsin; istersen aşağıdan iptal edebilirsin.</div>
     : null;
-  if (!sys) return <>{head}{blocker && <div className="mb-3">{blocker}</div>}<MethodList systems={systems} onPick={(s) => { setSys(s); setInfo({}); setErr(""); }} /><MyRequests type="WITHDRAWAL" refresh={refresh} onCancelled={() => { setRefresh((x) => x + 1); refreshMe(); }} /></>;
+  if (!sys) return <>{head}{blocker && <div className="mb-3">{blocker}</div>}<MethodList systems={systems} onPick={(s) => { setSys(s); setInfo({}); setErr(""); }} /><MyRequests type="WITHDRAWAL" refresh={refresh} systems={systems} onCancelled={() => { setRefresh((x) => x + 1); refreshMe(); }} /></>;
 
   const fields: any[] = Array.isArray(sys.fields) ? sys.fields : [];
   const amt = parseAmount(amount);
@@ -230,7 +231,6 @@ export function WithdrawPanel() {
     <div className="space-y-4">
       {head}
       <button onClick={() => setSys(null)} className="flex w-full items-center gap-3 rounded-[10px] bg-panel px-3 py-2.5 text-left hover:bg-card">
-        <I n="left" className="size-5 text-subtle" />
         {sys.logoUrl ? <img src={asset(sys.logoUrl)} alt="" className="h-6 w-9 rounded object-contain" /> : <I n="wallet" className="size-5 text-primary" />}
         <span className="flex-1 text-[15px] font-bold">{sys.displayName}</span><span className="text-[12px] font-medium text-subtle">Değiştir</span>
       </button>
@@ -256,7 +256,7 @@ export function WithdrawPanel() {
       <ErrBox e={err} />
       <Btn className="w-full" disabled={busy || !ready} onClick={submit}>{busy ? "Gönderiliyor…" : missing.length && amt ? `${missing[0].label} alanını doldur` : amt ? `${money(amt)} çekim talebi oluştur` : "Tutarı gir"}</Btn>
       <p className="text-center text-[12px] font-medium text-subtle">Tutar talep anında bakiyenden ayrılır; reddedilir ya da iptal edersen anında geri yüklenir.</p>
-      <MyRequests type="WITHDRAWAL" refresh={refresh} onCancelled={() => { setRefresh((x) => x + 1); refreshMe(); }} />
+      <MyRequests type="WITHDRAWAL" refresh={refresh} systems={systems} onCancelled={() => { setRefresh((x) => x + 1); refreshMe(); }} />
     </div>
   );
 }

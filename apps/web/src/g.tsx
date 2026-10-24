@@ -135,7 +135,7 @@ export function Sheet({ open, onClose, title, head, children, wide }: { open: bo
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-[60] flex items-end justify-center bg-[rgba(6,9,14,.9)] sm:items-center sm:p-6" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <section role="dialog" aria-modal="true" className={`animate-sheet flex max-h-[calc(100dvh-16px)] w-full flex-col overflow-hidden rounded-t-2xl bg-page sm:max-h-[86vh] sm:rounded-2xl ${wide ? "sm:max-w-[720px]" : "sm:max-w-[440px]"}`}>
+      <section role="dialog" aria-modal="true" className={`animate-sheet flex h-[calc(100dvh-16px)] w-full flex-col overflow-hidden rounded-t-2xl bg-page sm:h-auto sm:max-h-[86vh] sm:rounded-2xl ${wide ? "sm:max-w-[720px]" : "sm:max-w-[440px]"}`}>
         <div className="flex shrink-0 items-center gap-3 px-[15px] pt-[14px] pb-3">
           <div className="flex min-w-0 flex-1 items-center gap-3">{title && <p className="truncate text-[16px] font-bold text-white">{title}</p>}{head}</div>
           <button onClick={onClose} aria-label="Kapat" className="grid size-8 place-items-center rounded-lg text-subtle hover:text-fg"><I n="x" className="size-6" /></button>

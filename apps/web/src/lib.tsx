@@ -185,7 +185,7 @@ export function ErrBox({ e }: { e?: string }) {
     RAIN_ACCOUNT_TOO_NEW: "Yağmura katılmak için hesabın en az 24 saatlik olmalı", RAIN_DISABLED: "Yağmur şu an kapalı", RAIN_NOT_ALLOWED: "Yağmura katılamazsın",
     TIP_MIN: "Bahşiş minimumun altında", TIP_MAX: "Bahşiş maksimumun üstünde", TIP_SELF: "Kendine bahşiş gönderemezsin", USER_NOT_FOUND: "Bu kullanıcı adıyla bir oyuncu yok. Adı kontrol et.", RECIPIENT_UNAVAILABLE: "Bu kullanıcıya gönderilemez",
     TIP_DEPOSIT_REQUIRED: "Bahşiş göndermek için en az bir yatırım gerekli", TIP_DAILY_LIMIT: "Günlük bahşiş limitine ulaştın", TIP_DISABLED: "Bahşiş şu an kapalı", INVALID_AMOUNT: "Geçersiz tutar",
-    TXID_REQUIRED: "Gönderimin işlem numarasını (TXID) gir; cüzdan uygulamandaki işlem detayında yazar.", TXID_USED: "Bu işlem numarası (TXID) ile daha önce talep oluşturulmuş.",
+    DEPOSIT_ADDRESS_MISSING: "Bu yöntemin yatırım adresi tanımlı değil. Başka bir yöntem seç.", TXID_REQUIRED: "Gönderimin işlem numarasını (TXID) gir; cüzdan uygulamandaki işlem detayında yazar.", TXID_USED: "Bu işlem numarası (TXID) ile daha önce talep oluşturulmuş.",
     OPEN_DEPOSIT_LIMIT: "Onay bekleyen 3 yatırım talebin var. Onlar sonuçlanınca yenisini oluşturabilirsin.", BONUS_MIN_DEPOSIT: "Seçtiğin bonus için yatırım tutarı alt sınırın altında.",
     MISSING_FIELD: "Çekim bilgilerinde eksik alan var. Tüm alanları doldur.", PAYMENT_SYSTEM_NOT_AVAILABLE: "Bu ödeme yöntemi şu an kullanılamıyor. Başka bir yöntem seç.",
     BONUS_NOT_AVAILABLE: "Bu bonus şu an alınamıyor.", CANNOT_CANCEL: "Bu talep işleme alındığı için iptal edilemez.", ALREADY_PROCESSED: "Bu talep zaten sonuçlandı.",
