@@ -1,16 +1,18 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
-import { DateRange, Kpi, Panel, presetRange, money, num, pct, Err } from "../ui";
+import { Link } from "react-router-dom";
+import { DateRange, Kpi, Panel, presetRange, money, num, pct, Err, qs } from "../ui";
 
 export default function Dashboard() {
   const [range, setRange] = useState(presetRange("today"));
   const [d, setD] = useState<any>(null); const [e, setE] = useState("");
   useEffect(() => { setE(""); api(`/admin/dashboard?from=${encodeURIComponent(range.from)}&to=${encodeURIComponent(range.to)}`).then(setD).catch((x) => setE(x.message)); }, [range]);
   const k = d?.kpi ?? {};
+  const R = { from: range.from, to: range.to };
   const sb = d?.sportsbook;
   const row = (label: string, key: string, f: (v: any) => string, colorize = false) => (
     <tr key={key}>
-      <td className="border-l-2 border-bo-blue">{label}</td>
+      <td className="border-l-2 border-bo-blue"><Link className="hover:text-bo-blue hover:underline" to={"/bets" + qs({ ...R, state: key === "openBets" ? "ACTIVE" : "" })}>{label}</Link></td>
       {["prematch", "live", "total"].map((c) => {
         const v = sb?.[c]?.[key];
         const cls = colorize ? (Number(v) < 0 ? "bg-rose-50" : Number(v) > 0 ? "bg-emerald-50" : "") : "";
@@ -23,22 +25,22 @@ export default function Dashboard() {
       <div className="mb-3 flex justify-end"><DateRange value={range} onChange={setRange} /></div>
       <Err e={e} />
       <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
-        <Kpi label="Toplam Yatırım" value={money(k.deposits)} icon="⬇" color="teal" />
-        <Kpi label="Toplam Çekim" value={money(k.withdrawals)} icon="⬆" color="bo-red" />
-        <Kpi label="Giriş Yapan Oyuncu" value={num(k.playersLoggedIn)} icon="👤" color="bo-orange" />
-        <Kpi label="Toplam Giriş" value={num(k.loginCount)} icon="➜" color="lime" />
-        <Kpi label="Yeni Kayıt" value={num(k.playersRegistered)} icon="＋" color="bo-green" />
-        <Kpi label="Oyuncu Bakiyesi" value={money(k.playersBalance)} icon="💵" color="bo-purple" />
-        <Kpi label="Kâr (Yatırım − Çekim)" value={money(k.profit)} icon="📈" color="bo-green" />
-        <Kpi label="Yatırım Yapan Oyuncu" value={num(k.playersMakingDeposit)} icon="⬇" color="bo-blue" />
-        <Kpi label="Çekim Yapan Oyuncu" value={num(k.playersMakingWithdrawal)} icon="⬆" color="bo-orange" />
-        <Kpi label="Bonus Bakiyesi" value={money(k.bonusBalance)} icon="🎁" color="bo-purple" />
-        <Kpi label="Düzeltme (+)" value={money(k.correctionUp)} icon="✚" color="bo-red" />
-        <Kpi label="Düzeltme (−)" value={money(k.correctionDown)} icon="✖" color="teal" />
+        <Kpi to={"/finance/deposits" + qs({ state: "PAID", ...R })} label="Toplam Yatırım" value={money(k.deposits)} icon="⬇" color="teal" />
+        <Kpi to={"/finance/withdrawals" + qs({ state: "PAID", ...R })} label="Toplam Çekim" value={money(k.withdrawals)} icon="⬆" color="bo-red" />
+        <Kpi to={"/players" + qs({ loginFrom: R.from, loginTo: R.to, isTest: "" })} label="Giriş Yapan Oyuncu" value={num(k.playersLoggedIn)} icon="👤" color="bo-orange" />
+        <Kpi to={"/players" + qs({ loginFrom: R.from, loginTo: R.to, isTest: "" })} label="Toplam Giriş" value={num(k.loginCount)} icon="➜" color="lime" />
+        <Kpi to={"/players" + qs({ from: R.from, to: R.to })} label="Yeni Kayıt" value={num(k.playersRegistered)} icon="＋" color="bo-green" />
+        <Kpi to={"/players" + qs({ minBalance: "0.01" })} label="Oyuncu Bakiyesi" value={money(k.playersBalance)} icon="💵" color="bo-purple" />
+        <Kpi to={"/reports/financial" + qs(R)} label="Kâr (Yatırım − Çekim)" value={money(k.profit)} icon="📈" color="bo-green" />
+        <Kpi to={"/finance/deposits" + qs({ state: "PAID", ...R })} label="Yatırım Yapan Oyuncu" value={num(k.playersMakingDeposit)} icon="⬇" color="bo-blue" />
+        <Kpi to={"/finance/withdrawals" + qs({ state: "PAID", ...R })} label="Çekim Yapan Oyuncu" value={num(k.playersMakingWithdrawal)} icon="⬆" color="bo-orange" />
+        <Kpi to={"/reports/bonus" + qs({ state: "ACTIVE" })} label="Bonus Bakiyesi" value={money(k.bonusBalance)} icon="🎁" color="bo-purple" />
+        <Kpi to={"/finance/transactions" + qs({ type: "CORRECTION_UP", ...R })} label="Düzeltme (+)" value={money(k.correctionUp)} icon="✚" color="bo-red" />
+        <Kpi to={"/finance/transactions" + qs({ type: "CORRECTION_DOWN", ...R })} label="Düzeltme (−)" value={money(k.correctionDown)} icon="✖" color="teal" />
       </div>
 
       <div className="grid gap-3 xl:grid-cols-2">
-        <Panel title="Sportsbook Özeti">
+        <Panel title={<Link to={"/bets" + qs(R)} className="hover:underline">Sportsbook Özeti ›</Link>}>
           <table className="tbl">
             <thead><tr><th></th><th className="text-right">Maç Öncesi</th><th className="text-right">Canlı</th><th className="text-right">Toplam</th></tr></thead>
             <tbody>
@@ -58,7 +60,7 @@ export default function Dashboard() {
           </div>
         </Panel>
 
-        <Panel title="Bonus Özeti">
+        <Panel title={<Link to="/reports/bonus" className="hover:underline">Bonus Özeti ›</Link>}>
           <table className="tbl">
             <thead><tr><th>Tip</th><th>Ürün</th><th className="text-right">Verilen</th><th className="text-right">Oyuncu</th><th className="text-right">Dönüşen (Ana Paraya)</th></tr></thead>
             <tbody>
@@ -70,7 +72,7 @@ export default function Dashboard() {
         </Panel>
       </div>
 
-      <Panel title="En Çok Oynanan 5 Spor">
+      <Panel title={<Link to={"/reports/sportsbook" + qs(R)} className="hover:underline">En Çok Oynanan 5 Spor ›</Link>}>
         {(d?.topSports ?? []).length === 0 ? <div className="py-6 text-center text-bo-muted">Görüntülenecek veri yok</div> : (
           <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
             {d.topSports.map((s: any) => {

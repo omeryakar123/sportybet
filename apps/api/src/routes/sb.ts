@@ -2,21 +2,23 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { WalletType } from "@prisma/client";
 import { db } from "../index.js";
-import { getConfig, setConfig, listEvents, listLeagues, serializeEvent, placeBet, syncFixtures, syncOdds, syncResults, settleEvent, SbError } from "../services/sb.js";
+import { getConfig, setConfig, listEvents, listLive, listLeagues, serializeEvent, placeBet, syncFixtures, syncOdds, syncResults, settleEvent, SbError, MARKET_LIST, SPORT_LIST } from "../services/sb.js";
 import { feed, feedConfigured, feedUsage } from "../services/feed.js";
 
 // ---------- Oyuncu / site tarafı ----------
 export async function sbSiteRoutes(app: FastifyInstance) {
   app.get("/sb/leagues", async () => listLeagues(db));
+  app.get("/sb/live", async () => listLive(db));
   app.get("/sb/events", async (req) => {
-    const q = z.object({ league: z.coerce.number().optional(), limit: z.coerce.number().max(200).optional() }).parse(req.query);
-    return listEvents(db, { leagueId: q.league, limit: q.limit });
+    const q = z.object({ league: z.coerce.number().optional(), limit: z.coerce.number().max(300).optional(), q: z.string().max(60).optional() }).parse(req.query);
+    return listEvents(db, { leagueId: q.league, limit: q.limit, q: q.q?.trim() || undefined });
   });
   app.get("/sb/event/:id", async (req, reply) => {
-    const ev = await db.sbEvent.findUnique({ where: { id: Number((req.params as any).id) }, include: { markets: { where: { isOpen: true }, include: { selections: true } } } });
+    const ev = await db.sbEvent.findUnique({ where: { id: Number((req.params as any).id) }, include: { markets: { where: { isOpen: true }, include: { selections: true }, orderBy: { sortOrder: "asc" } } } });
     if (!ev) return reply.code(404).send({ error: "NOT_FOUND" });
     return serializeEvent(ev);
   });
+  app.get("/sb/limits", async () => { const c = await getConfig(db); return { minStake: c.minStake, maxStake: c.maxStake, maxWin: c.maxWin, maxSelections: c.maxSelections }; });
 
   const auth = async (req: FastifyRequest, reply: FastifyReply) => {
     try { await req.jwtVerify(); } catch { reply.code(401).send({ error: "UNAUTHORIZED" }); return null; }
@@ -34,7 +36,7 @@ export async function sbSiteRoutes(app: FastifyInstance) {
 
   app.get("/sb/my-bets", async (req, reply) => {
     const pid = await auth(req, reply); if (!pid) return;
-    return db.bet.findMany({ where: { playerId: pid, selections: { some: { sbSelectionId: { not: null } } } }, include: { selections: true }, orderBy: { id: "desc" }, take: 100 });
+    return db.bet.findMany({ where: { playerId: pid }, include: { selections: true }, orderBy: { id: "desc" }, take: 100 });
   });
 }
 
@@ -43,16 +45,26 @@ export async function sbAdminRoutes(app: FastifyInstance) {
   app.get("/sb/status", async () => {
     const cfg = await getConfig(db);
     let feedStatus: any = null;
-    if (feedConfigured()) feedStatus = await feed.status().then((r: any) => r).catch((e: any) => ({ error: e.message, detail: e.detail }));
+    if (feedConfigured()) feedStatus = await feed.status().catch((e: any) => ({ error: e.message, detail: e.detail }));
     return { configured: feedConfigured(), usage: feedUsage(), config: cfg, feed: feedStatus };
+  });
+  // Bonus kural editörü için seçenekler (spor / lig / market)
+  app.get("/sb/catalog", async () => {
+    const cfg = await getConfig(db);
+    const rows = await db.sbEvent.groupBy({ by: ["leagueId", "league", "country"], _count: true });
+    const map = new Map<number, { id: number; name: string; country: string | null; count: number }>();
+    for (const l of cfg.leagues) map.set(l.id, { id: l.id, name: l.name, country: null, count: 0 });
+    for (const r of rows) map.set(r.leagueId, { id: r.leagueId, name: r.league, country: r.country, count: r._count });
+    return { sports: SPORT_LIST, markets: MARKET_LIST, leagues: [...map.values()].sort((a, b) => a.name.localeCompare(b.name, "tr")) };
   });
   app.get("/sb/config", async () => getConfig(db));
   app.put("/sb/config", async (req) => {
     const b = z.object({
-      enabled: z.boolean().optional(), marginPct: z.number().min(0).max(50).optional(),
-      maxStake: z.number().positive().optional(), maxWin: z.number().positive().optional(),
+      enabled: z.boolean().optional(), marginPct: z.number().min(0).max(30).optional(),
+      minStake: z.number().min(0).optional(), maxStake: z.number().positive().optional(), maxWin: z.number().positive().optional(),
       maxSelections: z.number().int().min(1).max(30).optional(), syncDays: z.number().int().min(1).max(7).optional(),
-      leagues: z.array(z.object({ id: z.number(), name: z.string() })).optional(),
+      oddsPerRun: z.number().int().min(1).max(50).optional(),
+      leagues: z.array(z.object({ id: z.number().int().positive(), name: z.string().min(1) })).optional(),
     }).parse(req.body);
     return setConfig(db, b);
   });
@@ -65,7 +77,7 @@ export async function sbAdminRoutes(app: FastifyInstance) {
         ...(q.status ? { status: q.status } : {}),
         ...(q.settled === "true" ? { settledAt: { not: null } } : q.settled === "false" ? { settledAt: null } : {}),
       },
-      include: { markets: { include: { selections: true } }, _count: { select: { markets: true } } },
+      include: { markets: { include: { selections: true }, orderBy: { sortOrder: "asc" } } },
       orderBy: { startsAt: "asc" }, take: q.take,
     });
   });
@@ -83,8 +95,12 @@ export async function sbAdminRoutes(app: FastifyInstance) {
   });
   // manuel sonuçlandırma (feed gecikirse)
   app.post("/sb/events/:id/settle", async (req) => {
-    const b = z.object({ home: z.number().int().min(0), away: z.number().int().min(0), void: z.boolean().optional() }).parse(req.body);
-    await settleEvent(db, Number((req.params as any).id), b.home, b.away, !!b.void);
+    const b = z.object({ home: z.number().int().min(0).max(99), away: z.number().int().min(0).max(99), htHome: z.number().int().min(0).max(99).nullable().optional(), htAway: z.number().int().min(0).max(99).nullable().optional(), void: z.boolean().optional() })
+      .refine((x) => x.htHome == null || x.htAway == null || (x.htHome <= x.home && x.htAway <= x.away), { message: "İlk yarı skoru maç sonu skorundan büyük olamaz" })
+      .parse(req.body);
+    const ev = await db.sbEvent.findUniqueOrThrow({ where: { id: Number((req.params as any).id) } });
+    if (ev.settledAt) throw new SbError("ALREADY_SETTLED");
+    await settleEvent(db, ev.id, b.home, b.away, !!b.void, b.htHome ?? null, b.htAway ?? null);
     return { ok: true };
   });
   // manuel senkron tetikleyicileri

@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api";
-import { Panel, Field, DataTable, DateRange, presetRange, money, num, dt, StateBadge, Err, useForm } from "../ui";
+import { Panel, Field, DataTable, DateRange, presetRange, money, num, dt, StateBadge, Err, useForm, useUrlInit } from "../ui";
 
 const qs = (o: Record<string, any>) => new URLSearchParams(Object.fromEntries(Object.entries(o).filter(([, v]) => v !== "" && v !== undefined)));
 
 export function SportsbookReport() {
-  const [range, setRange] = useState(presetRange("month"));
+  const [range, setRange] = useState(useUrlInit().range("month"));
   const [rows, setRows] = useState<any[]>([]); const [e, setE] = useState("");
   useEffect(() => { api(`/admin/reports/sportsbook?${qs(range)}`).then(setRows).catch((x) => setE(x.message)); }, [range]);
   const tot = (k: string) => rows.reduce((a, r) => a + Number(r[k] ?? 0), 0);
@@ -29,7 +29,7 @@ export function SportsbookReport() {
 }
 
 export function FinancialReport() {
-  const [range, setRange] = useState(presetRange("month"));
+  const [range, setRange] = useState(useUrlInit().range("month"));
   const [d, setD] = useState<any>({ daily: [], bySystem: [] }); const [e, setE] = useState("");
   useEffect(() => { api(`/admin/reports/financial?${qs(range)}`).then(setD).catch((x) => setE(x.message)); }, [range]);
   return (
@@ -54,8 +54,9 @@ export function FinancialReport() {
 }
 
 export function BonusReport() {
-  const [range, setRange] = useState(presetRange("month"));
-  const { f, bind } = useForm({ state: "", type: "", bonusId: "", playerId: "" });
+  const U = useUrlInit();
+  const [range, setRange] = useState(U.range(U.get("state") ? "all" : "month"));
+  const { f, bind } = useForm({ state: U.get("state"), type: U.get("type"), bonusId: U.get("bonusId"), playerId: U.get("playerId") });
   const [rows, setRows] = useState<any[]>([]); const [defs, setDefs] = useState<any[]>([]); const [e, setE] = useState("");
   const load = () => api(`/admin/player-bonuses?${qs({ ...f, ...range, take: 1000 })}`).then(setRows).catch((x) => setE(x.message));
   useEffect(() => { load(); }, [range]);

@@ -1,17 +1,20 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api";
-import { Panel, Field, Modal, DataTable, money, dt, StateBadge, Err, useForm } from "../ui";
+import { Panel, Field, Modal, DataTable, money, dt, StateBadge, Err, useForm, useUrlInit } from "../ui";
 
 const bal = (p: any, t: string) => Number(p.wallets?.find((w: any) => w.type === t)?.balance ?? 0);
 
 export default function Players({ title = "Oyuncular", reportMode = false }: { title?: string; reportMode?: boolean }) {
-  const { f, bind, setF } = useForm({ search: "", id: "", status: "", category: "", verified: "", isTest: "false", btag: "", from: "", to: "", minBalance: "" });
+  const U = useUrlInit();
+  // datetime-local input'u için ISO → yerel "YYYY-MM-DDTHH:mm"
+  const loc = (v: string) => { if (!v) return ""; const d = new Date(v); return isNaN(+d) ? "" : new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16); };
+  const { f, bind, setF } = useForm({ search: "", id: "", status: U.get("status"), category: U.get("category"), verified: "", isTest: U.get("isTest", "false"), btag: "", from: loc(U.get("from")), to: loc(U.get("to")), minBalance: U.get("minBalance"), loginFrom: loc(U.get("loginFrom")), loginTo: loc(U.get("loginTo")) });
   const [page, setPage] = useState(1); const [size, setSize] = useState(reportMode ? 500 : 20);
   const [data, setData] = useState<any>({ items: [], total: 0 }); const [e, setE] = useState(""); const [create, setCreate] = useState(false);
   const load = (p = page) => {
     setE("");
-    const q = new URLSearchParams(Object.fromEntries(Object.entries({ ...f, page: String(p), size: String(size), from: f.from ? new Date(f.from).toISOString() : "", to: f.to ? new Date(f.to).toISOString() : "" }).filter(([, v]) => v !== "")));
+    const q = new URLSearchParams(Object.fromEntries(Object.entries({ ...f, page: String(p), size: String(size), from: f.from ? new Date(f.from).toISOString() : "", to: f.to ? new Date(f.to).toISOString() : "", loginFrom: f.loginFrom ? new Date(f.loginFrom).toISOString() : "", loginTo: f.loginTo ? new Date(f.loginTo).toISOString() : "" }).filter(([, v]) => v !== "")));
     api(`/admin/players?${q}`).then(setData).catch((x) => setE(x.message));
   };
   useEffect(() => { load(1); setPage(1); }, [size]);
@@ -30,10 +33,12 @@ export default function Players({ title = "Oyuncular", reportMode = false }: { t
           <Field label="Kayıt (başlangıç)"><input type="datetime-local" className="inp" {...bind("from")} /></Field>
           <Field label="Kayıt (bitiş)"><input type="datetime-local" className="inp" {...bind("to")} /></Field>
           <Field label="Min. Bakiye"><input type="number" className="inp" {...bind("minBalance")} /></Field>
+          <Field label="Giriş (başlangıç)"><input type="datetime-local" className="inp" {...bind("loginFrom")} /></Field>
+          <Field label="Giriş (bitiş)"><input type="datetime-local" className="inp" {...bind("loginTo")} /></Field>
         </div>
         <div className="mt-3 flex justify-end gap-2">
           <button className="btn-blue w-28" onClick={() => { setPage(1); load(1); }}>Uygula</button>
-          <button className="btn-ghost w-28" onClick={() => setF({ search: "", id: "", status: "", category: "", verified: "", isTest: "false", btag: "", from: "", to: "", minBalance: "" })}>Sıfırla</button>
+          <button className="btn-ghost w-28" onClick={() => setF({ search: "", id: "", status: "", category: "", verified: "", isTest: "false", btag: "", from: "", to: "", minBalance: "", loginFrom: "", loginTo: "" })}>Sıfırla</button>
         </div>
       </Panel>
       <Panel title={`${title} (${data.total})`} right={!reportMode && <button className="btn-green" onClick={() => setCreate(true)}>Oyuncu Ekle</button>}>

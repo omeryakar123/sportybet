@@ -35,6 +35,8 @@ enum TxType {
   PREDICTION_REFUND
   CORRECTION_UP
   CORRECTION_DOWN
+  DEPOSIT_REVERSAL    // ödenmiş yatırımın geri alınması (hatalı/sahte yatırım)
+  WITHDRAWAL_REVERSAL // ödenmiş çekimin iadesi (PSP'de başarısız/geri döndü)
 }
 
 enum PaymentType {
@@ -48,6 +50,7 @@ enum PaymentState {
   PAID
   REJECTED
   CANCELLED // oyuncu iptal etti
+  REVERSED  // ödendikten sonra geri alındı (ters kayıt atıldı)
 }
 
 enum BetState {
@@ -145,6 +148,7 @@ model Player {
   promoCode      String?
   regSource      String    @default("Web")
   isTest         Boolean   @default(false)
+  avatar         String?   // profil fotoğrafı: hazır avatar anahtarı ("av:3") ya da küçük data URL
   activeWallet   WalletType @default(MAIN) // oyuncunun oynadığı cüzdan (sportsbook + tahmin sadece bunu görür)
   city           String?
   address        String?
@@ -214,7 +218,8 @@ model Bet {
   winAmount    Decimal  @default(0) @db.Decimal(18, 2)
   state        BetState @default(PENDING)
   isLive       Boolean  @default(false)
-  playerBonusId Int?
+  playerBonusId Int?     // bonus cüzdanıyla oynandıysa hangi PlayerBonus
+  bonusEligible Boolean? // bonus kurallarına uyuyor mu (çevrime sayılır mı)
   source       String   @default("Web")
   ip           String?
   createdAt    DateTime @default(now())
@@ -266,6 +271,8 @@ model SbEvent {
   minute        Int?
   homeGoals     Int?
   awayGoals     Int?
+  htHomeGoals   Int?      // ilk yarı skoru (İY marketleri için)
+  htAwayGoals   Int?
   isOpen        Boolean   @default(true)  // bahise açık mı (admin kapatabilir)
   featured      Boolean   @default(false)
   oddsUpdatedAt DateTime?
@@ -282,8 +289,9 @@ model SbEvent {
 model SbMarket {
   id         Int           @id @default(autoincrement())
   eventId    Int
-  key        String        // 1x2 | ou25 | btts
+  key        String        // 1x2 | dc | ou15 | ou25 | ou35 | btts | ht1x2 | dnb | oe | htft
   name       String
+  sortOrder  Int           @default(0)
   isOpen     Boolean       @default(true)
   event      SbEvent       @relation(fields: [eventId], references: [id], onDelete: Cascade)
   selections SbSelection[]
@@ -484,6 +492,11 @@ model PaymentRequest {
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
   processedAt   DateTime?
+  // Düzeltme / geri alma (hatalı işlem çözümü)
+  reversedAt      DateTime?
+  reversedAdminId Int?
+  reverseReason   String?
+  correctedAmount Decimal?     @db.Decimal(18, 2) // tutar düzeltildiyse düzeltme ÖNCESİ (orijinal) tutar
   player        Player       @relation(fields: [playerId], references: [id])
 
   @@index([type, state, createdAt])

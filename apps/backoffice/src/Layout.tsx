@@ -124,7 +124,7 @@ export default function Layout() {
           <button onClick={() => { setToken(null); nav("/login"); }} className="text-bo-muted hover:text-bo-red">Çıkış</button>
         </header>
         <div className="flex h-11 items-center border-b border-bo-line bg-white px-5 text-[14px] text-bo-text">{pageTitle(loc.pathname)}</div>
-        <main className="min-w-0 flex-1 p-4"><Outlet context={{ me }} /></main>
+        <main className="min-w-0 flex-1 p-4"><Outlet key={loc.pathname + loc.search} context={{ me }} /></main>
       </div>
     </div>
   );

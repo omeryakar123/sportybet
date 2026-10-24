@@ -1,4 +1,5 @@
-import { ReactNode, useMemo, useState } from "react";
+import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 
 export const money = (v: any, cur = "₺") => {
   const n = Number(v ?? 0);
@@ -46,31 +47,110 @@ export function Tabs<T extends string>({ tabs, value, onChange }: { tabs: readon
     </div>
   );
 }
-export const Err = ({ e }: { e?: string }) => (e ? <div className="mb-2 rounded bg-bo-red/10 p-2 text-bo-red">{e}</div> : null);
+/** API hata kodlarının Türkçe karşılıkları (bilinmeyen kod olduğu gibi gösterilir) */
+export const ERR_TR: Record<string, string> = {
+  VALIDATION_ERROR: "Form alanlarını kontrol edin", NOT_FOUND: "Kayıt bulunamadı", ALREADY_EXISTS: "Bu kayıt zaten var", FORBIDDEN: "Bu işlem için yetkiniz yok",
+  INSUFFICIENT_FUNDS: "Yetersiz bakiye", INSUFFICIENT_BALANCE: "Oyuncunun bakiyesi yetersiz", REASON_REQUIRED: "Sebep yazmak zorunlu (en az 5 karakter)",
+  ALREADY_PROCESSED: "Bu talep zaten işlenmiş", ONLY_PAID_CAN_BE_REVERSED: "Sadece ödenmiş talepler geri alınabilir", ONLY_PAID_CAN_BE_CORRECTED: "Sadece ödenmiş talepler düzeltilebilir",
+  ONLY_REJECTED_CAN_BE_REOPENED: "Sadece reddedilen/iptal edilen talepler yeniden açılabilir", SAME_AMOUNT: "Yeni tutar mevcut tutarla aynı", INVALID_AMOUNT: "Geçersiz tutar",
+  INSUFFICIENT_BALANCE_FOR_REVERSAL: "Oyuncu parayı kullanmış — bakiye geri alma tutarını karşılamıyor",
+  BONUS_MAX_LT_MIN: "Maksimum tutar, minimum tutardan küçük olamaz", BONUS_MIN_NEGATIVE: "Minimum tutar negatif olamaz", BONUS_MAX_INVALID: "Maksimum tutar 0'dan büyük olmalı",
+  BONUS_MAX_PAYOUT_INVALID: "Maksimum ödeme 0'dan büyük olmalı", BONUS_MAX_PAYOUT_PCT_RANGE: "Maks. ödeme yüzdesi 0–100000 arası olmalı",
+  DEPOSIT_BONUS_NEEDS_PERCENT: "Yatırım bonusunda yüzde (%) zorunlu", BONUS_PERCENT_RANGE: "Bonus yüzdesi 0–1000 arası olmalı",
+  BONUS_WAGERING_RANGE: "Çevrim katı 0–100 arası olmalı", BONUS_EXPIRATION_RANGE: "Geçerlilik 1–365 gün olmalı", BONUS_DATES_INVALID: "Bitiş tarihi başlangıçtan sonra olmalı",
+  RULE_MIN_SELECTIONS: "Min. seçim sayısı en az 1", RULE_MIN_SEL_ODDS: "Min. seçim oranı en az 1.00", RULE_TOTAL_LT_SEL_ODDS: "Min. toplam oran, min. seçim oranından küçük olamaz",
+  RULE_SINGLE_MULTI_CONFLICT: "Bahis tipi 'Tekli' iken min. seçim sayısı 1 olmalı",
+  PROMO_CODE_FORMAT: "Kod 3–30 karakter: büyük harf, rakam, - veya _", PROMO_DATES_INVALID: "Bitiş tarihi başlangıçtan sonra olmalı", PROMO_BONUS_NOT_FOUND: "Seçilen bonus bulunamadı",
+  PROMO_BONUS_INACTIVE: "Seçilen bonus pasif", PROMO_AMOUNT_BELOW_BONUS_MIN: "Tutar, bonusun minimum tutarından küçük", PROMO_AMOUNT_ABOVE_BONUS_MAX: "Tutar, bonusun maksimum tutarından büyük",
+  PROMO_MAX_LT_USED: "Maks. kullanım, şimdiye kadarki kullanımdan az olamaz",
+  MAX_LT_MIN: "Maksimum tutar, minimum tutardan küçük olamaz", MIN_AMOUNT_NEGATIVE: "Minimum tutar negatif olamaz", CRYPTO_ADDRESS_REQUIRED: "TXID zorunluysa yatırım adresi de girilmeli",
+  MIN_STAKE_GT_MAX_STAKE: "Min. bahis, maks. bahisten büyük olamaz", MAX_WIN_LT_MAX_STAKE: "Maks. kazanç, maks. bahisten küçük olamaz", ALREADY_SETTLED: "Bu maç zaten sonuçlandırılmış",
+  ACTIVE_BONUS_EXISTS: "Oyuncunun zaten aktif bir bonusu var", BELOW_MIN_AMOUNT: "Tutar bonusun minimumunun altında", ABOVE_MAX_AMOUNT: "Tutar bonusun maksimumunun üstünde",
+  PLAYER_EXCLUDED_FROM_BONUSES: "Oyuncu bonuslardan hariç tutulmuş", BONUS_NOT_ACTIVE: "Bonus aktif değil", INVALID_CREDENTIALS: "Kullanıcı adı veya şifre hatalı",
+};
+export const trErr = (e?: string) => (e ? ERR_TR[e] ?? e : "");
+export const Err = ({ e }: { e?: string }) => (e ? <div className="mb-2 rounded border border-bo-red/30 bg-bo-red/10 px-3 py-2 text-bo-red">⚠ {trErr(e)}</div> : null);
+/** Form içi anlık uyarı (kaydetmeden önce) */
+export const Warn = ({ show, children }: { show: any; children: ReactNode }) => (show ? <div className="mt-1 text-[12px] text-bo-red">⚠ {children}</div> : null);
+
+/** Aranabilir çoklu seçim (BC tarzı dropdown + arama + etiketler) */
+export function MultiSelect({ options, value, onChange, placeholder = "Hepsi", disabled }: {
+  options: { value: string; label: string; hint?: string }[]; value: string[]; onChange: (v: string[]) => void; placeholder?: string; disabled?: boolean;
+}) {
+  const [open, setOpen] = useState(false); const [q, setQ] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => { const h = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); }; document.addEventListener("mousedown", h); return () => document.removeEventListener("mousedown", h); }, []);
+  const lower = q.toLocaleLowerCase("tr");
+  const filtered = options.filter((o) => !lower || o.label.toLocaleLowerCase("tr").includes(lower) || (o.hint ?? "").toLocaleLowerCase("tr").includes(lower));
+  const toggle = (v: string) => onChange(value.includes(v) ? value.filter((x) => x !== v) : [...value, v]);
+  const label = (v: string) => options.find((o) => o.value === v)?.label ?? v;
+  return (
+    <div ref={ref} className="relative">
+      <div onClick={() => !disabled && setOpen(!open)} className={`inp flex min-h-8 cursor-pointer flex-wrap items-center gap-1 py-1 ${disabled ? "opacity-60" : ""}`}>
+        {value.length === 0 ? <span className="text-bo-muted">{placeholder}</span> : value.map((v) => (
+          <span key={v} className="flex items-center gap-1 rounded-sm bg-bo-blue/10 px-1.5 py-0.5 text-[12px] text-bo-blue">{label(v)}<button type="button" onClick={(e) => { e.stopPropagation(); toggle(v); }} className="text-bo-blue/70 hover:text-bo-red">×</button></span>
+        ))}
+        <span className="ml-auto pl-2 text-bo-muted">▾</span>
+      </div>
+      {open && (
+        <div className="absolute left-0 right-0 z-50 mt-1 rounded border border-bo-line bg-white shadow-lg">
+          <div className="border-b border-bo-line p-2"><input autoFocus className="inp" placeholder="Ara…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
+          <div className="flex justify-between border-b border-bo-line px-3 py-1.5 text-[12px]">
+            <button type="button" className="text-bo-blue" onClick={() => onChange([...new Set([...value, ...filtered.map((o) => o.value)])])}>Tümünü seç</button>
+            <button type="button" className="text-bo-muted hover:text-bo-red" onClick={() => onChange([])}>Temizle</button>
+          </div>
+          <div className="max-h-60 overflow-auto py-1">
+            {filtered.length === 0 && <div className="px-3 py-2 text-bo-muted">Sonuç yok</div>}
+            {filtered.map((o) => (
+              <label key={o.value} className="flex cursor-pointer items-center gap-2 px-3 py-1.5 hover:bg-bo-head">
+                <input type="checkbox" checked={value.includes(o.value)} onChange={() => toggle(o.value)} />
+                <span className="flex-1">{o.label}</span>{o.hint && <span className="text-[11px] text-bo-muted">{o.hint}</span>}
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 const STATE_COLORS: Record<string, string> = {
   WON: "text-bo-green", PAID: "text-bo-green", COMPLETED: "text-bo-green", APPROVED: "text-bo-green", SUCCESS: "text-bo-green", OPEN: "text-bo-green",
   LOST: "text-bo-red", REJECTED: "text-bo-red", BLOCKED: "text-bo-red", CLOSED: "text-bo-red",
   EXPIRED: "text-bo-muted", CANCELLED: "text-bo-muted", CANCELED: "text-bo-muted", RETURNED: "text-bo-muted",
-  PENDING: "text-bo-orange", NEW: "text-bo-blue", ACTIVE: "text-bo-blue", CASHED_OUT: "text-bo-purple",
+  PENDING: "text-bo-orange", NEW: "text-bo-blue", ACTIVE: "text-bo-blue", CASHED_OUT: "text-bo-purple", REVERSED: "text-bo-purple",
 };
 const STATE_TR: Record<string, string> = {
   WON: "Kazandı", LOST: "Kaybetti", ACTIVE: "Açık", PENDING: "Bekliyor", RETURNED: "İade", CASHED_OUT: "Cashout", CANCELLED: "İptal",
   NEW: "Yeni", PAID: "Ödendi", REJECTED: "Reddedildi", COMPLETED: "Tamamlandı", EXPIRED: "Süresi doldu", CANCELED: "İptal", APPROVED: "Onaylandı",
-  OPEN: "Açık", BLOCKED: "Bloke", CLOSED: "Kapalı", SELF_EXCLUDED: "Kendini dışladı",
+  OPEN: "Açık", BLOCKED: "Bloke", CLOSED: "Kapalı", SELF_EXCLUDED: "Kendini dışladı", REVERSED: "Geri alındı",
 };
 export const StateBadge = ({ s }: { s: string }) => <span className={STATE_COLORS[s] ?? ""}>{STATE_TR[s] ?? s}</span>;
 
 /** KPI kartı (BC dashboard / player KPIs) */
-export function Kpi({ label, value, icon, color = "bo-blue" }: { label: string; value: ReactNode; icon: string; color?: string }) {
+export function Kpi({ label, value, icon, color = "bo-blue", to }: { label: string; value: ReactNode; icon: string; color?: string; to?: string }) {
   const bg: Record<string, string> = { "bo-blue": "bg-sky-100 text-sky-600", "bo-red": "bg-rose-100 text-rose-600", "bo-orange": "bg-amber-100 text-amber-600", "bo-green": "bg-emerald-100 text-emerald-600", "bo-purple": "bg-violet-100 text-violet-600", lime: "bg-lime-100 text-lime-700", teal: "bg-teal-100 text-teal-600" };
-  return (
-    <div className="panel flex h-[74px] items-stretch overflow-hidden">
+  const body = (
+    <>
       <div className={`grid w-[74px] shrink-0 place-items-center ${bg[color] ?? bg["bo-blue"]}`}><div className="grid size-10 place-items-center rounded-full bg-white/80 text-xl shadow-sm">{icon}</div></div>
       <div className="flex min-w-0 flex-col justify-center px-3"><div className="truncate text-[11px] uppercase tracking-wide text-[#3b4351]">{label}</div><div className="mt-1 truncate text-[19px] text-[#8a93a1]">{value}</div></div>
-    </div>
+    </>
   );
+  return to
+    ? <Link to={to} title="Detaya git" className="panel flex h-[74px] items-stretch overflow-hidden transition-shadow hover:shadow-md hover:ring-1 hover:ring-bo-blue/40">{body}</Link>
+    : <div className="panel flex h-[74px] items-stretch overflow-hidden">{body}</div>;
 }
+
+/** URL'den başlangıç filtresi (dashboard kutularından gelen ?state=PAID&from=...&to=... gibi) */
+export function useUrlInit() {
+  const [sp] = useSearchParams();
+  return {
+    get: (k: string, def = "") => sp.get(k) ?? def,
+    range: (fallback: string): Range => (sp.get("from") ? { from: sp.get("from")!, to: sp.get("to") ?? new Date().toISOString() } : presetRange(fallback)),
+  };
+}
+/** Dashboard'dan detay sayfasına link üretici */
+export const qs = (o: Record<string, any>) => "?" + new URLSearchParams(Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined && v !== null && v !== ""))).toString();
 
 /** Tarih aralığı + hızlı butonlar (Bugün, Dün, Bu Hafta ...) */
 export type Range = { from: string; to: string };
@@ -84,6 +164,7 @@ export function presetRange(p: string): Range {
     case "lastweek": return { from: iso(new Date(sod.getTime() - (dow + 7) * day)), to: iso(new Date(sod.getTime() - dow * day)) };
     case "month": return { from: iso(new Date(now.getFullYear(), now.getMonth(), 1)), to: iso(new Date(sod.getTime() + day)) };
     case "lastmonth": return { from: iso(new Date(now.getFullYear(), now.getMonth() - 1, 1)), to: iso(new Date(now.getFullYear(), now.getMonth(), 1)) };
+    case "all": return { from: "2000-01-01T00:00:00.000Z", to: iso(new Date(sod.getTime() + day)) };
     default: return { from: iso(sod), to: iso(new Date(sod.getTime() + day)) };
   }
 }

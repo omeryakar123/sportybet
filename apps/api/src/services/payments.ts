@@ -13,7 +13,7 @@ import { move } from "./wallet.js";
 import { grantBonus } from "./bonus.js";
 
 const D = (v: Prisma.Decimal.Value) => new Prisma.Decimal(v);
-export class BizError extends Error {}
+export class BizError extends Error { detail?: any; }
 
 async function checkSystem(db: PrismaClient, siteId: number, name: string, type: PaymentType, amount: Prisma.Decimal) {
   const ps = await db.paymentSystem.findFirst({ where: { siteId, name } });
@@ -110,4 +110,92 @@ export async function processPayment(db: PrismaClient, id: bigint, action: "allo
     }
   }
   return out.req;
+}
+
+// ================== HATALI İŞLEM ÇÖZÜMÜ ==================
+// Tüm düzeltmeler: zorunlu sebep, satır kilidi, işlem geçmişinde `pay:<id>:<tür>` referansı, audit (route tarafında).
+
+async function lockPayment(tx: Prisma.TransactionClient, id: bigint) {
+  const [r] = await tx.$queryRaw<{ id: bigint }[]>`SELECT id FROM "PaymentRequest" WHERE id = ${id} FOR UPDATE`;
+  if (!r) throw new BizError("NOT_FOUND");
+  return tx.paymentRequest.findUniqueOrThrow({ where: { id } });
+}
+async function mainBalance(tx: Prisma.TransactionClient, playerId: number) {
+  const w = await tx.wallet.findFirst({ where: { playerId, type: WalletType.MAIN } });
+  return D(w?.balance ?? 0);
+}
+
+/**
+ * Ödenmiş talebi geri al.
+ *  - Yatırım: tutar ana paradan düşülür (DEPOSIT_REVERSAL). Bu yatırımla verilen aktif bonus iptal edilir.
+ *    Bakiye yetmezse: force=false → hata (eksik tutar bilgisiyle); force=true → mevcut bakiye alınır,
+ *    eksik kısım kayda geçer ve hesap BLOKE edilir.
+ *  - Çekim: oyuncuya ulaşmadıysa tutar ana paraya iade edilir (WITHDRAWAL_REVERSAL).
+ */
+export async function reversePayment(db: PrismaClient, id: bigint, opts: { adminId: number; reason: string; force?: boolean }) {
+  if (!opts.reason || opts.reason.trim().length < 5) throw new BizError("REASON_REQUIRED");
+  return db.$transaction(async (tx) => {
+    const req = await lockPayment(tx, id);
+    if (req.state !== PaymentState.PAID) throw new BizError("ONLY_PAID_CAN_BE_REVERSED");
+    const ref = `pay:${req.id}:reversal`;
+    let shortfall = D(0);
+    if (req.type === PaymentType.DEPOSIT) {
+      // bu yatırımla verilen aktif yatırım bonusunu iptal et
+      if (req.bonusId) {
+        const pb = await tx.playerBonus.findFirst({ where: { playerId: req.playerId, bonusId: req.bonusId, state: PlayerBonusState.ACTIVE, createdAt: { gte: new Date((req.processedAt ?? req.createdAt).getTime() - 60_000) } } });
+        if (pb) {
+          const bw = await tx.wallet.findFirst({ where: { playerId: req.playerId, type: WalletType.BONUS } });
+          if (bw && D(bw.balance).gt(0)) await move(tx, { playerId: req.playerId, wallet: WalletType.BONUS, type: TxType.BONUS_CANCEL, amount: D(bw.balance).neg(), reference: ref, adminId: opts.adminId, note: "Yatırım geri alındı → bonus iptal" });
+          await tx.playerBonus.update({ where: { id: pb.id }, data: { state: PlayerBonusState.CANCELED, resultAt: new Date() } });
+        }
+      }
+      const bal = await mainBalance(tx, req.playerId);
+      const amt = D(req.amount);
+      let take = amt;
+      if (bal.lt(amt)) {
+        if (!opts.force) { const e: any = new BizError("INSUFFICIENT_BALANCE_FOR_REVERSAL"); e.detail = { balance: Number(bal), amount: Number(amt), shortfall: Number(amt.sub(bal)) }; throw e; }
+        take = bal; shortfall = amt.sub(bal);
+      }
+      if (take.gt(0)) await move(tx, { playerId: req.playerId, wallet: WalletType.MAIN, type: TxType.DEPOSIT_REVERSAL, amount: take.neg(), paymentSystem: req.paymentSystem, reference: ref, adminId: opts.adminId, note: `Yatırım geri alındı: ${opts.reason}` });
+      if (shortfall.gt(0)) await tx.player.update({ where: { id: req.playerId }, data: { status: "BLOCKED" } });
+    } else {
+      await move(tx, { playerId: req.playerId, wallet: WalletType.MAIN, type: TxType.WITHDRAWAL_REVERSAL, amount: req.amount, paymentSystem: req.paymentSystem, reference: ref, adminId: opts.adminId, note: `Çekim iade edildi: ${opts.reason}` });
+    }
+    const note = shortfall.gt(0) ? `${opts.reason} | EKSİK: ${shortfall.toFixed(2)} (hesap bloke)` : opts.reason;
+    return tx.paymentRequest.update({ where: { id }, data: { state: PaymentState.REVERSED, reversedAt: new Date(), reversedAdminId: opts.adminId, reverseReason: note } });
+  });
+}
+
+/** Ödenmiş talebin tutarını düzelt (fark kadar düzeltme kaydı; rapora yeni tutar girer, eski tutar saklanır). */
+export async function correctPayment(db: PrismaClient, id: bigint, opts: { adminId: number; reason: string; newAmount: number }) {
+  if (!opts.reason || opts.reason.trim().length < 5) throw new BizError("REASON_REQUIRED");
+  const newAmt = D(opts.newAmount);
+  if (newAmt.lte(0)) throw new BizError("INVALID_AMOUNT");
+  return db.$transaction(async (tx) => {
+    const req = await lockPayment(tx, id);
+    if (req.state !== PaymentState.PAID) throw new BizError("ONLY_PAID_CAN_BE_CORRECTED");
+    const diff = newAmt.sub(req.amount); // yatırımda +: oyuncuya ekle, çekimde +: oyuncudan fazladan düş
+    if (diff.isZero()) throw new BizError("SAME_AMOUNT");
+    const ref = `pay:${req.id}:correction`;
+    // Yatırım: fark doğrudan bakiyeye. Çekim: daha fazla ödendiyse oyuncudan düş, eksik ödendiyse iade et.
+    const delta = req.type === PaymentType.DEPOSIT ? diff : diff.neg();
+    if (delta.isNegative() && (await mainBalance(tx, req.playerId)).lt(delta.abs())) throw new BizError("INSUFFICIENT_BALANCE");
+    await move(tx, { playerId: req.playerId, wallet: WalletType.MAIN, type: delta.isNegative() ? TxType.CORRECTION_DOWN : TxType.CORRECTION_UP, amount: delta, paymentSystem: req.paymentSystem, reference: ref, adminId: opts.adminId, note: `Tutar düzeltme ${req.amount} → ${newAmt}: ${opts.reason}` });
+    return tx.paymentRequest.update({ where: { id }, data: { amount: newAmt, correctedAmount: req.correctedAmount ?? req.amount, notes: [req.notes, `Düzeltme: ${req.amount} → ${newAmt} (${opts.reason})`].filter(Boolean).join(" | ") } });
+  });
+}
+
+/** Yanlışlıkla reddedilen/iptal edilen talebi yeniden aç (çekimde tutar tekrar bloke edilir). */
+export async function reopenPayment(db: PrismaClient, id: bigint, opts: { adminId: number; reason: string }) {
+  if (!opts.reason || opts.reason.trim().length < 5) throw new BizError("REASON_REQUIRED");
+  return db.$transaction(async (tx) => {
+    const req = await lockPayment(tx, id);
+    if (req.state !== PaymentState.REJECTED && req.state !== PaymentState.CANCELLED) throw new BizError("ONLY_REJECTED_CAN_BE_REOPENED");
+    if (req.type === PaymentType.WITHDRAWAL) {
+      try {
+        await move(tx, { playerId: req.playerId, wallet: WalletType.MAIN, type: TxType.WITHDRAWAL, amount: D(req.amount).neg(), paymentSystem: req.paymentSystem, reference: `pay:${req.id}:reopen`, adminId: opts.adminId, note: `Talep yeniden açıldı: ${opts.reason}` });
+      } catch (e: any) { if (e.message === "INSUFFICIENT_FUNDS") throw new BizError("INSUFFICIENT_BALANCE"); throw e; }
+    }
+    return tx.paymentRequest.update({ where: { id }, data: { state: PaymentState.NEW, rejectReason: null, rejectAdminId: null, processedAt: null, notes: [req.notes, `Yeniden açıldı: ${opts.reason}`].filter(Boolean).join(" | ") } });
+  });
 }

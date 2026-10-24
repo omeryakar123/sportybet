@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
-import { Panel, Field, DataTable, DateRange, presetRange, money, Err, useForm } from "../ui";
+import { Panel, Field, DataTable, DateRange, money, Err, useForm, useUrlInit } from "../ui";
 import { betCols, Selections } from "./PlayerDetail";
 
 export default function SportsBets() {
-  const [range, setRange] = useState(presetRange("today"));
-  const { f, bind, check } = useForm({ state: "", isLive: "", coupon: "", playerId: "", type: "", minStake: "", bonusOnly: false as any });
+  const U = useUrlInit();
+  const [range, setRange] = useState(U.range("today"));
+  const { f, bind, check } = useForm({ state: U.get("state"), isLive: U.get("isLive"), coupon: U.get("coupon"), playerId: U.get("playerId"), playerBonusId: U.get("playerBonusId"), type: U.get("type"), minStake: "", bonusOnly: (U.get("bonusOnly") === "true") as any });
   const [bets, setBets] = useState<any[]>([]); const [e, setE] = useState("");
   const [auto, setAuto] = useState(true);
   const [last, setLast] = useState<Date | null>(null);
@@ -21,12 +22,13 @@ export default function SportsBets() {
     <>
       <Panel title="Filtre">
         <div className="mb-3"><DateRange value={range} onChange={setRange} /></div>
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
           <Field label="Durum"><select className="inp" {...bind("state")}><option value="">Tümü</option><option value="ACTIVE">Açık</option><option value="WON">Kazandı</option><option value="LOST">Kaybetti</option><option value="RETURNED">İade</option><option value="CASHED_OUT">Cashout</option><option value="CANCELLED">İptal</option></select></Field>
           <Field label="Canlı"><select className="inp" {...bind("isLive")}><option value="">Hepsi</option><option value="true">Canlı</option><option value="false">Maç Öncesi</option></select></Field>
           <Field label="Tip"><select className="inp" {...bind("type")}><option value="">Hepsi</option><option value="SINGLE">Tekli</option><option value="MULTIPLE">Kombine</option></select></Field>
           <Field label="Kupon No"><input className="inp" {...bind("coupon")} /></Field>
           <Field label="Oyuncu ID"><input className="inp" {...bind("playerId")} /></Field>
+          <Field label="Bonus Kayıt ID"><input className="inp" placeholder="ör. 12" {...bind("playerBonusId")} /></Field>
           <Field label="Min. Yatırılan"><input type="number" className="inp" {...bind("minStake")} /></Field>
           <label className="flex items-end gap-2 pb-2"><input type="checkbox" {...check("bonusOnly")} />Sadece bonuslu</label>
         </div>

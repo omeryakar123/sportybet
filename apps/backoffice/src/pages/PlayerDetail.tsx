@@ -194,10 +194,27 @@ function Reports({ p, reload }: any) {
 
 export function Selections({ b }: { b: any }) {
   return (
+    <>
+    {b.bonus && <div className={`mb-2 rounded border px-3 py-2 text-[12px] ${b.bonusEligible === false ? "border-bo-red/40 bg-rose-50 text-rose-700" : "border-amber-200 bg-amber-50 text-amber-800"}`}>
+      Bu kupon <b>bonus cüzdanından</b> oynandı — Bonus kaydı <Link className="font-semibold underline" to={`/players/${b.playerId}`}>#{b.bonus.playerBonusId}</Link> · {b.bonus.name} (tanım #{b.bonus.bonusId}) · durum {b.bonus.state} · çevrim {money(b.bonus.wagerDone)} / {money(b.bonus.wagerRequired)}
+      {b.bonusEligible === false ? " · ⚠ Bonus spor kurallarına UYMUYOR — çevrime sayılmadı" : b.bonusEligible ? " · ✓ Kurallara uygun, çevrime sayıldı" : ""}
+    </div>}
     <table className="tbl"><thead><tr><th>Maç Başlangıç</th><th>Spor</th><th>Bölge</th><th>Lig</th><th>Maç</th><th>Market</th><th>Seçim</th><th>Oran</th><th>Durum</th><th>Canlı</th><th>Bilgi</th></tr></thead>
-      <tbody>{(b.selections ?? []).length === 0 ? <tr><td colSpan={11} className="text-bo-muted">Seçim detayı henüz gelmedi (bet_placed webhook'u bekleniyor)</td></tr> : b.selections.map((s: any) => (
+      <tbody>{(b.selections ?? []).length === 0 ? <tr><td colSpan={11} className="text-bo-muted">Bu kuponda seçim kaydı yok</td></tr> : b.selections.map((s: any) => (
         <tr key={s.id}><td>{dt(s.matchStart)}</td><td>{s.sport}</td><td>{s.region}</td><td>{s.competition}</td><td>{s.matchName}</td><td>{s.market}</td><td>{s.selection}</td><td>{Number(s.odds).toFixed(2)}</td><td><StateBadge s={s.state} /></td><td>{s.isLive ? "Evet" : "Hayır"}</td><td>{s.info}</td></tr>
       ))}</tbody></table>
+    </>
+  );
+}
+
+export function BetBonusBadge({ b }: { b: any }) {
+  if (!b.bonus && !(Number(b.stakeFromBonus) > 0)) return <span className="text-bo-muted">—</span>;
+  const bad = b.bonusEligible === false;
+  return (
+    <span className={`inline-block whitespace-nowrap rounded border px-1.5 py-0.5 text-[11px] font-semibold ${bad ? "border-bo-red/40 bg-rose-50 text-rose-700" : "border-amber-300 bg-amber-50 text-amber-700"}`}
+      title={b.bonus ? `${b.bonus.name} · ${b.bonus.state}${bad ? " · kural dışı" : ""}` : "Bonus bakiyesiyle"}>
+      {b.bonus ? <Link to={`/bets?playerBonusId=${b.bonus.playerBonusId}&from=2000-01-01T00:00:00.000Z`}>BONUS #{b.bonus.playerBonusId}</Link> : "BONUS"}{bad ? " ⚠" : ""}
+    </span>
   );
 }
 
@@ -206,6 +223,7 @@ export const betCols = (showPlayer: boolean) => [
   ...(showPlayer ? [{ key: "player", label: "Oyuncu", value: (b: any) => b.player?.username, render: (b: any) => <Link className="text-bo-blue" to={`/players/${b.playerId}`}>{b.player?.username}</Link> }] : []),
   { key: "createdAt", label: "Oluşturma", render: (b: any) => dt(b.createdAt) },
   { key: "stake", label: "Yatırılan", money: true, sum: true },
+  { key: "bonus", label: "Bonus", value: (b: any) => (b.bonus ? `#${b.bonus.playerBonusId} ${b.bonus.name}` : ""), render: (b: any) => <BetBonusBadge b={b} /> },
   { key: "stakeFromBonus", label: "Bonus Tutarı", money: true, sum: true },
   { key: "totalOdds", label: "Oran", value: (b: any) => Number(b.totalOdds).toFixed(2), align: "right" as const },
   { key: "state", label: "Durum", render: (b: any) => <StateBadge s={b.state} /> },

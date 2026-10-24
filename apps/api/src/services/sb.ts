@@ -2,12 +2,13 @@
  * Kendi sportsbook motorumuz. Feed (feed.ts) veriyi getirir, burada:
  *  - oranlara site marjı uygulanır
  *  - maçlar/oranlar DB'ye senkronlanır (kota-dostu)
- *  - kupon kabulü (cüzdan debit) + otomatik settlement (skor → kazandı/kaybetti)
- * Mevcut Bet / BetSelection / wallet.move altyapısını kullanır.
+ *  - kupon kabulü (cüzdan debit) + otomatik settlement (skor → kazandı/kaybetti/iade)
+ *  - bonus cüzdanıyla oynanan kuponlar ilgili PlayerBonus'a bağlanır; kurallara uyuyorsa çevrime sayılır
  */
-import { Prisma, PrismaClient, BetState, BetType, TxType, WalletType } from "@prisma/client";
-import { feed, feedConfigured, FINAL_STATUS, VOID_STATUS } from "./feed.js";
+import { Prisma, PrismaClient, BetState, BetType, TxType, WalletType, PlayerBonusState } from "@prisma/client";
+import { feed, feedConfigured, feedBudget, feedUsage, FINAL_STATUS, VOID_STATUS } from "./feed.js";
 import { move } from "./wallet.js";
+import { addWagering } from "./bonus.js";
 
 const D = (v: Prisma.Decimal.Value) => new Prisma.Decimal(v);
 export class SbError extends Error {}
@@ -18,12 +19,14 @@ export type SbConfig = {
   marginPct: number;        // her orana uygulanan site marjı (%)
   leagues: { id: number; name: string }[];
   maxStake: number;         // kupon başına azami yatırım
+  minStake: number;         // kupon başına asgari yatırım
   maxWin: number;           // kupon başına azami kazanç (cap)
   maxSelections: number;    // kombinede azami maç
   syncDays: number;         // kaç günü ileri senkronla
+  oddsPerRun: number;       // oran senkronunda tek seferde en fazla kaç maç (kota)
 };
 const DEFAULTS: SbConfig = {
-  enabled: true, marginPct: 6, maxStake: 50000, maxWin: 500000, maxSelections: 12, syncDays: 2,
+  enabled: true, marginPct: 6, minStake: 10, maxStake: 50000, maxWin: 500000, maxSelections: 12, syncDays: 2, oddsPerRun: 8,
   leagues: [
     { id: 203, name: "Süper Lig" }, { id: 39, name: "Premier League" }, { id: 140, name: "La Liga" },
     { id: 135, name: "Serie A" }, { id: 78, name: "Bundesliga" }, { id: 61, name: "Ligue 1" },
@@ -31,13 +34,15 @@ const DEFAULTS: SbConfig = {
   ],
 };
 
-export async function getConfig(db: PrismaClient): Promise<SbConfig> {
-  const row = await db.cmsSetting.findUnique({ where: { siteId_key: { siteId: 1, key: CFG_KEY } } });
+export async function getConfig(db: PrismaClient | Prisma.TransactionClient): Promise<SbConfig> {
+  const row = await (db as PrismaClient).cmsSetting.findUnique({ where: { siteId_key: { siteId: 1, key: CFG_KEY } } });
   return { ...DEFAULTS, ...((row?.value as any) ?? {}) };
 }
 export async function setConfig(db: PrismaClient, patch: Partial<SbConfig>) {
   const cur = await getConfig(db);
   const next = { ...cur, ...patch };
+  if (next.minStake > next.maxStake) throw new SbError("MIN_STAKE_GT_MAX_STAKE");
+  if (next.maxWin < next.maxStake) throw new SbError("MAX_WIN_LT_MAX_STAKE");
   await db.cmsSetting.upsert({ where: { siteId_key: { siteId: 1, key: CFG_KEY } }, update: { value: next as any }, create: { siteId: 1, key: CFG_KEY, value: next as any } });
   return next;
 }
@@ -48,12 +53,62 @@ export function withMargin(base: number, marginPct: number) {
   return Math.max(1.01, v);
 }
 
-// Market tanımları: feed anahtarı → görünür ad + seçimler
-const MARKETS: Record<string, { name: string; sels: (ev: { home: string; away: string }) => { code: string; name: string }[] }> = {
-  "1x2": { name: "Maç Sonucu", sels: (ev) => [{ code: "HOME", name: ev.home }, { code: "DRAW", name: "Beraberlik" }, { code: "AWAY", name: ev.away }] },
-  ou25: { name: "Alt / Üst 2.5", sels: () => [{ code: "OVER", name: "2.5 Üst" }, { code: "UNDER", name: "2.5 Alt" }] },
-  btts: { name: "Karşılıklı Gol", sels: () => [{ code: "YES", name: "Var" }, { code: "NO", name: "Yok" }] },
+// ---------- MARKETLER ----------
+type R = "WON" | "LOST" | "VOID";
+type Ctx = { h: number; a: number; hh: number | null; ha: number | null };
+const res3 = (x: number, y: number) => (x > y ? "H" : x < y ? "A" : "D");
+const ou = (line: number) => (code: string, c: Ctx): R => ((code === "OVER") === (c.h + c.a > line) ? "WON" : "LOST");
+
+export const MARKETS: Record<string, {
+  name: string; order: number;
+  sels: (ev: { home: string; away: string }) => { code: string; name: string }[];
+  settle: (code: string, c: Ctx) => R;
+}> = {
+  "1x2": {
+    name: "Maç Sonucu", order: 1,
+    sels: (ev) => [{ code: "HOME", name: ev.home }, { code: "DRAW", name: "Beraberlik" }, { code: "AWAY", name: ev.away }],
+    settle: (code, c) => ({ HOME: "H", DRAW: "D", AWAY: "A" } as any)[code] === res3(c.h, c.a) ? "WON" : "LOST",
+  },
+  dc: {
+    name: "Çifte Şans", order: 2,
+    sels: () => [{ code: "1X", name: "1-X" }, { code: "12", name: "1-2" }, { code: "X2", name: "X-2" }],
+    settle: (code, c) => { const r = res3(c.h, c.a); const ok = code === "1X" ? r !== "A" : code === "12" ? r !== "D" : r !== "H"; return ok ? "WON" : "LOST"; },
+  },
+  ou25: { name: "Alt / Üst 2.5", order: 3, sels: () => [{ code: "OVER", name: "2.5 Üst" }, { code: "UNDER", name: "2.5 Alt" }], settle: ou(2.5) },
+  btts: {
+    name: "Karşılıklı Gol", order: 4,
+    sels: () => [{ code: "YES", name: "KG Var" }, { code: "NO", name: "KG Yok" }],
+    settle: (code, c) => ((code === "YES") === (c.h > 0 && c.a > 0) ? "WON" : "LOST"),
+  },
+  ou15: { name: "Alt / Üst 1.5", order: 5, sels: () => [{ code: "OVER", name: "1.5 Üst" }, { code: "UNDER", name: "1.5 Alt" }], settle: ou(1.5) },
+  ou35: { name: "Alt / Üst 3.5", order: 6, sels: () => [{ code: "OVER", name: "3.5 Üst" }, { code: "UNDER", name: "3.5 Alt" }], settle: ou(3.5) },
+  ht1x2: {
+    name: "İlk Yarı Sonucu", order: 7,
+    sels: (ev) => [{ code: "HOME", name: `İY ${ev.home}` }, { code: "DRAW", name: "İY Beraberlik" }, { code: "AWAY", name: `İY ${ev.away}` }],
+    settle: (code, c) => (c.hh == null || c.ha == null ? "VOID" : ({ HOME: "H", DRAW: "D", AWAY: "A" } as any)[code] === res3(c.hh, c.ha) ? "WON" : "LOST"),
+  },
+  dnb: {
+    name: "Beraberlikte İade", order: 8,
+    sels: (ev) => [{ code: "HOME", name: ev.home }, { code: "AWAY", name: ev.away }],
+    settle: (code, c) => (c.h === c.a ? "VOID" : (code === "HOME") === (c.h > c.a) ? "WON" : "LOST"),
+  },
+  oe: {
+    name: "Tek / Çift", order: 9,
+    sels: () => [{ code: "ODD", name: "Tek" }, { code: "EVEN", name: "Çift" }],
+    settle: (code, c) => ((code === "ODD") === ((c.h + c.a) % 2 === 1) ? "WON" : "LOST"),
+  },
+  htft: {
+    name: "İY / MS", order: 10,
+    sels: () => ["HH", "HD", "HA", "DH", "DD", "DA", "AH", "AD", "AA"].map((k) => ({ code: k, name: k.replace(/H/g, "1").replace(/D/g, "X").replace(/A/g, "2").split("").join("/") })),
+    settle: (code, c) => (c.hh == null || c.ha == null ? "VOID" : code === res3(c.hh, c.ha) + res3(c.h, c.a) ? "WON" : "LOST"),
+  },
 };
+export const MARKET_LIST = Object.entries(MARKETS).sort((a, b) => a[1].order - b[1].order).map(([key, m]) => ({ key, name: m.name }));
+export const SPORT_LIST = [
+  { key: "football", name: "Futbol", active: true }, { key: "basketball", name: "Basketbol" }, { key: "tennis", name: "Tenis" },
+  { key: "volleyball", name: "Voleybol" }, { key: "icehockey", name: "Buz Hokeyi" }, { key: "handball", name: "Hentbol" },
+  { key: "esports", name: "E-Spor" }, { key: "americanfootball", name: "Amerikan Futbolu" }, { key: "baseball", name: "Beyzbol" }, { key: "mma", name: "MMA" },
+];
 
 // ---------- SENKRON ----------
 
@@ -61,6 +116,7 @@ const MARKETS: Record<string, { name: string; sels: (ev: { home: string; away: s
 export async function syncFixtures(db: PrismaClient) {
   const cfg = await getConfig(db);
   if (!cfg.enabled || !feedConfigured()) return { skipped: true };
+  if (!feedBudget(20)) return { skipped: "QUOTA_LOW", usage: feedUsage() };
   const leagueIds = new Set(cfg.leagues.map((l) => l.id));
   let upserted = 0;
   for (let d = 0; d < Math.max(1, cfg.syncDays); d++) {
@@ -73,46 +129,47 @@ export async function syncFixtures(db: PrismaClient) {
         home: f.teams.home.name, away: f.teams.away.name, homeLogo: f.teams.home.logo, awayLogo: f.teams.away.logo,
         startsAt: new Date(f.fixture.date), status: f.fixture.status.short, minute: f.fixture.status.elapsed,
         homeGoals: f.goals.home, awayGoals: f.goals.away,
+        htHomeGoals: f.score?.halftime?.home ?? null, htAwayGoals: f.score?.halftime?.away ?? null,
       };
       await db.sbEvent.upsert({ where: { fixtureId: f.fixture.id }, update: data, create: { fixtureId: f.fixture.id, ...data } });
       upserted++;
     }
   }
-  return { upserted, usage: (await import("./feed.js")).feedUsage() };
+  return { upserted, usage: feedUsage() };
 }
 
-/** Oranları çek (pahalı: maç başına 1 çağrı) → marj uygula → DB. Çağrı sayısı `max` ile sınırlı. */
-export async function syncOdds(db: PrismaClient, max = 15) {
+/** Oranları çek (maç başına 1 çağrı, tüm marketler tek çağrıda) → marj uygula → DB. */
+export async function syncOdds(db: PrismaClient, max?: number) {
   const cfg = await getConfig(db);
   if (!cfg.enabled || !feedConfigured()) return { skipped: true };
+  const take = max ?? cfg.oddsPerRun;
   const soon = new Date(Date.now() + 3 * 86400_000);
   const stale = new Date(Date.now() - 6 * 3600_000);
   const events = await db.sbEvent.findMany({
-    where: {
-      status: { in: ["NS", "TBD"] }, startsAt: { gt: new Date(), lt: soon },
-      OR: [{ oddsUpdatedAt: null }, { oddsUpdatedAt: { lt: stale } }],
-    },
-    orderBy: { startsAt: "asc" }, take: max,
+    where: { status: { in: ["NS", "TBD"] }, startsAt: { gt: new Date(), lt: soon }, OR: [{ oddsUpdatedAt: null }, { oddsUpdatedAt: { lt: stale } }] },
+    // önce hiç oranı olmayanlar, sonra en yakın başlayanlar
+    orderBy: [{ oddsUpdatedAt: { sort: "asc", nulls: "first" } }, { startsAt: "asc" }], take,
   });
   let done = 0;
   for (const ev of events) {
+    if (!feedBudget(15)) break; // sonuçlandırma için kota bırak
     try {
       const odds = await feed.odds(ev.fixtureId);
-      for (const key of Object.keys(MARKETS)) {
-        const set = (odds as any)[key];
+      for (const [key, def] of Object.entries(MARKETS)) {
+        const set = odds[key];
         if (!set) continue;
-        const def = MARKETS[key];
         const market = await db.sbMarket.upsert({
           where: { eventId_key: { eventId: ev.id, key } },
-          update: { name: def.name }, create: { eventId: ev.id, key, name: def.name },
+          update: { name: def.name, sortOrder: def.order }, create: { eventId: ev.id, key, name: def.name, sortOrder: def.order },
         });
         for (const s of def.sels(ev)) {
           const base = set[s.code];
           if (!base) continue;
+          const odd = withMargin(base, cfg.marginPct);
           await db.sbSelection.upsert({
             where: { marketId_code: { marketId: market.id, code: s.code } },
-            update: { name: s.name, baseOdds: base, odds: withMargin(base, cfg.marginPct) },
-            create: { marketId: market.id, code: s.code, name: s.name, baseOdds: base, odds: withMargin(base, cfg.marginPct) },
+            update: { name: s.name, baseOdds: base, odds: odd },
+            create: { marketId: market.id, code: s.code, name: s.name, baseOdds: base, odds: odd },
           });
         }
       }
@@ -120,50 +177,46 @@ export async function syncOdds(db: PrismaClient, max = 15) {
       done++;
     } catch { /* tek maç hatası tüm senkronu durdurmasın */ }
   }
-  return { done };
+  return { done, usage: feedUsage() };
 }
 
 /** Başlamış/biten maçları güncelle ve sonuçlandır (tek çağrıda 20 maç). */
 export async function syncResults(db: PrismaClient) {
   const cfg = await getConfig(db);
   if (!cfg.enabled || !feedConfigured()) return { skipped: true };
-  const pending = await db.sbEvent.findMany({
-    where: { settledAt: null, startsAt: { lt: new Date() } },
-    orderBy: { startsAt: "asc" }, take: 20,
-  });
+  const pending = await db.sbEvent.findMany({ where: { settledAt: null, startsAt: { lt: new Date() } }, orderBy: { startsAt: "asc" }, take: 20 });
   if (!pending.length) return { checked: 0 };
+  if (!feedBudget(0)) return { skipped: "QUOTA_EMPTY" };
   const fresh = await feed.fixturesByIds(pending.map((e) => e.fixtureId));
   let settled = 0;
   for (const f of fresh) {
     const ev = pending.find((e) => e.fixtureId === f.fixture.id);
     if (!ev) continue;
     const st = f.fixture.status.short;
-    await db.sbEvent.update({ where: { id: ev.id }, data: { status: st, minute: f.fixture.status.elapsed, homeGoals: f.goals.home, awayGoals: f.goals.away } });
-    if (FINAL_STATUS.includes(st)) { await settleEvent(db, ev.id, f.goals.home ?? 0, f.goals.away ?? 0, false); settled++; }
+    const hh = f.score?.halftime?.home ?? null, ha = f.score?.halftime?.away ?? null;
+    await db.sbEvent.update({ where: { id: ev.id }, data: { status: st, minute: f.fixture.status.elapsed, homeGoals: f.goals.home, awayGoals: f.goals.away, htHomeGoals: hh, htAwayGoals: ha } });
+    if (FINAL_STATUS.includes(st)) { await settleEvent(db, ev.id, f.goals.home ?? 0, f.goals.away ?? 0, false, hh, ha); settled++; }
     else if (VOID_STATUS.includes(st)) { await settleEvent(db, ev.id, 0, 0, true); settled++; }
   }
   return { checked: pending.length, settled };
 }
 
-// Bir seçimin sonucu (skordan)
-function selResult(key: string, code: string, h: number, a: number): "WON" | "LOST" {
-  if (key === "1x2") { const r = h > a ? "HOME" : h < a ? "AWAY" : "DRAW"; return code === r ? "WON" : "LOST"; }
-  if (key === "ou25") { const over = h + a > 2.5; return (code === "OVER") === over ? "WON" : "LOST"; }
-  if (key === "btts") { const yes = h > 0 && a > 0; return (code === "YES") === yes ? "WON" : "LOST"; }
-  return "LOST";
-}
-
 /** Maçı sonuçlandır: seçim sonuçlarını yaz, etkilenen kuponları öde. void=iade. */
-export async function settleEvent(db: PrismaClient, eventId: number, h: number, a: number, isVoid: boolean) {
+export async function settleEvent(db: PrismaClient, eventId: number, h: number, a: number, isVoid: boolean, hh: number | null = null, ha: number | null = null) {
   const markets = await db.sbMarket.findMany({ where: { eventId }, include: { selections: true } });
   const selIds: number[] = [];
+  const ctx: Ctx = { h, a, hh, ha };
   await db.$transaction(async (tx) => {
     for (const m of markets) for (const s of m.selections) {
-      const res = isVoid ? "VOID" : selResult(m.key, s.code, h, a);
+      const def = MARKETS[m.key];
+      const res: R = isVoid || !def ? "VOID" : def.settle(s.code, ctx);
       await tx.sbSelection.update({ where: { id: s.id }, data: { result: res } });
       selIds.push(s.id);
     }
-    await tx.sbEvent.update({ where: { id: eventId }, data: { settledAt: new Date(), isOpen: false } });
+    await tx.sbEvent.update({
+      where: { id: eventId },
+      data: { settledAt: new Date(), isOpen: false, ...(isVoid ? {} : { homeGoals: h, awayGoals: a, ...(hh != null ? { htHomeGoals: hh, htAwayGoals: ha } : {}) }) },
+    });
   });
   await settleBetsForSelections(db, selIds);
 }
@@ -173,55 +226,85 @@ async function settleBetsForSelections(db: PrismaClient, sbSelectionIds: number[
   if (!sbSelectionIds.length) return;
   const rows = await db.betSelection.findMany({ where: { sbSelectionId: { in: sbSelectionIds } }, select: { betId: true } });
   const betIds = [...new Set(rows.map((r) => r.betId))];
+  const cfg = await getConfig(db);
   for (const betId of betIds) {
     await db.$transaction(async (tx) => {
       const bet = await tx.bet.findUnique({ where: { id: betId }, include: { selections: true } });
       if (!bet || (bet.state !== BetState.ACTIVE && bet.state !== BetState.PENDING)) return;
-      // tüm seçimlerin sonucunu topla
       const ids = bet.selections.map((s) => s.sbSelectionId).filter((x): x is number => x != null);
       const sels = await tx.sbSelection.findMany({ where: { id: { in: ids } } });
       const byId = new Map(sels.map((s) => [s.id, s]));
-      let anyPending = false, anyLost = false;
-      let effOdds = 1;
+      let anyPending = false, anyLost = false, effOdds = 1;
       for (const bs of bet.selections) {
-        const s = bs.sbSelectionId ? byId.get(bs.sbSelectionId) : null;
-        const res = s?.result;
+        const res = bs.sbSelectionId ? byId.get(bs.sbSelectionId)?.result : null;
         if (!res) { anyPending = true; break; }
         if (res === "LOST") anyLost = true;
-        else if (res === "WON") effOdds *= Number(bs.odds);
-        // VOID → oran 1.0 (etkisiz)
+        else if (res === "WON") effOdds *= Number(bs.odds); // VOID → 1.0
       }
-      if (anyPending) return; // başka maç bitmemiş
+      if (anyPending) return;
+
+      // Ödeme cüzdanı: bonusla oynandıysa → bonus hâlâ aktifse BONUS, tamamlandıysa MAIN
       const fromBonus = Number(bet.stakeFromBonus) > 0;
-      const wallet = fromBonus ? WalletType.BONUS : WalletType.MAIN;
+      let wallet: WalletType = WalletType.MAIN;
+      const pb = bet.playerBonusId ? await tx.playerBonus.findUnique({ where: { id: bet.playerBonusId } }) : null;
+      if (fromBonus) wallet = pb && pb.state === PlayerBonusState.COMPLETED ? WalletType.MAIN : WalletType.BONUS;
+
+      let finalState: BetState;
       if (anyLost) {
+        finalState = BetState.LOST;
         await tx.bet.update({ where: { id: betId }, data: { state: BetState.LOST, winAmount: 0, settledAt: new Date() } });
       } else {
         const allVoid = effOdds === 1;
-        const payout = Math.min(Number(bet.stake) * effOdds, Number((await getConfigTx(tx)).maxWin));
-        await move(tx, { playerId: bet.playerId, wallet, type: TxType.BET_WIN, amount: payout, reference: `bet:${betId}`, note: allVoid ? "Kupon iade" : "Kupon kazancı" });
-        await tx.bet.update({ where: { id: betId }, data: { state: allVoid ? BetState.RETURNED : BetState.WON, winAmount: payout, settledAt: new Date() } });
+        const payout = Math.min(Number(bet.stake) * effOdds, cfg.maxWin);
+        finalState = allVoid ? BetState.RETURNED : BetState.WON;
+        await move(tx, { playerId: bet.playerId, wallet, type: allVoid ? TxType.BET_REFUND : TxType.BET_WIN, amount: payout, reference: `bet:${betId}`, note: allVoid ? "Kupon iade" : "Kupon kazancı" });
+        await tx.bet.update({ where: { id: betId }, data: { state: finalState, winAmount: payout, settledAt: new Date() } });
       }
-      // seçim durumlarını da işaretle
       for (const bs of bet.selections) {
-        const s = bs.sbSelectionId ? byId.get(bs.sbSelectionId) : null;
+        const r = bs.sbSelectionId ? byId.get(bs.sbSelectionId)?.result : null;
         const map: any = { WON: BetState.WON, LOST: BetState.LOST, VOID: BetState.RETURNED };
-        if (s?.result) await tx.betSelection.update({ where: { id: bs.id }, data: { state: map[s.result] } });
+        if (r) await tx.betSelection.update({ where: { id: bs.id }, data: { state: map[r] } });
+      }
+      // Çevrim: bonus kurallarına uyan, sonuçlanmış (iade hariç) bonus kuponu
+      if (bet.playerBonusId && bet.bonusEligible && finalState !== BetState.RETURNED && pb?.state === PlayerBonusState.ACTIVE) {
+        await addWagering(tx, bet.playerBonusId, bet.stake);
       }
     });
   }
 }
-async function getConfigTx(tx: Prisma.TransactionClient): Promise<SbConfig> {
-  const row = await tx.cmsSetting.findUnique({ where: { siteId_key: { siteId: 1, key: CFG_KEY } } });
-  return { ...DEFAULTS, ...((row?.value as any) ?? {}) };
+
+// ---------- BONUS KURAL EŞLEŞMESİ ----------
+const asList = (v: any): string[] => (Array.isArray(v) ? v.map(String) : typeof v === "string" ? v.split(",").map((x) => x.trim()).filter(Boolean) : []);
+/** Bonus kurallarını kupona uygula. Boş liste = hepsi geçerli. */
+export function matchBonusRules(rules: any, betType: BetType, sels: { marketKey: string; leagueId: number; league: string; sport: string; odds: number }[]) {
+  const r = rules ?? {};
+  const why: string[] = [];
+  const sports = asList(r.sports), leagues = asList(r.leagues ?? r.competitions), markets = asList(r.markets), exLeagues = asList(r.excludeLeagues);
+  if (r.betType === "SINGLE" && betType !== BetType.SINGLE) why.push("Sadece tekli kupon geçerli");
+  if (r.betType === "MULTIPLE" && betType !== BetType.MULTIPLE) why.push("Sadece kombine kupon geçerli");
+  if (r.minSelections && sels.length < Number(r.minSelections)) why.push(`En az ${r.minSelections} seçim`);
+  const total = sels.reduce((a, s) => a * s.odds, 1);
+  if (r.minTotalOdds && total < Number(r.minTotalOdds)) why.push(`Toplam oran en az ${r.minTotalOdds}`);
+  for (const s of sels) {
+    if (r.minSelectionOdds && s.odds < Number(r.minSelectionOdds)) { why.push(`Her seçim oranı en az ${r.minSelectionOdds}`); break; }
+  }
+  for (const s of sels) {
+    const lg = [String(s.leagueId), s.league];
+    if (sports.length && !sports.includes(s.sport)) { why.push("Spor kural dışı"); break; }
+    if (leagues.length && !lg.some((x) => leagues.includes(x))) { why.push("Lig kural dışı"); break; }
+    if (exLeagues.length && lg.some((x) => exLeagues.includes(x))) { why.push("Hariç tutulan lig"); break; }
+    if (markets.length && !markets.includes(s.marketKey)) { why.push("Market kural dışı"); break; }
+  }
+  return { ok: why.length === 0, why };
 }
 
 // ---------- KUPON ----------
 export async function placeBet(db: PrismaClient, playerId: number, body: { selectionIds: number[]; stake: number; mode?: "combo" | "single"; wallet?: WalletType }) {
   const cfg = await getConfig(db);
   if (!cfg.enabled) throw new SbError("SPORTSBOOK_DISABLED");
-  const stake = Number(body.stake);
+  const stake = Math.round(Number(body.stake) * 100) / 100;
   if (!(stake > 0)) throw new SbError("INVALID_STAKE");
+  if (stake < (cfg.minStake ?? 0)) throw new SbError("MIN_STAKE");
   if (stake > cfg.maxStake) throw new SbError("MAX_STAKE_EXCEEDED");
   const ids = [...new Set(body.selectionIds ?? [])];
   if (!ids.length) throw new SbError("NO_SELECTION");
@@ -232,65 +315,80 @@ export async function placeBet(db: PrismaClient, playerId: number, body: { selec
   for (const s of sels) {
     const ev = s.market.event;
     if (!s.market.isOpen || !ev.isOpen || ev.settledAt) throw new SbError("SELECTION_CLOSED");
-    if (ev.status !== "NS" && ev.status !== "TBD") throw new SbError("EVENT_STARTED");
-    if (new Date(ev.startsAt).getTime() <= Date.now()) throw new SbError("EVENT_STARTED");
+    if ((ev.status !== "NS" && ev.status !== "TBD") || new Date(ev.startsAt).getTime() <= Date.now()) throw new SbError("EVENT_STARTED");
   }
   const mode = body.mode ?? "combo";
   const player = await db.player.findUniqueOrThrow({ where: { id: playerId } });
   if (player.status !== "OPEN" || player.isSportBlocked) throw new SbError("SPORT_BLOCKED");
   const wallet = body.wallet ?? (player.activeWallet === "BONUS" ? WalletType.BONUS : WalletType.MAIN);
+  // Bonus cüzdanıyla oynanıyorsa aktif bonusu bağla
+  const pb = wallet === WalletType.BONUS
+    ? await db.playerBonus.findFirst({ where: { playerId, state: PlayerBonusState.ACTIVE }, include: { bonus: true } })
+    : null;
+
+  const plan = (group: typeof sels, type: BetType) => {
+    const totalOdds = group.reduce((a, s) => a * Number(s.odds), 1);
+    const check = pb ? matchBonusRules(pb.bonus.rules, type, group.map((s) => ({ marketKey: s.market.key, leagueId: s.market.event.leagueId, league: s.market.event.league, sport: s.market.event.sport, odds: Number(s.odds) }))) : null;
+    return { group, type, totalOdds, potential: Math.min(stake * totalOdds, cfg.maxWin), eligible: check ? check.ok : null, why: check?.why ?? [] };
+  };
 
   if (mode === "combo") {
-    const evSet = new Set(sels.map((s) => s.market.eventId));
-    if (evSet.size !== sels.length) throw new SbError("SAME_EVENT_IN_COMBO");
-    const totalOdds = sels.reduce((a, s) => a * Number(s.odds), 1);
-    const potential = Math.min(stake * totalOdds, cfg.maxWin);
-    return createBet(db, player.id, wallet, sels, stake, totalOdds, potential, sels.length > 1 ? BetType.MULTIPLE : BetType.SINGLE);
+    if (new Set(sels.map((s) => s.market.eventId)).size !== sels.length) throw new SbError("SAME_EVENT_IN_COMBO");
+    const p = plan(sels, sels.length > 1 ? BetType.MULTIPLE : BetType.SINGLE);
+    const bet = await createBet(db, player.id, wallet, p.group, stake, p.totalOdds, p.potential, p.type, pb?.id ?? null, p.eligible);
+    return { ...bet, bonus: pb ? { playerBonusId: pb.id, name: pb.bonus.name, eligible: p.eligible, why: p.why } : null };
   }
-  // single: her seçim ayrı kupon, her birine `stake`
   const out = [];
   for (const s of sels) {
-    const odds = Number(s.odds);
-    out.push(await createBet(db, player.id, wallet, [s], stake, odds, Math.min(stake * odds, cfg.maxWin), BetType.SINGLE));
+    const p = plan([s], BetType.SINGLE);
+    out.push(await createBet(db, player.id, wallet, p.group, stake, p.totalOdds, p.potential, BetType.SINGLE, pb?.id ?? null, p.eligible));
   }
   return { bets: out };
 }
 
-async function createBet(db: PrismaClient, playerId: number, wallet: WalletType, sels: any[], stake: number, totalOdds: number, potential: number, type: BetType) {
+async function createBet(db: PrismaClient, playerId: number, wallet: WalletType, sels: any[], stake: number, totalOdds: number, potential: number, type: BetType, playerBonusId: number | null, bonusEligible: boolean | null) {
   return db.$transaction(async (tx) => {
-    try {
-      await move(tx, { playerId, wallet, type: TxType.BET_STAKE, amount: -stake, reference: "bet", note: "Kupon" });
-    } catch (e: any) {
-      if (e.message === "INSUFFICIENT_FUNDS") throw new SbError("INSUFFICIENT_BALANCE");
-      throw e;
-    }
     const bet = await tx.bet.create({
       data: {
         playerId, type, stake, totalOdds: D(totalOdds.toFixed(3)), potentialWin: D(potential.toFixed(2)),
         stakeFromMain: wallet === WalletType.MAIN ? stake : 0, stakeFromBonus: wallet === WalletType.BONUS ? stake : 0,
-        state: BetState.ACTIVE, source: "Web",
+        state: BetState.ACTIVE, source: "Web", playerBonusId, bonusEligible,
         selections: {
           create: sels.map((s) => ({
-            providerEventId: String(s.market.event.fixtureId), sport: s.market.event.sport, competition: s.market.event.league,
+            providerEventId: String(s.market.event.fixtureId), sport: s.market.event.sport, region: s.market.event.country, competition: s.market.event.league,
             matchName: `${s.market.event.home} - ${s.market.event.away}`, matchStart: s.market.event.startsAt,
             market: s.market.name, selection: s.name, odds: s.odds, state: BetState.ACTIVE, sbSelectionId: s.id,
           })),
         },
       },
-      include: { selections: true },
     });
-    // stake referansını kupon id'siyle güncelle (rapor eşleşmesi)
-    return { id: bet.id.toString(), totalOdds, potentialWin: potential, state: bet.state, type };
+    const couponId = `SB${String(bet.id).padStart(7, "0")}`;
+    await tx.bet.update({ where: { id: bet.id }, data: { couponId } });
+    try {
+      await move(tx, { playerId, wallet, type: TxType.BET_STAKE, amount: -stake, reference: `bet:${bet.id}`, note: `Kupon ${couponId}` });
+    } catch (e: any) {
+      if (e.message === "INSUFFICIENT_FUNDS") throw new SbError("INSUFFICIENT_BALANCE");
+      throw e;
+    }
+    return { id: bet.id.toString(), couponId, totalOdds, potentialWin: potential, state: bet.state, type };
   });
 }
 
 // ---------- SİTE İÇİN SERİLEŞTİRME ----------
-export async function listEvents(db: PrismaClient, opts: { leagueId?: number; limit?: number } = {}) {
+const mInclude = { markets: { where: { isOpen: true }, include: { selections: true }, orderBy: { sortOrder: "asc" as const } } };
+export async function listEvents(db: PrismaClient, opts: { leagueId?: number; limit?: number; q?: string } = {}) {
   const events = await db.sbEvent.findMany({
-    where: { isOpen: true, settledAt: null, startsAt: { gt: new Date() }, ...(opts.leagueId ? { leagueId: opts.leagueId } : {}) },
-    orderBy: { startsAt: "asc" }, take: opts.limit ?? 80,
-    include: { markets: { where: { isOpen: true }, include: { selections: true } } },
+    where: {
+      isOpen: true, settledAt: null, startsAt: { gt: new Date() }, ...(opts.leagueId ? { leagueId: opts.leagueId } : {}),
+      ...(opts.q ? { OR: [{ home: { contains: opts.q, mode: "insensitive" } }, { away: { contains: opts.q, mode: "insensitive" } }, { league: { contains: opts.q, mode: "insensitive" } }] } : {}),
+    },
+    orderBy: [{ featured: "desc" }, { startsAt: "asc" }], take: opts.limit ?? 120, include: mInclude,
   });
+  return events.map(serializeEvent);
+}
+/** Başlamış ama bitmemiş maçlar (canlı skor gösterimi — canlı bahis faz 2) */
+export async function listLive(db: PrismaClient) {
+  const events = await db.sbEvent.findMany({ where: { settledAt: null, startsAt: { lt: new Date() }, status: { notIn: ["NS", "TBD", ...FINAL_STATUS, ...VOID_STATUS] } }, orderBy: { startsAt: "asc" }, take: 50, include: mInclude });
   return events.map(serializeEvent);
 }
 export async function listLeagues(db: PrismaClient) {
@@ -300,10 +398,11 @@ export async function listLeagues(db: PrismaClient) {
 export function serializeEvent(ev: any) {
   return {
     id: ev.id, fixtureId: ev.fixtureId, league: ev.league, leagueId: ev.leagueId, country: ev.country, leagueLogo: ev.leagueLogo,
-    home: ev.home, away: ev.away, homeLogo: ev.homeLogo, awayLogo: ev.awayLogo, startsAt: ev.startsAt, status: ev.status,
+    home: ev.home, away: ev.away, homeLogo: ev.homeLogo, awayLogo: ev.awayLogo, startsAt: ev.startsAt, status: ev.status, minute: ev.minute,
+    score: ev.homeGoals == null ? null : { h: ev.homeGoals, a: ev.awayGoals, hh: ev.htHomeGoals, ha: ev.htAwayGoals }, featured: ev.featured,
     markets: (ev.markets ?? []).map((m: any) => ({
-      key: m.key, name: m.name,
-      selections: m.selections.sort((a: any, b: any) => a.id - b.id).map((s: any) => ({ id: s.id, code: s.code, name: s.name, odds: Number(s.odds) })),
+      id: m.id, key: m.key, name: m.name,
+      selections: [...m.selections].sort((a: any, b: any) => a.id - b.id).map((s: any) => ({ id: s.id, code: s.code, name: s.name, odds: Number(s.odds) })),
     })),
   };
 }

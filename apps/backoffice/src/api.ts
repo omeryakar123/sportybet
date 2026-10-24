@@ -14,6 +14,6 @@ export async function api<T = any>(path: string, opts: RequestInit & { json?: an
   const res = await fetch(API_URL + path, { ...opts, headers });
   if (res.status === 401 && t) { setToken(null); }
   const data = await res.json().catch(() => null);
-  if (!res.ok) throw new Error(data?.error || data?.message || `HTTP ${res.status}`);
+  if (!res.ok) { const err: any = new Error(data?.error || data?.message || `HTTP ${res.status}`); err.detail = data?.detail; throw err; }
   return data as T;
 }

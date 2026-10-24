@@ -7,7 +7,7 @@ import { grantBonus, cancelBonus } from "../services/bonus.js";
 import { move, ensureWallets } from "../services/wallet.js";
 import { sbAdminRoutes } from "./sb.js";
 import { allSites, bustSiteCache, seedSiteDefaults } from "../services/sites.js";
-import { processPayment, BizError } from "../services/payments.js";
+import { processPayment, reversePayment, correctPayment, reopenPayment, BizError } from "../services/payments.js";
 import { dashboard, playerKpis, range, sportsbookDaily, financialReport } from "../services/reports.js";
 import { predictionAdminRoutes } from "./predictions.js";
 import { seedDemo, purgeDemo } from "../services/demo.js";
@@ -70,7 +70,7 @@ const dateQ = z.object({ from: z.string().optional(), to: z.string().optional() 
 export async function adminRoutes(app: FastifyInstance) {
   app.setErrorHandler((err: any, _req, reply) => {
     if (err instanceof z.ZodError) return reply.code(400).send({ error: "VALIDATION_ERROR", detail: err.flatten() });
-    if (err instanceof BizError) return reply.code(400).send({ error: err.message });
+    if (err instanceof BizError) return reply.code(400).send({ error: err.message, detail: err.detail });
     if (err instanceof Prisma.PrismaClientKnownRequestError) {
       if (err.code === "P2025") return reply.code(404).send({ error: "NOT_FOUND" });
       if (err.code === "P2002") return reply.code(409).send({ error: "ALREADY_EXISTS" });
@@ -111,6 +111,14 @@ export async function adminRoutes(app: FastifyInstance) {
   const audit = (req: FastifyRequest, action: string, target: string, payload?: unknown) =>
     db.auditLog.create({ data: { adminId: adminId(req), action, target, payload: (payload ?? {}) as any } });
   const idParam = (req: FastifyRequest) => Number((req.params as any).id);
+  /** Kuponlara bağlı bonus bilgisini ekle (Bet → PlayerBonus ilişkisi şemada yok; elle birleştir) */
+  const attachBonus = async <T extends { playerBonusId: number | null }>(bets: T[]) => {
+    const ids = [...new Set(bets.map((b) => b.playerBonusId).filter((x): x is number => x != null))];
+    if (!ids.length) return bets.map((b) => ({ ...b, bonus: null }));
+    const pbs = await db.playerBonus.findMany({ where: { id: { in: ids } }, include: { bonus: { select: { id: true, name: true, type: true } } } });
+    const m = new Map(pbs.map((p) => [p.id, { playerBonusId: p.id, bonusId: p.bonusId, name: p.bonus.name, type: p.bonus.type, state: p.state, wagerDone: Number(p.wagerDone), wagerRequired: Number(p.wagerRequired) }]));
+    return bets.map((b) => ({ ...b, bonus: b.playerBonusId ? m.get(b.playerBonusId) ?? null : null }));
+  };
   /** Backoffice'in seçtiği site (X-Site: kod). Bulunamazsa varsayılan site 1. */
   const sid = async (req: FastifyRequest) => {
     const code = ((req.headers["x-site"] as string) || "").trim().toLowerCase();
@@ -207,7 +215,8 @@ export async function adminRoutes(app: FastifyInstance) {
     const q = z.object({
       search: z.string().optional(), id: z.coerce.number().optional(), status: z.string().optional(), category: z.string().optional(),
       verified: z.string().optional(), isTest: z.string().optional(), btag: z.string().optional(), from: z.string().optional(), to: z.string().optional(),
-      minBalance: z.coerce.number().optional(), page: z.coerce.number().default(1), size: z.coerce.number().max(500).default(20),
+      minBalance: z.coerce.number().optional(), loginFrom: z.string().optional(), loginTo: z.string().optional(),
+      page: z.coerce.number().default(1), size: z.coerce.number().max(500).default(20),
       sort: z.string().default("id"), dir: z.enum(["asc", "desc"]).default("desc"),
     }).parse(req.query);
     const where: Prisma.PlayerWhereInput = {
@@ -223,6 +232,7 @@ export async function adminRoutes(app: FastifyInstance) {
       ...(q.btag ? { btag: q.btag } : {}),
       ...(q.from || q.to ? { createdAt: { ...(q.from ? { gte: new Date(q.from) } : {}), ...(q.to ? { lt: new Date(q.to) } : {}) } } : {}),
       ...(q.minBalance !== undefined ? { wallets: { some: { type: WalletType.MAIN, balance: { gte: q.minBalance } } } } : {}),
+      ...(q.loginFrom || q.loginTo ? { logins: { some: { createdAt: { ...(q.loginFrom ? { gte: new Date(q.loginFrom) } : {}), ...(q.loginTo ? { lt: new Date(q.loginTo) } : {}) } } } } : {}),
     };
     const sortable = ["id", "username", "createdAt", "lastLoginAt", "firstName", "lastName"];
     const [items, total] = await Promise.all([
@@ -281,7 +291,7 @@ export async function adminRoutes(app: FastifyInstance) {
       include: { wallet: true }, orderBy: { id: "desc" }, take: 500,
     });
   });
-  app.get("/players/:id/bets", async (req) => db.bet.findMany({ where: { playerId: idParam(req) }, include: { selections: true }, orderBy: { id: "desc" }, take: 300 }));
+  app.get("/players/:id/bets", async (req) => attachBonus(await db.bet.findMany({ where: { playerId: idParam(req) }, include: { selections: true }, orderBy: { id: "desc" }, take: 300 })));
   app.get("/players/:id/bonuses", async (req) => db.playerBonus.findMany({ where: { playerId: idParam(req) }, include: { bonus: true }, orderBy: { id: "desc" } }));
   app.get("/players/:id/payments", async (req) => db.paymentRequest.findMany({ where: { playerId: idParam(req) }, orderBy: { id: "desc" }, take: 300 }));
   app.get("/players/:id/logins", async (req) => db.loginLog.findMany({ where: { playerId: idParam(req) }, orderBy: { id: "desc" }, take: 200 }));
@@ -346,15 +356,26 @@ export async function adminRoutes(app: FastifyInstance) {
     ]);
     const admins = await db.admin.findMany({ select: { id: true, username: true } });
     const name = (id: number | null) => (id ? admins.find((a) => a.id === id)?.username ?? String(id) : null);
-    return { items: items.map((i) => ({ ...i, allowUser: name(i.allowAdminId), rejectUser: name(i.rejectAdminId), paidUser: name(i.paidAdminId) })), total, sum: Number(sum._sum.amount ?? 0) };
+    // Çekimde ödeme kararı için: oyuncunun son bonus kaydı
+    let lastB = new Map<number, any>();
+    if (q.type === "WITHDRAWAL" && items.length) {
+      const pbs = await db.playerBonus.findMany({ where: { playerId: { in: [...new Set(items.map((i) => i.playerId))] } }, include: { bonus: { select: { name: true } } }, orderBy: { id: "desc" } });
+      for (const pb of pbs) if (!lastB.has(pb.playerId)) lastB.set(pb.playerId, { id: pb.id, name: pb.bonus.name, state: pb.state, wagerDone: Number(pb.wagerDone), wagerRequired: Number(pb.wagerRequired) });
+    }
+    return { items: items.map((i) => ({ ...i, lastBonus: lastB.get(i.playerId) ?? null, allowUser: name(i.allowAdminId), rejectUser: name(i.rejectAdminId), paidUser: name(i.paidAdminId) })), total, sum: Number(sum._sum.amount ?? 0) };
   });
   app.post("/payment-requests/:id/:action", async (req) => {
     const { id, action } = req.params as { id: string; action: string };
-    const a = z.enum(["allow", "pay", "reject"]).parse(action);
-    const { reason, notes } = z.object({ reason: z.string().optional(), notes: z.string().optional() }).parse(req.body ?? {});
-    if (notes !== undefined) await db.paymentRequest.update({ where: { id: BigInt(id) }, data: { notes } });
-    const r = await processPayment(db, BigInt(id), a, { adminId: adminId(req), reason });
-    await audit(req, `PAYMENT_${a.toUpperCase()}`, `payment:${id}`, { reason });
+    const a = z.enum(["allow", "pay", "reject", "reverse", "correct", "reopen"]).parse(action);
+    const b = z.object({ reason: z.string().optional(), notes: z.string().optional(), newAmount: z.number().positive().optional(), force: z.boolean().optional() }).parse(req.body ?? {});
+    if (a === "reject" && (!b.reason || b.reason.trim().length < 3)) throw new BizError("REASON_REQUIRED");
+    if (b.notes !== undefined) await db.paymentRequest.update({ where: { id: BigInt(id) }, data: { notes: b.notes } });
+    const opts = { adminId: adminId(req), reason: b.reason ?? "" };
+    const r = a === "reverse" ? await reversePayment(db, BigInt(id), { ...opts, force: b.force })
+      : a === "correct" ? await correctPayment(db, BigInt(id), { ...opts, newAmount: b.newAmount ?? 0 })
+      : a === "reopen" ? await reopenPayment(db, BigInt(id), opts)
+      : await processPayment(db, BigInt(id), a, opts);
+    await audit(req, `PAYMENT_${a.toUpperCase()}`, `payment:${id}`, { reason: b.reason, newAmount: b.newAmount, force: b.force });
     return r;
   });
   app.patch("/payment-requests/:id", async (req) => {
@@ -369,8 +390,18 @@ export async function adminRoutes(app: FastifyInstance) {
     minAmount: z.coerce.number().default(0), maxAmount: z.preprocess(toNum, z.number().optional()), fields: z.any().optional(), instructions: z.string().nullable().optional(),
     isActive: z.boolean().default(true), sortOrder: z.coerce.number().default(0), config: z.any().optional(),
   });
-  app.post("/payment-systems", async (req) => db.paymentSystem.create({ data: { ...psBody.parse(req.body), siteId: await sid(req) } }));
-  app.patch("/payment-systems/:id", async (req) => db.paymentSystem.update({ where: { id: idParam(req) }, data: psBody.partial().parse(req.body) }));
+  const checkPs = (d: any) => {
+    if (d.minAmount != null && d.minAmount < 0) throw new BizError("MIN_AMOUNT_NEGATIVE");
+    if (d.maxAmount != null && d.minAmount != null && Number(d.maxAmount) < Number(d.minAmount)) throw new BizError("MAX_LT_MIN");
+    if (d.config?.requireTxid && !d.config?.depositAddress && (d.kind ?? "BOTH") !== "WITHDRAWAL") throw new BizError("CRYPTO_ADDRESS_REQUIRED");
+  };
+  app.post("/payment-systems", async (req) => { const d = psBody.parse(req.body); checkPs(d); return db.paymentSystem.create({ data: { ...d, siteId: await sid(req) } }); });
+  app.patch("/payment-systems/:id", async (req) => {
+    const d = psBody.partial().parse(req.body);
+    const cur = await db.paymentSystem.findUniqueOrThrow({ where: { id: idParam(req) } });
+    checkPs({ ...cur, minAmount: Number(cur.minAmount), maxAmount: cur.maxAmount == null ? null : Number(cur.maxAmount), ...d });
+    return db.paymentSystem.update({ where: { id: idParam(req) }, data: d });
+  });
 
   // ---------- Tüm işlemler ----------
   app.get("/transactions", async (req) => {
@@ -432,19 +463,22 @@ export async function adminRoutes(app: FastifyInstance) {
     const q = z.object({
       state: z.string().optional(), isLive: z.string().optional(), coupon: z.string().optional(), playerId: z.coerce.number().optional(), bonusOnly: z.string().optional(),
       type: z.string().optional(), minStake: z.coerce.number().optional(), from: z.string().optional(), to: z.string().optional(), take: z.coerce.number().max(1000).default(200),
+      playerBonusId: z.coerce.number().optional(),
     }).parse(req.query);
-    return db.bet.findMany({
+    const bets = await db.bet.findMany({
       where: {
         player: { siteId: await sid(req) },
         ...(q.state ? { state: { in: q.state.split(",") as any } } : {}), ...(q.isLive ? { isLive: q.isLive === "true" } : {}),
         ...(q.coupon ? { couponId: q.coupon } : {}), ...(q.playerId ? { playerId: q.playerId } : {}),
-        ...(q.bonusOnly === "true" ? { stakeFromBonus: { gt: 0 } } : {}), ...(q.type ? { type: q.type as any } : {}),
+        ...(q.bonusOnly === "true" ? { OR: [{ stakeFromBonus: { gt: 0 } }, { playerBonusId: { not: null } }] } : {}), ...(q.type ? { type: q.type as any } : {}),
+        ...(q.playerBonusId ? { playerBonusId: q.playerBonusId } : {}),
         ...(q.minStake !== undefined ? { stake: { gte: q.minStake } } : {}),
         ...(q.from || q.to ? { createdAt: { ...(q.from ? { gte: new Date(q.from) } : {}), ...(q.to ? { lt: new Date(q.to) } : {}) } } : {}),
       },
       include: { selections: true, player: { select: { id: true, username: true } } },
       orderBy: { id: "desc" }, take: q.take,
     });
+    return attachBonus(bets);
   });
 
   // ---------- Sportsbook (kendi motorumuz — trading) ----------
@@ -478,8 +512,33 @@ export async function adminRoutes(app: FastifyInstance) {
     const stats = await db.playerBonus.groupBy({ by: ["bonusId"], _count: true, _sum: { amount: true, convertedAmount: true } });
     return list.map((b) => { const s = stats.find((x) => x.bonusId === b.id); return { ...b, awardedCount: s?._count ?? 0, awardedSum: Number(s?._sum.amount ?? 0), convertedSum: Number(s?._sum.convertedAmount ?? 0) }; });
   });
-  app.post("/bonuses", async (req) => { const b = await db.bonus.create({ data: { ...nullify(bonusBody.parse(req.body)), siteId: await sid(req) } as any }); await audit(req, "BONUS_CREATE", `bonus:${b.id}`); return b; });
-  app.patch("/bonuses/:id", async (req) => { const b = await db.bonus.update({ where: { id: idParam(req) }, data: nullify(bonusBody.partial().parse(req.body)) as any }); await audit(req, "BONUS_UPDATE", `bonus:${b.id}`); return b; });
+  /** Bonus mantıksal kontrolleri (oluşturma ve güncellemede birleşik veri üzerinde) */
+  const checkBonus = (d: any) => {
+    const n = (v: any) => (v === null || v === undefined || v === "" ? null : Number(v));
+    const min = n(d.minAmount), max = n(d.maxAmount), mp = n(d.maxPayout), pct = n(d.percent), mpp = n(d.maxPayoutPct);
+    if (min != null && min < 0) throw new BizError("BONUS_MIN_NEGATIVE");
+    if (max != null && max <= 0) throw new BizError("BONUS_MAX_INVALID");
+    if (min != null && max != null && max < min) throw new BizError("BONUS_MAX_LT_MIN");
+    if (mp != null && mp <= 0) throw new BizError("BONUS_MAX_PAYOUT_INVALID");
+    if (mpp != null && (mpp <= 0 || mpp > 100000)) throw new BizError("BONUS_MAX_PAYOUT_PCT_RANGE");
+    if (d.type === "DEPOSIT" && (pct == null || pct <= 0)) throw new BizError("DEPOSIT_BONUS_NEEDS_PERCENT");
+    if (pct != null && (pct <= 0 || pct > 1000)) throw new BizError("BONUS_PERCENT_RANGE");
+    if (n(d.wageringMultiplier) != null && (Number(d.wageringMultiplier) < 0 || Number(d.wageringMultiplier) > 100)) throw new BizError("BONUS_WAGERING_RANGE");
+    if (n(d.expirationDays) != null && (Number(d.expirationDays) < 1 || Number(d.expirationDays) > 365)) throw new BizError("BONUS_EXPIRATION_RANGE");
+    if (d.startsAt && d.endsAt && new Date(d.endsAt) <= new Date(d.startsAt)) throw new BizError("BONUS_DATES_INVALID");
+    const r = d.rules ?? {};
+    if (r.minSelections != null && r.minSelections !== "" && Number(r.minSelections) < 1) throw new BizError("RULE_MIN_SELECTIONS");
+    if (r.minSelectionOdds != null && r.minSelectionOdds !== "" && Number(r.minSelectionOdds) < 1) throw new BizError("RULE_MIN_SEL_ODDS");
+    if (r.minTotalOdds != null && r.minTotalOdds !== "" && r.minSelectionOdds != null && r.minSelectionOdds !== "" && Number(r.minTotalOdds) < Number(r.minSelectionOdds)) throw new BizError("RULE_TOTAL_LT_SEL_ODDS");
+    if (r.betType === "SINGLE" && Number(r.minSelections ?? 1) > 1) throw new BizError("RULE_SINGLE_MULTI_CONFLICT");
+  };
+  app.post("/bonuses", async (req) => { const d = nullify(bonusBody.parse(req.body)); checkBonus(d); const b = await db.bonus.create({ data: { ...d, siteId: await sid(req) } as any }); await audit(req, "BONUS_CREATE", `bonus:${b.id}`); return b; });
+  app.patch("/bonuses/:id", async (req) => {
+    const d = bonusBody.partial().parse(req.body);
+    const cur = await db.bonus.findUniqueOrThrow({ where: { id: idParam(req) } });
+    checkBonus({ ...cur, ...Object.fromEntries(Object.entries(d).filter(([, v]) => v !== undefined)) });
+    const b = await db.bonus.update({ where: { id: idParam(req) }, data: nullify(d) as any }); await audit(req, "BONUS_UPDATE", `bonus:${b.id}`); return b;
+  });
 
   // ---------- Promo kodlar ----------
   const promoBody = z.object({
@@ -490,8 +549,28 @@ export async function adminRoutes(app: FastifyInstance) {
     conditions: z.any().optional(),
   });
   app.get("/promo-codes", async (req) => db.promoCode.findMany({ where: { siteId: await sid(req) }, include: { bonus: { select: { name: true, type: true } } }, orderBy: { id: "desc" } }));
-  app.post("/promo-codes", async (req) => db.promoCode.create({ data: { ...promoBody.parse(req.body), siteId: await sid(req) } }));
-  app.patch("/promo-codes/:id", async (req) => db.promoCode.update({ where: { id: idParam(req) }, data: promoBody.partial().parse(req.body) }));
+  const checkPromo = async (d: any, siteId: number) => {
+    if (d.code != null && !/^[A-Z0-9_-]{3,30}$/.test(String(d.code))) throw new BizError("PROMO_CODE_FORMAT");
+    if (d.startsAt && d.endsAt && new Date(d.endsAt) <= new Date(d.startsAt)) throw new BizError("PROMO_DATES_INVALID");
+    const bonus = await db.bonus.findUnique({ where: { id: Number(d.bonusId) } });
+    if (!bonus || bonus.siteId !== siteId) throw new BizError("PROMO_BONUS_NOT_FOUND");
+    if (!bonus.isActive) throw new BizError("PROMO_BONUS_INACTIVE");
+    if (bonus.minAmount && Number(d.amount) < Number(bonus.minAmount)) throw new BizError("PROMO_AMOUNT_BELOW_BONUS_MIN");
+    if (bonus.maxAmount && Number(d.amount) > Number(bonus.maxAmount)) throw new BizError("PROMO_AMOUNT_ABOVE_BONUS_MAX");
+  };
+  app.post("/promo-codes", async (req) => {
+    const d = promoBody.parse(req.body); d.code = d.code.trim().toUpperCase();
+    const siteId = await sid(req); await checkPromo(d, siteId);
+    return db.promoCode.create({ data: { ...d, siteId } });
+  });
+  app.patch("/promo-codes/:id", async (req) => {
+    const d = promoBody.partial().parse(req.body); if (d.code) d.code = d.code.trim().toUpperCase();
+    const cur = await db.promoCode.findUniqueOrThrow({ where: { id: idParam(req) } });
+    const merged = { ...cur, ...Object.fromEntries(Object.entries(d).filter(([, v]) => v !== undefined)) };
+    await checkPromo(merged, cur.siteId);
+    if (d.maxCount != null && d.maxCount < cur.usedCount) throw new BizError("PROMO_MAX_LT_USED");
+    return db.promoCode.update({ where: { id: idParam(req) }, data: d });
+  });
   app.get("/promo-codes/:id/redemptions", async (req) => db.promoRedemption.findMany({ where: { promoCodeId: idParam(req) }, include: { player: { select: { username: true } } }, orderBy: { id: "desc" } }));
 
   // ---------- Tahminler ----------
