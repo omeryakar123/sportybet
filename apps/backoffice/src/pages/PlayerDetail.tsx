@@ -17,7 +17,7 @@ export default function PlayerDetail() {
   return (
     <>
       <div className="mb-2 flex items-center justify-between">
-        <div><Link to="/players" className="text-bo-blue">Oyuncular</Link> › <b>{p.username}</b> <span className="text-bo-muted">#{p.id}</span> {p.isTest && <span className="ml-2 rounded bg-amber-100 px-2 text-xs text-amber-700">TEST</span>}</div>
+        <div><Link to="/players" className="text-bo-blue">Oyuncular</Link> › {p.avatar?.startsWith("data:image/") ? <img src={p.avatar} alt="" className="mx-1 inline size-7 rounded-full object-cover align-middle" /> : p.avatar ? <span className="mx-1 inline-grid size-7 place-items-center rounded-full bg-emerald-100 align-middle text-[10px] font-bold text-emerald-700" title="Hazır avatar">{p.avatar.slice(3)}</span> : null}<b>{p.username}</b> <span className="text-bo-muted">#{p.id}</span> {p.isTest && <span className="ml-2 rounded bg-amber-100 px-2 text-xs text-amber-700">TEST</span>}</div>
         <div className="flex items-center gap-4">
           <span className={`rounded px-2 py-0.5 ${p.activeWallet !== "BONUS" ? "bg-bo-blue text-white" : "bg-bo-head"}`}>Ana Para: <b>{money(w("MAIN"))}</b></span>
           <span className={`rounded px-2 py-0.5 ${p.activeWallet === "BONUS" ? "bg-bo-purple text-white" : "bg-bo-head"}`}>Bonus: <b>{money(w("BONUS"))}</b></span>

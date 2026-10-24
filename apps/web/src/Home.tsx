@@ -9,31 +9,31 @@ const BallArt = ({ className }: { className?: string }) => (
   <svg viewBox="0 0 200 200" aria-hidden className={className}>
     <defs><radialGradient id="sb-ball" cx="0.38" cy="0.3" r="0.8"><stop offset="0" stopColor="#ffffff" /><stop offset="1" stopColor="#c9d2e3" /></radialGradient></defs>
     <circle cx="100" cy="100" r="96" fill="url(#sb-ball)" />
-    <polygon points="100,62 136,88 122,130 78,130 64,88" fill="#17171a" />
-    <g stroke="#17171a" strokeWidth="5" fill="none"><path d="M100 62V20M136 88l40-12M122 130l26 34M78 130l-26 34M64 88 24 76" /></g>
+    <polygon points="100,62 136,88 122,130 78,130 64,88" fill="#0f1923" />
+    <g stroke="#0f1923" strokeWidth="5" fill="none"><path d="M100 62V20M136 88l40-12M122 130l26 34M78 130l-26 34M64 88 24 76" /></g>
   </svg>
 );
 const SlipArt = ({ className }: { className?: string }) => (
   <svg viewBox="0 0 200 200" aria-hidden className={className}>
-    <rect x="20" y="36" width="160" height="150" rx="12" fill="#2b2b31" />
-    <rect x="20" y="36" width="160" height="36" rx="12" fill="#3c3c44" />
-    <rect x="56" y="50" width="88" height="8" rx="4" fill="#9b9ba4" />
-    <rect x="36" y="92" width="74" height="26" rx="6" fill="#2fd476" /><rect x="110" y="92" width="54" height="26" rx="6" fill="#232328" />
-    <rect x="36" y="130" width="46" height="26" rx="6" fill="#232328" /><rect x="90" y="130" width="74" height="26" rx="6" fill="#f6383a" />
+    <rect x="20" y="36" width="160" height="150" rx="12" fill="#213141" />
+    <rect x="20" y="36" width="160" height="36" rx="12" fill="#2a3c50" />
+    <rect x="56" y="50" width="88" height="8" rx="4" fill="#9aa8b8" />
+    <rect x="36" y="92" width="74" height="26" rx="6" fill="#1fe88a" /><rect x="110" y="92" width="54" height="26" rx="6" fill="#1a2734" />
+    <rect x="36" y="130" width="46" height="26" rx="6" fill="#1a2734" /><rect x="90" y="130" width="74" height="26" rx="6" fill="#ff4d5e" />
   </svg>
 );
 const BasketArt = ({ className }: { className?: string }) => (
   <svg viewBox="0 0 200 200" aria-hidden className={className}>
-    <defs><radialGradient id="sb-bask" cx="0.4" cy="0.3" r="0.8"><stop offset="0" stopColor="#ffb057" /><stop offset="1" stopColor="#c2410c" /></radialGradient></defs>
+    <defs><radialGradient id="sb-bask" cx="0.4" cy="0.3" r="0.8"><stop offset="0" stopColor="#1fe88a" /><stop offset="1" stopColor="#12a366" /></radialGradient></defs>
     <circle cx="100" cy="100" r="96" fill="url(#sb-bask)" />
-    <g fill="none" stroke="#1c1917" strokeWidth="5"><path d="M4 100h192M100 4v192" /><path d="M30 30c30 30 30 110 0 140M170 30c-30 30-30 110 0 140" /></g>
+    <g fill="none" stroke="#111d1a" strokeWidth="5"><path d="M4 100h192M100 4v192" /><path d="M30 30c30 30 30 110 0 140M170 30c-30 30-30 110 0 140" /></g>
   </svg>
 );
 const BoxArt = ({ className }: { className?: string }) => (
   <svg viewBox="0 0 200 200" aria-hidden className={className}>
-    <rect x="30" y="80" width="140" height="96" rx="10" fill="#e8d3a6" />
-    <rect x="30" y="80" width="140" height="26" rx="10" fill="#f5e6c4" />
-    <rect x="86" y="88" width="28" height="10" rx="4" fill="#3f2d14" />
+    <rect x="30" y="80" width="140" height="96" rx="10" fill="#bff5da" />
+    <rect x="30" y="80" width="140" height="26" rx="10" fill="#dffbec" />
+    <rect x="86" y="88" width="28" height="10" rx="4" fill="#174a35" />
     <rect x="76" y="28" width="48" height="40" rx="5" fill="#fff" transform="rotate(-8 100 48)" />
   </svg>
 );
@@ -74,8 +74,8 @@ export default function Home() {
   return (
     <div className="animate-sports-fade">
       {/* HERO */}
-      <section className="relative isolate overflow-hidden rounded-lg bg-[linear-gradient(115deg,#140d08_0%,#1f140b_45%,#2f1c0c_100%)] max-lg:min-h-[400px] lg:h-[337px]">
-        <div className="absolute top-0 left-1/2 -z-10 h-56 w-[520px] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(255,190,123,0.35),transparent)] blur-2xl" />
+      <section className="relative isolate overflow-hidden rounded-lg bg-[linear-gradient(115deg,#0b1a17_0%,#0f231c_45%,#123326_100%)] max-lg:min-h-[400px] lg:h-[337px]">
+        <div className="absolute top-0 left-1/2 -z-10 h-56 w-[520px] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(31,232,138,0.35),transparent)] blur-2xl" />
         <BallArt className="absolute -bottom-10 -left-8 -z-10 h-[290px] rotate-[-12deg] max-lg:top-2 max-lg:left-[-70px] max-lg:h-[190px] max-lg:opacity-70" />
         <div className="relative z-10 flex h-full flex-col items-center justify-center px-6 py-10 text-center">
           <h1 className="max-w-[560px] text-3xl leading-tight font-extrabold lg:text-4xl">{me ? <>Hoş geldin, <span className="text-primary">{me.username}</span></> : <>Maçı Oyna, Gündemi Tahmin Et</>}</h1>
@@ -106,7 +106,7 @@ export default function Home() {
       {/* Spor / Tahminler kartları */}
       <section className="mt-6 grid grid-cols-2 gap-2 lg:gap-4">
         {[
-          { to: "/spor", label: "Spor", grad: "linear-gradient(180deg,#1b1a2a 0%,#5a2e10 100%)", Art: BasketArt },
+          { to: "/spor", label: "Spor", grad: "linear-gradient(180deg,#1b1a2a 0%,#145c3d 100%)", Art: BasketArt },
           { to: "/tahminler", label: "Tahminler", grad: "linear-gradient(180deg,#0f1a33 0%,#1d3c78 100%)", Art: BoxArt },
         ].map(({ to, label, grad, Art }) => (
           <Link key={to} to={to} className="group overflow-hidden rounded-[3px] bg-card-2 outline-none focus-visible:outline-2 focus-visible:outline-primary">

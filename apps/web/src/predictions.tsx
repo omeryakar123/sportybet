@@ -27,7 +27,7 @@ export function OutcomeButtons({ m, compact }: { m: any; compact?: boolean }) {
         <button onClick={() => go(a)} disabled={!a.buyEnabled} className="grid h-10 shrink-0 cursor-pointer place-items-center rounded-sm bg-[#294c4c] text-center text-sm font-bold text-win transition-colors hover:bg-[#00ae61] hover:text-white disabled:cursor-default disabled:opacity-50">
           {a.name} · {pct(a.probability)}
         </button>
-        <button onClick={() => go(b)} disabled={!b.buyEnabled} className="grid h-10 shrink-0 cursor-pointer place-items-center rounded-sm bg-[#4a2733] text-center text-sm font-bold text-loss transition-colors hover:bg-loss hover:text-white disabled:cursor-default disabled:opacity-50">
+        <button onClick={() => go(b)} disabled={!b.buyEnabled} className="grid h-10 shrink-0 cursor-pointer place-items-center rounded-sm bg-[#1d3a4a] text-center text-sm font-bold text-loss transition-colors hover:bg-loss hover:text-white disabled:cursor-default disabled:opacity-50">
           {b.name} · {pct(b.probability)}
         </button>
       </div>
@@ -105,11 +105,11 @@ export function PredictionsPage() {
     <div className="animate-sports-fade">
       {/* üst tanıtım şeridi */}
       <section className="no-scrollbar -mx-4 mb-5 flex gap-3 overflow-x-auto px-4">
-        <PromoTile grad="linear-gradient(115deg,#140d08,#2f1c0c)" tag="GÜNDEMİ TAHMİN ET" title={<>Gündeme Yön Ver,<br />Kazan</>} art={
+        <PromoTile grad="linear-gradient(115deg,#0b1a17,#123326)" tag="GÜNDEMİ TAHMİN ET" title={<>Gündeme Yön Ver,<br />Kazan</>} art={
           <div className="relative mr-2 h-[84px] w-[130px]"><span className="absolute top-3 left-0 rotate-[-6deg] rounded-md bg-win px-2.5 py-1 text-xs font-extrabold text-[#06130c]">Evet · %62</span>
             <span className="absolute bottom-3 right-0 rotate-3 rounded-md bg-loss px-2.5 py-1 text-xs font-extrabold text-white">Hayır · %38</span></div>} to="/tahminler" />
-        <PromoTile grad="linear-gradient(115deg,#1a1208,#3a2409)" tag="SPOR · HEMEN OYNA" title={<>Maçı Oyna,<br />Oranı Yakala</>} art={
-          <div className="mr-2 flex gap-1.5"><span className="grid size-12 place-items-center rounded-lg bg-caution text-sm font-extrabold text-[#241a02]">FB</span>
+        <PromoTile grad="linear-gradient(115deg,#0d1f19,#14402d)" tag="SPOR · HEMEN OYNA" title={<>Maçı Oyna,<br />Oranı Yakala</>} art={
+          <div className="mr-2 flex gap-1.5"><span className="grid size-12 place-items-center rounded-lg bg-caution text-sm font-extrabold text-[#0f2219]">FB</span>
             <span className="grid size-12 place-items-center rounded-lg bg-primary text-sm font-extrabold text-primary-fg">GS</span></div>} to="/spor" />
         <PromoTile grad="linear-gradient(115deg,#0f1a33,#1d3c78)" tag="LİDERLİK TABLOSU" title={<>Zirveye<br />Sen Oyna</>} art={<I n="trophy" className="mr-3 size-14 text-caution" />} to="/liderlik" />
       </section>

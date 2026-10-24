@@ -121,11 +121,11 @@ export function Deposit() {
             <div className="mb-2 text-[13px] font-semibold text-soft">Yatırım bonusu seç (isteğe bağlı)</div>
             <div className="space-y-2">
               <label className={`flex cursor-pointer items-center gap-3 rounded-lg border p-3 ${!bonusId ? "border-primary bg-primary/10" : "border-line bg-card"}`}>
-                <input type="radio" checked={!bonusId} onChange={() => setBonusId(0)} className="accent-[#ffbe7b]" /><span className="text-sm font-bold">Bonus istemiyorum</span>
+                <input type="radio" checked={!bonusId} onChange={() => setBonusId(0)} className="accent-[#1fe88a]" /><span className="text-sm font-bold">Bonus istemiyorum</span>
               </label>
               {bonuses.map((b) => (
                 <label key={b.id} className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 ${bonusId === b.id ? "border-primary bg-primary/10" : "border-line bg-card"}`}>
-                  <input type="radio" checked={bonusId === b.id} onChange={() => setBonusId(b.id)} className="mt-1 accent-[#ffbe7b]" />
+                  <input type="radio" checked={bonusId === b.id} onChange={() => setBonusId(b.id)} className="mt-1 accent-[#1fe88a]" />
                   <span>
                     <span className="block text-sm font-extrabold">{b.name} <span className="text-primary">%{Number(b.percent)}</span></span>
                     <span className="block text-xs font-medium text-subtle">{b.description ?? `Çevrim x${Number(b.wageringMultiplier)} · ${b.expirationDays} gün geçerli`}</span>

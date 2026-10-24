@@ -58,6 +58,14 @@ const PATHS: Record<string, React.ReactNode> = {
   arrowup: <><path d="M12 20V7" /><path d="m6 12 6-6 6 6" /></>,
   refresh: <><path d="M20 12a8 8 0 1 1-2.5-5.8" /><path d="M20 3v4h-4" /></>,
   headset: <><path d="M4 13a8 8 0 0 1 16 0" /><rect x="3" y="13" width="4" height="6" rx="1.5" /><rect x="17" y="13" width="4" height="6" rx="1.5" /><path d="M19 19a3 3 0 0 1-3 2h-3" /></>,
+  lock: <><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></>,
+  trash: <><path d="M4 7h16M10 11v6M14 11v6" /><path d="M6 7l1 13h10l1-13M9 7V4h6v3" /></>,
+  plus: <path d="M12 5v14M5 12h14" />,
+  minus: <path d="M5 12h14" />,
+  flame: <path d="M12 3c1 3.5 5 5.5 5 10a5 5 0 0 1-10 0c0-2.2 1.2-3.6 2.4-4.6.2 1.6 1 2.6 2.1 3C11 8.6 11.3 5.6 12 3Z" />,
+  play: <path d="M8 5v14l11-7Z" fill="currentColor" />,
+  camera: <><path d="M4 8h3l2-3h6l2 3h3v11H4Z" /><circle cx="12" cy="13" r="3.5" /></>,
+  rewards: <><circle cx="12" cy="9" r="5" /><path d="m8.5 13-1.5 8 5-3 5 3-1.5-8" /></>,
   copy: <><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" /></>,
 };
 export function I({ n, className = "size-4" }: { n: string; className?: string }) {
@@ -139,4 +147,36 @@ export function ErrBox({ e }: { e?: string }) {
     PLAYER_EXCLUDED_FROM_BONUSES: "Hesabınız bonus kampanyalarına kapalı", ACCOUNT_BLOCKED: "Hesabınız işleme kapalı", NOT_ENOUGH_DEPOSITS: "Bu kod için yeterli yatırımınız yok",
   };
   return <div className="rounded-md border border-loss/30 bg-loss/10 px-3 py-2.5 text-sm font-semibold text-loss">{TR[e] ?? e}</div>;
+}
+
+// ---------- profil fotoğrafı ----------
+// Hazır avatarlar: özgün geometrik tasarımlar ("av:1".."av:12"). Kullanıcı kendi resmini de yükleyebilir (data URL).
+export const AVATAR_PRESETS: { bg: [string, string]; shape: React.ReactNode }[] = [
+  { bg: ["#1fe88a", "#0b8f5a"], shape: <path d="M20 44 32 18l12 26Z" fill="#062314" opacity=".85" /> },
+  { bg: ["#19e3d1", "#1361a8"], shape: <circle cx="32" cy="32" r="12" fill="none" stroke="#04202b" strokeWidth="5" /> },
+  { bg: ["#ffc93c", "#f0742c"], shape: <path d="M32 16l4.5 10 11 1-8.3 7.3 2.6 10.7L32 39.3 22.2 45l2.6-10.7L16.5 27l11-1Z" fill="#3a1c00" opacity=".85" /> },
+  { bg: ["#ff5f8f", "#9c2bd1"], shape: <path d="M32 46s-13-8-13-17a7 7 0 0 1 13-3.6A7 7 0 0 1 45 29c0 9-13 17-13 17Z" fill="#2b0420" opacity=".8" /> },
+  { bg: ["#7c8cff", "#2c2f9e"], shape: <path d="M36 14 22 35h10l-4 15 14-21H32Z" fill="#0e0f3a" opacity=".85" /> },
+  { bg: ["#43e0ff", "#1fe88a"], shape: <><rect x="20" y="20" width="10" height="10" rx="2" fill="#042a25" /><rect x="34" y="20" width="10" height="10" rx="2" fill="#042a25" opacity=".6" /><rect x="20" y="34" width="10" height="10" rx="2" fill="#042a25" opacity=".6" /><rect x="34" y="34" width="10" height="10" rx="2" fill="#042a25" /></> },
+  { bg: ["#ff8a3d", "#d1272b"], shape: <path d="M32 14c2 7 10 10 10 19a10 10 0 0 1-20 0c0-4.2 2.3-7 4.6-9 .4 3 2 5 4 5.8C29.6 24.6 30.4 19 32 14Z" fill="#3a0808" opacity=".8" /> },
+  { bg: ["#b6ff5c", "#22a35a"], shape: <><circle cx="32" cy="32" r="13" fill="none" stroke="#0d2b07" strokeWidth="4" /><path d="M32 19v26M19 32h26" stroke="#0d2b07" strokeWidth="3" /></> },
+  { bg: ["#e0e7ff", "#7d8ca1"], shape: <path d="M22 40V24l10-6 10 6v16l-10 6Z" fill="none" stroke="#1a2734" strokeWidth="4" strokeLinejoin="round" /> },
+  { bg: ["#ffd84d", "#1fe88a"], shape: <><circle cx="25" cy="29" r="3.2" fill="#123" /><circle cx="39" cy="29" r="3.2" fill="#123" /><path d="M24 38c4.5 5 11.5 5 16 0" stroke="#123" strokeWidth="3.4" fill="none" strokeLinecap="round" /></> },
+  { bg: ["#2b3d53", "#0f1923"], shape: <path d="M32 15 44 22v14c0 6.5-5 11-12 13-7-2-12-6.5-12-13V22Z" fill="#1fe88a" /> },
+  { bg: ["#ff4d5e", "#ffc93c"], shape: <path d="M18 38c6-14 22-14 28 0M24 30l-3-8M40 30l3-8M32 27v-9" stroke="#3a0d00" strokeWidth="3.5" fill="none" strokeLinecap="round" /> },
+];
+export function Avatar({ src, name = "?", className = "size-[30px]" }: { src?: string | null; name?: string; className?: string }) {
+  const n = src?.startsWith("av:") ? Number(src.slice(3)) : 0;
+  const pre = n >= 1 ? AVATAR_PRESETS[(n - 1) % AVATAR_PRESETS.length] : null;
+  if (src && src.startsWith("data:image/")) return <img src={src} alt="" className={`${className} shrink-0 rounded-full object-cover`} />;
+  if (pre) {
+    const id = `avg${n}`;
+    return (
+      <svg viewBox="0 0 64 64" className={`${className} shrink-0 rounded-full`} aria-hidden>
+        <defs><linearGradient id={id} x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor={pre.bg[0]} /><stop offset="1" stopColor={pre.bg[1]} /></linearGradient></defs>
+        <rect width="64" height="64" fill={`url(#${id})`} />{pre.shape}
+      </svg>
+    );
+  }
+  return <span className={`${className} grid shrink-0 place-items-center rounded-full bg-primary text-sm font-extrabold text-primary-fg uppercase`}>{name[0] ?? "?"}</span>;
 }

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { api, setToken } from "./api";
-import { Btn, ErrBox, Field, I, inp, money, pct, useStore } from "./lib";
+import { Avatar, Btn, ErrBox, Field, I, inp, money, pct, useStore } from "./lib";
 
 function Logo({ className = "h-9" }: { className?: string }) {
   const { settings } = useStore();
@@ -24,8 +24,8 @@ function SideLink({ to, icon, label, count, badge, exact }: { to: string; icon: 
   const { setSidebarOpen } = useStore();
   return (
     <NavLink to={to} end={exact} onClick={() => setSidebarOpen(false)}
-      className={({ isActive }) => `flex h-10 items-center gap-3 rounded-lg px-3 text-sm font-semibold transition-colors ${isActive ? "bg-card text-fg" : "text-muted hover:bg-card hover:text-fg"}`}>
-      <I n={icon} className="size-[18px] shrink-0" />
+      className={({ isActive }) => `flex h-9 items-center gap-2.5 rounded-lg px-2 text-[13px] font-semibold transition-colors ${isActive ? "bg-card text-primary" : "text-muted hover:bg-card hover:text-fg"}`}>
+      <I n={icon} className="size-4 shrink-0" />
       <span className="flex-1 truncate">{label}</span>
       {badge && <span className="rounded-sm bg-primary px-1.5 py-0.5 text-[10px] font-extrabold tracking-wide text-primary-fg uppercase">{badge}</span>}
       {count !== undefined && count > 0 && <span className="rounded-sm bg-elevated px-1.5 py-0.5 text-[11px] font-bold text-soft">{count}</span>}
@@ -34,36 +34,65 @@ function SideLink({ to, icon, label, count, badge, exact }: { to: string; icon: 
 }
 const SideHead = ({ t }: { t: string }) => <div className="mt-5 mb-1.5 px-3 text-[11px] font-extrabold tracking-wider text-dim uppercase">{t}</div>;
 
+const TILES = [
+  { to: "/", icon: "home", label: "Lobi", exact: true },
+  { to: "/spor", icon: "ball", label: "Spor" },
+  { to: "/tahminler", icon: "vote", label: "Tahminler" },
+  { to: "/hesap/kuponlarim", icon: "ticket", label: "Kuponlarım" },
+];
+function SideCard({ title, children, open: o = true }: { title: string; children: React.ReactNode; open?: boolean }) {
+  const [open, setOpen] = useState(o);
+  return (
+    <div className="mt-3 rounded-xl bg-panel">
+      <button onClick={() => setOpen(!open)} className="flex h-10 w-full items-center gap-2 px-3 text-[11px] font-extrabold tracking-wider text-soft uppercase">
+        <span className="flex-1 text-left">{title}</span>
+        <span className={`grid size-5 place-items-center rounded-full ${open ? "bg-primary/15 text-primary" : "bg-card text-subtle"}`}><I n={open ? "minus" : "plus"} className="size-3" /></span>
+      </button>
+      {open && <div className="px-1.5 pb-1.5">{children}</div>}
+    </div>
+  );
+}
 function SidebarBody() {
-  const { predCats, settings } = useStore();
+  const { predCats, settings, setSidebarOpen } = useStore();
+  const [lgs, setLgs] = useState<any[]>([]);
+  useEffect(() => { api("/api/sb/leagues").then((r) => setLgs(r.slice(0, 6))).catch(() => {}); }, []);
   const total = predCats.reduce((a, c) => a + (c.activeCount ?? 0), 0);
   return (
     <nav className="flex-1 overflow-y-auto px-3 pt-3 pb-8">
-      <SideLink to="/" icon="home" label="Ana Sayfa" exact />
-      <SideHead t="Spor" />
-      {SPORT_ITEMS.map((s) => <SideLink key={s.label} {...s} exact={s.to === "/spor"} />)}
-      <SideHead t="Tahminler" />
-      <SideLink to="/tahminler" icon="grid" label="Tüm Tahminler" count={total} exact />
-      <SideLink to="/liderlik" icon="trophy" label="Liderlik Tablosu" />
-      {predCats.filter((c) => c.activeCount > 0).map((c) => (
-        <SideLink key={c.id} to={`/tahminler?kategori=${c.slug}`} icon={c.icon && !c.icon.startsWith("http") ? "hash" : "hash"} label={c.name} count={c.activeCount} />
-      ))}
-      <SideHead t="Ayrıcalıkları Keşfet" />
-      <SideLink to="/vip" icon="crown" label="VIP Kulübü" badge="Yakında" />
-      <SideLink to="/promosyonlar" icon="gift" label="Promosyonlar" badge="Yeni" />
-      <SideHead t="Diğer" />
-      <a href={settings.supportEmail ? `mailto:${settings.supportEmail}` : "#"} className="flex h-10 items-center gap-3 rounded-lg px-3 text-sm font-semibold text-muted transition-colors hover:bg-card hover:text-fg">
-        <I n="headset" className="size-[18px]" /><span>Canlı Destek</span>
-      </a>
-      {settings.telegram || true ? (
-        <>
-          <SideHead t="Sosyal" />
-          <a href={settings.telegram || "#"} target="_blank" rel="noreferrer" className="flex h-10 items-center gap-3 rounded-lg px-3 text-sm font-semibold text-muted transition-colors hover:bg-card hover:text-fg">
-            <I n="send" className="size-[18px]" /><span className="flex-1">Telegram</span>
-            <span className="rounded-sm bg-elevated px-1.5 py-0.5 text-[10px] font-extrabold tracking-wide text-primary uppercase">Popüler</span>
-          </a>
-        </>
-      ) : null}
+      <div className="grid grid-cols-2 gap-1.5">
+        {TILES.map((t) => (
+          <NavLink key={t.to} to={t.to} end={t.exact} onClick={() => setSidebarOpen(false)}
+            className={({ isActive }) => `flex h-[58px] flex-col items-center justify-center gap-1 rounded-lg text-[11px] font-extrabold uppercase tracking-wide transition-colors ${isActive ? "bg-primary text-primary-fg" : "bg-panel text-muted hover:bg-card hover:text-fg"}`}>
+            <I n={t.icon} className="size-5" />{t.label}
+          </NavLink>
+        ))}
+      </div>
+      {lgs.length > 0 && (
+        <SideCard title="Popüler Ligler">
+          {lgs.map((l) => (
+            <Link key={l.id} to={`/spor?lig=${l.id}`} onClick={() => setSidebarOpen(false)} className="flex h-9 items-center gap-2.5 rounded-lg px-2 text-[13px] font-semibold text-muted hover:bg-card hover:text-fg">
+              {l.logo ? <img src={l.logo} alt="" className="size-4 object-contain" /> : <I n="ball" className="size-4" />}
+              <span className="flex-1 truncate">{l.name}</span><span className="text-[11px] font-bold text-dim">{l.count}</span>
+            </Link>
+          ))}
+        </SideCard>
+      )}
+      <SideCard title="Tahminler">
+        <SideLink to="/tahminler" icon="grid" label="Tüm Tahminler" count={total} exact />
+        <SideLink to="/liderlik" icon="trophy" label="Liderlik Tablosu" />
+        {predCats.filter((c) => c.activeCount > 0).slice(0, 6).map((c) => (
+          <SideLink key={c.id} to={`/tahminler?kategori=${c.slug}`} icon="hash" label={c.name} count={c.activeCount} />
+        ))}
+      </SideCard>
+      <SideCard title="Ayrıcalıklar">
+        <SideLink to="/promosyonlar" icon="gift" label="Promosyonlar" badge="Yeni" />
+        <SideLink to="/vip" icon="crown" label="VIP Kulübü" badge="Yakında" />
+        <SideLink to="/hesap/bonuslarim" icon="rewards" label="Bonuslarım" />
+      </SideCard>
+      <SideCard title="Destek" open={false}>
+        <a href={settings.supportEmail ? `mailto:${settings.supportEmail}` : "#"} className="flex h-10 items-center gap-3 rounded-lg px-3 text-sm font-semibold text-muted transition-colors hover:bg-card hover:text-fg"><I n="headset" className="size-[18px]" /><span>Canlı Destek</span></a>
+        <a href={settings.telegram || "#"} target="_blank" rel="noreferrer" className="flex h-10 items-center gap-3 rounded-lg px-3 text-sm font-semibold text-muted transition-colors hover:bg-card hover:text-fg"><I n="send" className="size-[18px]" /><span>Telegram</span></a>
+      </SideCard>
     </nav>
   );
 }
@@ -103,12 +132,15 @@ function WalletChip() {
   const active = me?.activeWallet === "BONUS" ? "BONUS" : "MAIN";
   return (
     <div ref={ref} className="relative">
-      <button onClick={() => { setOpen(!open); refreshMe(); }} className="flex h-[42px] cursor-pointer items-center gap-2 rounded-lg bg-elevated px-3 text-sm font-bold transition-colors hover:bg-elevated-hover">
-        <I n="wallet" className="size-[18px] text-primary" />
-        <span>{money(balance(active as any))}</span>
-        {active === "BONUS" && <span className="rounded-sm bg-primary/20 px-1 text-[10px] font-extrabold text-primary uppercase">Bonus</span>}
-        <I n="down" className="size-3.5 text-subtle" />
-      </button>
+      <div className="flex h-[42px] items-center rounded-lg bg-panel-deep p-1">
+        <button onClick={() => { setOpen(!open); refreshMe(); }} className="flex h-full cursor-pointer items-center gap-2 rounded-md pr-2 pl-1 text-sm font-extrabold transition-colors hover:bg-card">
+          <span className={`grid size-[26px] place-items-center rounded-md text-[14px] font-extrabold ${active === "BONUS" ? "bg-caution text-[#2a1d00]" : "bg-primary text-primary-fg"}`}>₺</span>
+          <span className="tabular-nums">{money(balance(active as any)).replace("₺", "")}</span>
+          {active === "BONUS" && <span className="hidden rounded-sm bg-caution/20 px-1 text-[10px] font-extrabold text-caution uppercase sm:inline">Bonus</span>}
+          <I n="down" className="size-3 text-subtle" />
+        </button>
+        <Link to="/para-yatir" className="ml-1 grid h-full place-items-center rounded-md bg-primary px-3 text-sm font-extrabold text-primary-fg hover:bg-primary-hover sm:px-4">Cüzdan</Link>
+      </div>
       {open && (
         <div className="animate-slip-item absolute right-0 top-[calc(100%+8px)] z-50 w-[300px] rounded-xl border border-line bg-panel p-3 shadow-[0_18px_50px_rgba(0,0,0,.5)]">
           <div className="mb-2 text-[11px] font-extrabold tracking-wider text-dim uppercase">Oynadığın cüzdan</div>
@@ -118,7 +150,7 @@ function WalletChip() {
                 <span className="block text-sm font-bold">{w === "MAIN" ? "Ana Para" : "Bonus"}</span>
                 <span className="block text-xs text-subtle">{w === "MAIN" ? "Yatırımların ve çekilebilir bakiyen" : "Çevrim tamamlanınca ana paraya geçer"}</span>
               </span>
-              <span className={`text-sm font-extrabold ${active === w ? "text-primary" : "text-fg"}`}>{money(balance(w))}</span>
+              <span className={`text-sm font-extrabold tabular-nums ${active === w ? "text-primary" : "text-fg"}`}>{money(balance(w))}</span>
             </button>
           ))}
           <div className="mt-2 grid grid-cols-2 gap-2">
@@ -140,13 +172,16 @@ function UserMenu() {
   const ITEMS = [["/hesap", "Hesap"], ["/hesap/tahminlerim", "Tahminlerim"], ["/hesap/islemler", "İşlemler"], ["/hesap/kuponlarim", "Kuponlarım"], ["/hesap/bonuslarim", "Bonuslarım"], ["/hesap/guvenlik", "Güvenlik"]];
   return (
     <div ref={ref} className="relative">
-      <button onClick={() => setOpen(!open)} className="flex h-[42px] cursor-pointer items-center gap-2 rounded-lg bg-elevated pr-3 pl-1.5 text-sm font-bold transition-colors hover:bg-elevated-hover">
-        <span className="grid size-[30px] place-items-center rounded-md bg-primary text-sm font-extrabold text-primary-fg uppercase">{me.username[0]}</span>
-        <span className="hidden max-w-[110px] truncate sm:block">{me.username}</span>
-        <I n="down" className="size-3.5 text-subtle" />
+      <button onClick={() => setOpen(!open)} className="flex h-[42px] cursor-pointer items-center gap-2 rounded-lg pr-1 pl-1 text-sm font-bold transition-colors hover:bg-card md:pr-3">
+        <Avatar src={me.avatar} name={me.username} className="size-[36px] ring-2 ring-primary/40" />
+        <span className="hidden max-w-[110px] flex-col items-start leading-tight md:flex"><span className="truncate">{me.username}</span><span className="text-[11px] font-semibold text-primary">{me.isVerified ? "Doğrulandı" : "Profil"}</span></span>
       </button>
       {open && (
-        <div className="animate-slip-item absolute right-0 top-[calc(100%+8px)] z-50 w-56 rounded-xl border border-line bg-panel py-1.5 shadow-[0_18px_50px_rgba(0,0,0,.5)]">
+        <div className="animate-slip-item absolute right-0 top-[calc(100%+8px)] z-50 w-60 rounded-xl border border-line bg-panel py-1.5 shadow-[0_18px_50px_rgba(0,0,0,.5)]">
+          <Link to="/hesap" onClick={() => setOpen(false)} className="mx-1.5 mb-1 flex items-center gap-3 rounded-lg bg-card px-3 py-2.5 hover:bg-surface-hover">
+            <Avatar src={me.avatar} name={me.username} className="size-10" />
+            <span className="min-w-0"><span className="block truncate text-sm font-extrabold">{me.username}</span><span className="block text-[12px] font-semibold text-primary">Fotoğrafı değiştir</span></span>
+          </Link>
           {ITEMS.map(([to, l]) => <Link key={to} to={to} onClick={() => setOpen(false)} className="block px-4 py-2.5 text-sm font-semibold text-muted hover:bg-card hover:text-fg">{l}</Link>)}
           <div className="mx-3 my-1 h-px bg-line" />
           <button onClick={() => { logout(); setOpen(false); nav("/"); }} className="block w-full px-4 py-2.5 text-left text-sm font-semibold text-loss hover:bg-card">Çıkış Yap</button>
@@ -157,7 +192,7 @@ function UserMenu() {
 }
 
 const NavPill = ({ to, icon, label }: { to: string; icon: string; label: string }) => (
-  <NavLink to={to} className={({ isActive }) => `inline-flex h-[42px] shrink-0 items-center justify-center gap-2 rounded-lg px-5 text-sm font-bold whitespace-nowrap transition-colors ${isActive ? "bg-elevated-hover text-primary" : "bg-elevated text-fg hover:bg-elevated-hover"}`}>
+  <NavLink to={to} className={({ isActive }) => `relative inline-flex h-[42px] shrink-0 items-center justify-center gap-2 rounded-lg px-4 text-sm font-bold whitespace-nowrap transition-colors ${isActive ? "text-primary after:absolute after:inset-x-3 after:-bottom-[11px] after:h-[3px] after:rounded-full after:bg-primary" : "text-muted hover:text-fg"}`}>
     <I n={icon} className="size-4" /><span className="hidden md:inline">{label}</span>
   </NavLink>
 );
@@ -174,15 +209,15 @@ function Header() {
           <NavPill to="/spor" icon="ball" label="Spor" />
           <NavPill to="/tahminler" icon="vote" label="Tahminler" />
           <NavPill to="/liderlik" icon="trophy" label="Liderlik" />
+          <NavPill to="/promosyonlar" icon="gift" label="Promosyonlar" />
         </nav>
         <div className="ml-auto flex items-center gap-2">
-          <button onClick={() => nav("/tahminler?ara=1")} aria-label="Ara" className="hidden size-[42px] place-items-center rounded-lg bg-elevated text-muted transition-colors hover:bg-elevated-hover hover:text-fg sm:grid"><I n="search" className="size-[18px]" /></button>
-          <Link to="/promosyonlar" aria-label="Promosyonlar" className="hidden size-[42px] place-items-center rounded-lg bg-elevated text-muted transition-colors hover:bg-elevated-hover hover:text-fg sm:grid"><I n="gift" className="size-[18px]" /></Link>
+          <button onClick={() => nav("/spor")} aria-label="Ara" className="hidden size-[42px] place-items-center rounded-lg text-muted transition-colors hover:bg-card hover:text-fg xl:grid"><I n="search" className="size-[18px]" /></button>
           {me ? (
             <><WalletChip /><UserMenu /></>
           ) : (
             <>
-              <button onClick={() => setAuthOpen(true)} className="inline-flex h-[42px] items-center rounded-lg bg-elevated px-5 text-sm font-bold hover:bg-elevated-hover">Giriş Yap</button>
+              <button onClick={() => setAuthOpen(true)} className="inline-flex h-[42px] items-center rounded-lg px-4 text-sm font-bold text-fg hover:bg-card">Giriş Yap</button>
               <button onClick={() => setAuthOpen("register")} className="inline-flex h-[42px] items-center rounded-lg bg-primary px-5 text-sm font-bold text-primary-fg hover:bg-primary-hover">Kayıt Ol</button>
             </>
           )}
@@ -238,12 +273,15 @@ function Footer() {
 
 // ---------------- Mobil alt menü ----------------
 function BottomNav() {
-  const items = [["/", "home", "Ana Sayfa"], ["/spor", "ball", "Spor"], ["/tahminler", "vote", "Tahminler"], ["/hesap/kuponlarim", "ticket", "Kuponlarım"], ["/hesap", "user", "Hesap"]];
+  const { setSidebarOpen } = useStore();
+  const items = [["/spor", "ball", "Spor"], ["/tahminler", "vote", "Tahminler"], ["/promosyonlar", "gift", "Ödüller"], ["/hesap/kuponlarim", "ticket", "Kuponlarım"]];
+  const cls = (a: boolean) => `flex flex-col items-center justify-center gap-1 text-[11px] font-bold ${a ? "text-primary" : "text-subtle"}`;
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 grid h-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom))] grid-cols-5 border-t border-line/60 bg-header pb-[env(safe-area-inset-bottom)] lg:hidden">
+      <button onClick={() => setSidebarOpen(true)} className={cls(false)}><I n="menu" className="size-5" />Menü</button>
       {items.map(([to, icon, label]) => (
-        <NavLink key={to} to={to} end={to === "/" || to === "/hesap"} className={({ isActive }) => `flex flex-col items-center justify-center gap-1 text-[10px] font-bold ${isActive ? "text-primary" : "text-subtle"}`}>
-          <I n={icon} className="size-5" />{label}
+        <NavLink key={to} to={to} className={({ isActive }) => cls(isActive)}>
+          {({ isActive }) => <><span className={`grid size-7 place-items-center rounded-full ${isActive ? "bg-primary/15" : ""}`}><I n={icon} className="size-5" /></span>{label}</>}
         </NavLink>
       ))}
     </nav>
@@ -299,15 +337,15 @@ function AuthModal() {
 export default function Layout() {
   const loc = useLocation();
   useEffect(() => { window.scrollTo(0, 0); }, [loc.pathname]);
-  const bare = loc.pathname === "/spor"; // iframe sayfası tam genişlik
+  const bare = false;
   return (
     <div className="min-h-dvh lg:pl-[var(--sidebar-w)]">
       <Sidebar />
       <Header />
-      <main className={bare ? "" : "mx-auto max-w-[1286px] px-4 pt-[22px] pb-24 lg:pb-10"}>
+      <main className={bare ? "" : `mx-auto px-3 pt-4 pb-24 sm:px-4 lg:pb-10 ${loc.pathname === "/spor" ? "max-w-[1480px]" : "max-w-[1286px] pt-[22px]"}`}>
         <Outlet />
       </main>
-      {!bare && <Footer />}
+      {loc.pathname !== "/spor" && <Footer />}
       <BottomNav />
       <AuthModal />
     </div>

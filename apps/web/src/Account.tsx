@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import { api } from "./api";
-import { Btn, Empty, ErrBox, Field, I, Spinner, TX_TR, dt, inp, money, useStore } from "./lib";
+import { AVATAR_PRESETS, Avatar, Btn, Empty, ErrBox, Field, I, Spinner, TX_TR, dt, inp, money, useStore } from "./lib";
 import { MyPositions } from "./predictions";
 
 const NAV = [
@@ -64,6 +64,7 @@ export function Profile() {
   return (
     <>
       <H>Hesap</H>
+      <AvatarPicker />
       <div className="mb-6 grid gap-3 sm:grid-cols-3">
         {[["Ana Para", balance("MAIN"), "wallet"], ["Bonus", balance("BONUS"), "gift"], ["Oynadığın Cüzdan", me.activeWallet === "BONUS" ? "Bonus" : "Ana Para", "check"]].map(([l, v, ic]: any) => (
           <div key={l} className="flex items-center gap-3 rounded-lg border border-line bg-card px-4 py-3.5">
@@ -85,6 +86,63 @@ export function Profile() {
       <div className="mt-4 space-y-2">{msg && <div className="rounded-md border border-win/30 bg-win/10 px-3 py-2.5 text-sm font-bold text-win">{msg}</div>}<ErrBox e={err} /></div>
       <Btn className="mt-4" onClick={save}>Kaydet</Btn>
     </>
+  );
+}
+
+// ---------- Profil fotoğrafı ----------
+function AvatarPicker() {
+  const { me, refreshMe } = useStore();
+  const [err, setErr] = useState(""); const [busy, setBusy] = useState(false); const [open, setOpen] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+  async function save(v: string | null) {
+    setErr(""); setBusy(true);
+    try { await api("/api/me", { method: "PATCH", json: { avatar: v } }); await refreshMe(); setOpen(false); } catch (x: any) { setErr(x.message === "VALIDATION_ERROR" ? "Resim kabul edilmedi (png/jpg/webp, en fazla ~150 KB)" : x.message); }
+    setBusy(false);
+  }
+  // Seçilen resmi tarayıcıda 256×256 kare kırpıp webp/jpeg olarak küçült
+  function onFile(f?: File) {
+    if (!f) return;
+    if (!/^image\/(png|jpe?g|webp|gif)$/.test(f.type)) { setErr("Sadece resim dosyası seçebilirsin"); return; }
+    if (f.size > 8 * 1024 * 1024) { setErr("Dosya 8 MB'tan büyük olamaz"); return; }
+    const img = new Image(); const url = URL.createObjectURL(f);
+    img.onload = () => {
+      const S = 256, c = document.createElement("canvas"); c.width = S; c.height = S;
+      const x = c.getContext("2d")!; const m = Math.min(img.width, img.height);
+      x.drawImage(img, (img.width - m) / 2, (img.height - m) / 2, m, m, 0, 0, S, S);
+      let d = c.toDataURL("image/webp", 0.85); if (!d.startsWith("data:image/webp")) d = c.toDataURL("image/jpeg", 0.85);
+      URL.revokeObjectURL(url); save(d);
+    };
+    img.onerror = () => { setErr("Resim okunamadı"); URL.revokeObjectURL(url); };
+    img.src = url;
+  }
+  return (
+    <div className="mb-6 rounded-xl border border-line bg-card p-4">
+      <div className="flex flex-wrap items-center gap-4">
+        <div className="relative">
+          <Avatar src={me.avatar} name={me.username} className="size-20 ring-4 ring-primary/30" />
+          <button onClick={() => fileRef.current?.click()} className="absolute -right-1 -bottom-1 grid size-8 place-items-center rounded-full bg-primary text-primary-fg shadow-lg hover:bg-primary-hover" aria-label="Fotoğraf yükle"><I n="camera" className="size-4" /></button>
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="text-lg font-extrabold">{me.username}</div>
+          <div className="text-sm text-subtle">Profil fotoğrafın sitede ve kuponlarında görünür.</div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Btn kind="soft" onClick={() => setOpen(!open)}>Avatar seç</Btn>
+          <Btn onClick={() => fileRef.current?.click()} disabled={busy}>Fotoğraf yükle</Btn>
+          {me.avatar && <Btn kind="ghost" onClick={() => save(null)} disabled={busy}>Kaldır</Btn>}
+        </div>
+        <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden" onChange={(e) => { onFile(e.target.files?.[0]); e.target.value = ""; }} />
+      </div>
+      {open && (
+        <div className="mt-4 grid grid-cols-6 gap-3 sm:grid-cols-12">
+          {AVATAR_PRESETS.map((_, i) => {
+            const k = `av:${i + 1}`;
+            return <button key={k} disabled={busy} onClick={() => save(k)} className={`rounded-full transition-transform hover:scale-110 ${me.avatar === k ? "ring-2 ring-primary ring-offset-2 ring-offset-card" : ""}`}><Avatar src={k} className="size-12" /></button>;
+          })}
+        </div>
+      )}
+      {err && <div className="mt-3"><ErrBox e={err} /></div>}
+    </div>
   );
 }
 
