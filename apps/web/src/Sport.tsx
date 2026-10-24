@@ -502,7 +502,7 @@ export default function Sport() {
   const scrollBy = (d: number) => scroller.current?.scrollBy({ left: d, behavior: "smooth" });
 
   return (
-    <div className="pb-[calc(var(--bottom-nav-h)+64px)] lg:pb-20">
+    <div className="pb-[calc(var(--bottom-nav-h)+72px)] lg:pb-20">
       {toast && <div role="status" aria-live="polite" className={`fixed left-1/2 top-[calc(var(--header-h)+12px)] z-[70] max-w-[92vw] -translate-x-1/2 rounded-xl px-5 py-3 text-sm font-bold shadow-2xl ${toast.kind === "warn" ? "bg-caution text-[#2a1d00]" : "bg-primary text-primary-fg"}`}>{toast.t}</div>}
 
       <h1 className="sr-only">{evParam ? "Maç detayı" : "Spor bahisleri"}</h1>
@@ -534,7 +534,7 @@ export default function Sport() {
       <div className="mb-5 flex gap-2">
         <label className="flex h-11 flex-1 items-center gap-2 rounded-lg border border-line bg-panel px-3 focus-within:border-primary/70">
           <I n="search" className="size-4 text-subtle" />
-          <input value={q} onChange={(e) => setQ(e.target.value)} aria-label="Takım veya lig ara" placeholder="Takım veya lig ara" className="w-full bg-transparent text-sm font-medium outline-none placeholder:text-subtle" />
+          <input id="sb-search" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Takım veya lig ara" placeholder="Takım veya lig ara" className="w-full bg-transparent text-sm font-medium outline-none placeholder:text-subtle" />
           {q && <button onClick={() => setQ("")} className="text-subtle hover:text-fg"><I n="x" className="size-4" /></button>}
         </label>
         <div ref={lgRef} className="relative shrink-0 sm:w-72">
@@ -614,7 +614,7 @@ export default function Sport() {
 
       {/* CANLI MAÇLAR */}
       {liveGroups.length > 0 && !q && sport === "football" && (
-        <section className="mb-7">
+        <section id="canli" className="mb-7 scroll-mt-20">
           <div className="mb-3 flex items-center gap-2">
             <span className="grid size-7 place-items-center rounded-full bg-live text-white"><I n="play" className="size-3.5" /></span>
             <h2 className="title text-[22px]">Canlı Maçlar</h2>
@@ -661,13 +661,29 @@ export default function Sport() {
 
       {/* YAPIŞKAN KUPON — masaüstü sağ alt, mobil alt menünün üstünde; mobilde açıkken arka plan karartılır */}
       {slipOpen && <div className="fixed inset-0 z-[39] bg-black/60 backdrop-blur-[2px] lg:hidden" onClick={() => setSlipOpen(false)} aria-hidden />}
-      <div className={`fixed inset-x-0 bottom-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom))] z-40 lg:inset-x-auto lg:right-5 lg:bottom-5 lg:w-[370px] ${chatOpen ? "xl:right-[360px]" : ""}`}>
-        <div className="overflow-hidden border-t border-line bg-panel shadow-[0_-12px_40px_rgba(0,0,0,.5)] lg:rounded-xl lg:border">
+      {/* mobil: kupon yalnızca açıkken panel olarak görünür (Gamdom gibi alt menüden açılır); masaüstü: yüzen çubuk */}
+      <div className={`fixed inset-x-0 bottom-[calc(var(--bottom-nav-h)+56px+env(safe-area-inset-bottom))] z-40 lg:inset-x-auto lg:right-5 lg:bottom-5 lg:w-[370px] ${chatOpen ? "xl:right-[360px]" : ""} ${slipOpen ? "" : "hidden lg:block"}`}>
+        <div className="overflow-hidden rounded-t-2xl border-t border-line bg-panel shadow-[0_-12px_40px_rgba(0,0,0,.5)] lg:rounded-xl lg:border">
           {SlipBar}
           {quick && <div className="flex items-center gap-2 bg-[#0b0f13] px-3 py-1.5 text-[12px] font-semibold text-primary"><I n="spark" className="size-3.5" />Hızlı bahis açık: orana dokunduğunda {money(st)} ile tekli kupon oynanır.<button onClick={() => setQuick(false)} className="ml-auto font-bold text-subtle hover:text-fg">Kapat</button></div>}
           {slipOpen && SlipBody}
         </div>
       </div>
+
+      {/* mobil spor alt menüsü (ana menünün üstünde) */}
+      <nav aria-label="Spor menüsü" className="fixed inset-x-0 bottom-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom))] z-[41] grid h-14 grid-cols-5 border-t border-line bg-[#0f161c] lg:hidden">
+        {([
+          ["home", "Lobi", () => { setSlipOpen(false); if (evParam) nav("/spor"); else window.scrollTo({ top: 0, behavior: "smooth" }); }, !slipOpen && !evParam],
+          ["live", "Canlı", () => { setSlipOpen(false); if (evParam) nav("/spor"); setTimeout(() => document.getElementById("canli")?.scrollIntoView({ behavior: "smooth", block: "start" }), evParam ? 400 : 0); }, false],
+          ["ticket", "Kuponlarım", () => nav("/hesap/kuponlarim"), false],
+          ["promo", "Kupon", () => setSlipOpen(!slipOpen), slipOpen],
+          ["search", "Ara", () => { setSlipOpen(false); if (evParam) nav("/spor"); setTimeout(() => { window.scrollTo({ top: 0, behavior: "smooth" }); (document.getElementById("sb-search") as HTMLInputElement | null)?.focus(); }, evParam ? 400 : 50); }, false],
+        ] as [string, string, () => void, boolean][]).map(([ic, l, fn, on]) => (
+          <button key={l} onClick={fn} aria-pressed={on} className={`relative flex flex-col items-center justify-center gap-0.5 text-[11px] font-bold ${on ? "text-primary" : "text-subtle"}`}>
+            <span className="relative"><I n={ic} className="size-5" />{l === "Kupon" && picks.length > 0 && <span key={picks.length} className="animate-bump absolute -right-2.5 -top-2 grid size-[17px] place-items-center rounded-full bg-primary text-[10px] font-extrabold text-primary-fg">{picks.length}</span>}</span>{l}
+          </button>
+        ))}
+      </nav>
     </div>
   );
 }

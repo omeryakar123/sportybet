@@ -279,11 +279,13 @@ function Footer() {
 // ---------------- Mobil alt menü ----------------
 function BottomNav() {
   const { setSidebarOpen, chatOpen, setChatOpen } = useStore();
-  const items = [["/spor", "ball", "Spor"], ["/tahminler", "vote", "Tahminler"], ["/hesap/kuponlarim", "ticket", "Kuponlarım"]];
+  const nav = useNavigate();
+  const items = [["/tahminler", "vote", "Tahminler"], ["/spor", "ball", "Spor"], ["/promosyonlar", "rewards", "Ödüller"]];
   const cls = (a: boolean) => `flex flex-col items-center justify-center gap-1 text-[11px] font-bold ${a ? "text-primary" : "text-subtle"}`;
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 grid h-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom))] grid-cols-5 border-t border-line/60 bg-header pb-[env(safe-area-inset-bottom)] lg:hidden">
+    <nav className="fixed inset-x-0 bottom-0 z-40 grid h-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom))] grid-cols-6 border-t border-line/60 bg-header pb-[env(safe-area-inset-bottom)] lg:hidden">
       <button onClick={() => setSidebarOpen(true)} className={cls(false)}><span className="grid size-7 place-items-center rounded-full"><I n="menu" className="size-5" /></span>Menü</button>
+      <button onClick={() => { setChatOpen(false); nav("/spor"); setTimeout(() => (document.getElementById("sb-search") as HTMLInputElement | null)?.focus(), 350); }} className={cls(false)}><span className="grid size-7 place-items-center rounded-full"><I n="search" className="size-5" /></span>Ara</button>
       {items.map(([to, icon, label]) => (
         <NavLink key={to} to={to} onClick={() => setChatOpen(false)} className={({ isActive }) => cls(isActive && !chatOpen)}>
           {({ isActive }) => <><span className={`grid size-7 place-items-center rounded-full ${isActive && !chatOpen ? "bg-primary/15" : ""}`}><I n={icon} className="size-5" /></span>{label}</>}
