@@ -267,10 +267,10 @@ export default function Sport() {
   // ---------- oran butonu ----------
   const odd = ({ ev, m, code, label, key }: { ev: Ev; m?: Market; code: string; label?: string; key?: any }) => {
     const s = sel(m, code);
-    if (!s || !m || s.suspended) return <div key={key ?? code} title={s?.suspended ? "Askıda" : ""} className="flex h-10 items-center justify-between rounded-[9px] bg-card/50 px-2.5 text-dim">{label && s ? <span className="text-[12px] font-semibold">{label}</span> : <span />}<I n="lock" className="size-3.5" /></div>;
+    if (!s || !m || s.suspended) return <div key={key ?? code} role="img" aria-label={s?.suspended ? "Oran askıda" : "Oran yok"} title={s?.suspended ? "Askıda" : ""} className="flex h-10 items-center justify-between rounded-[9px] bg-card/50 px-2.5 text-dim">{label && s ? <span className="text-[12px] font-semibold">{label}</span> : <span />}<I n="lock" className="size-3.5" /></div>;
     const on = has(s.id); const c = changed[s.id];
     return (
-      <button key={key ?? s.id} onClick={() => toggle(ev, m, s)} title={`${m.name}: ${s.name}`} aria-pressed={on} className={`odd ${on ? "odd-on" : ""}`}>
+      <button key={key ?? s.id} onClick={() => toggle(ev, m, s)} title={`${m.name}: ${s.name}`} aria-label={`${ev.home} - ${ev.away}, ${m.name}: ${s.name}, oran ${s.odds.toFixed(2)}${on ? ", kuponda" : ""}`} aria-pressed={on} className={`odd ${on ? "odd-on" : ""}`}>
         {label && <span className="l">{label}</span>}
         <span className={`o ml-auto ${!on && c === "up" ? "text-win" : !on && c === "down" ? "text-loss" : ""}`}>{s.odds.toFixed(2)}</span>
         {c && !on && <span className={`absolute right-1 top-1 size-0 border-x-[4px] border-x-transparent ${c === "up" ? "border-b-[5px] border-b-win" : "border-t-[5px] border-t-loss"}`} />}
@@ -347,7 +347,7 @@ export default function Sport() {
             <div className="flex gap-2">
               <label className="flex h-11 min-w-0 flex-1 items-center gap-2 rounded-lg border border-line-strong bg-field px-2 focus-within:border-primary">
                 <span className="grid size-6 shrink-0 place-items-center rounded bg-primary text-[13px] font-extrabold text-primary-fg">₺</span>
-                <input value={stake} onChange={(e) => setStake(e.target.value.replace(/[^0-9.,]/g, ""))} inputMode="decimal" className="w-full bg-transparent text-[15px] font-bold outline-none" placeholder="Tutar" />
+                <input aria-label="Bahis tutarı" value={stake} onChange={(e) => setStake(e.target.value.replace(/[^0-9.,]/g, ""))} inputMode="decimal" className="w-full bg-transparent text-[15px] font-bold outline-none" placeholder="Tutar" />
               </label>
               {[50, 200, 500].map((v) => <button key={v} onClick={() => setStake(String(v))} className="h-11 w-14 rounded-lg bg-card text-sm font-bold text-muted hover:bg-surface-hover hover:text-fg">{v}</button>)}
             </div>
@@ -503,8 +503,9 @@ export default function Sport() {
 
   return (
     <div className="pb-[calc(var(--bottom-nav-h)+64px)] lg:pb-20">
-      {toast && <div className={`fixed left-1/2 top-[calc(var(--header-h)+12px)] z-[70] max-w-[92vw] -translate-x-1/2 rounded-xl px-5 py-3 text-sm font-bold shadow-2xl ${toast.kind === "warn" ? "bg-caution text-[#2a1d00]" : "bg-primary text-primary-fg"}`}>{toast.t}</div>}
+      {toast && <div role="status" aria-live="polite" className={`fixed left-1/2 top-[calc(var(--header-h)+12px)] z-[70] max-w-[92vw] -translate-x-1/2 rounded-xl px-5 py-3 text-sm font-bold shadow-2xl ${toast.kind === "warn" ? "bg-caution text-[#2a1d00]" : "bg-primary text-primary-fg"}`}>{toast.t}</div>}
 
+      <h1 className="sr-only">{evParam ? "Maç detayı" : "Spor bahisleri"}</h1>
       {evParam ? (
         det ? <MatchDetail ev={det as any} info={info} onBack={() => (window.history.length > 1 ? nav(-1) : nav("/spor"))} isPicked={has} onPick={(e, m, x) => toggle(e as any, m as any, x as any)} changed={changed} />
           : detErr ? <div className="rounded-xl bg-panel p-12 text-center"><p className="font-bold">Maç bulunamadı</p><button onClick={() => nav("/spor")} className="btn btn-primary mt-3">Spor sayfasına dön</button></div>
@@ -533,7 +534,7 @@ export default function Sport() {
       <div className="mb-5 flex gap-2">
         <label className="flex h-11 flex-1 items-center gap-2 rounded-lg border border-line bg-panel px-3 focus-within:border-primary/70">
           <I n="search" className="size-4 text-subtle" />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Takım veya lig ara" className="w-full bg-transparent text-sm font-medium outline-none placeholder:text-subtle" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} aria-label="Takım veya lig ara" placeholder="Takım veya lig ara" className="w-full bg-transparent text-sm font-medium outline-none placeholder:text-subtle" />
           {q && <button onClick={() => setQ("")} className="text-subtle hover:text-fg"><I n="x" className="size-4" /></button>}
         </label>
         <div ref={lgRef} className="relative shrink-0 sm:w-72">
@@ -543,7 +544,7 @@ export default function Sport() {
           </button>
           {lgOpen && (
             <div className="animate-slip-item absolute right-0 top-[calc(100%+6px)] z-40 w-[min(320px,calc(100vw-24px))] sm:left-0 sm:w-auto overflow-hidden rounded-xl border border-line bg-panel shadow-[0_18px_50px_rgba(0,0,0,.55)]">
-              <div className="border-b border-line p-2"><label className="flex h-9 items-center gap-2 rounded-lg bg-field px-2.5"><I n="search" className="size-4 text-subtle" /><input autoFocus value={lgQ} onChange={(e) => setLgQ(e.target.value)} placeholder="Lig ara" className="w-full bg-transparent text-sm font-medium outline-none placeholder:text-subtle" /></label></div>
+              <div className="border-b border-line p-2"><label className="flex h-9 items-center gap-2 rounded-lg bg-field px-2.5"><I n="search" className="size-4 text-subtle" /><input autoFocus value={lgQ} onChange={(e) => setLgQ(e.target.value)} aria-label="Lig ara" placeholder="Lig ara" className="w-full bg-transparent text-sm font-medium outline-none placeholder:text-subtle" /></label></div>
               <div className="sb-scroll max-h-72 overflow-y-auto p-1.5">
                 <button onClick={() => { pickLeague(0); setLgOpen(false); }} className={`flex h-10 w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-sm font-bold ${lg === 0 ? "bg-primary/10 text-primary" : "text-muted hover:bg-card hover:text-fg"}`}><SportIcon k="football" className="size-5" /><span className="flex-1">Tüm ligler</span>{lg === 0 && <I n="check" className="size-4" />}</button>
                 {leagues.filter((l) => !lgQ || `${l.name} ${l.country ?? ""}`.toLocaleLowerCase("tr").includes(lgQ.toLocaleLowerCase("tr"))).map((l) => (

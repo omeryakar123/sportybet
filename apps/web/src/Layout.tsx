@@ -114,7 +114,7 @@ function Sidebar() {
           <aside className="animate-sports-fade absolute inset-y-0 left-0 flex w-[min(303px,80vw)] flex-col border-r border-line/60 bg-rail" onClick={(e) => e.stopPropagation()}>
             <div className="flex h-[var(--header-h)] shrink-0 items-center justify-between border-b border-line/60 bg-header px-4">
               <Logo />
-              <button onClick={() => setSidebarOpen(false)} className="grid size-9 place-items-center rounded-lg text-muted hover:text-fg"><I n="x" className="size-5" /></button>
+              <button onClick={() => setSidebarOpen(false)} aria-label="Menüyü kapat" className="grid size-9 place-items-center rounded-lg text-muted hover:text-fg"><I n="x" className="size-5" /></button>
             </div>
             <SidebarBody />
           </aside>
@@ -207,7 +207,7 @@ function Header() {
   return (
     <header className="sticky top-0 z-30 h-[var(--header-h)] border-b border-line/60 bg-header">
       <div className="mx-auto flex h-full max-w-[1286px] items-center gap-2 px-4">
-        <button onClick={() => setSidebarOpen(true)} className="mr-1 grid size-9 place-items-center rounded-lg text-muted hover:text-fg lg:hidden"><I n="menu" className="size-6" /></button>
+        <button onClick={() => setSidebarOpen(true)} aria-label="Menüyü aç" className="mr-1 grid size-9 place-items-center rounded-lg text-muted hover:text-fg lg:hidden"><I n="menu" className="size-6" /></button>
         <Link to="/" className="mr-2 lg:hidden"><Logo className="h-7" /></Link>
         <nav className="hidden items-center gap-2 min-[480px]:flex">
           <NavPill to="/spor" icon="ball" label="Spor" />
@@ -301,6 +301,7 @@ function AuthModal() {
   const [f, setF] = useState({ username: "", password: "", email: "", phone: "" });
   const [err, setErr] = useState(""); const [busy, setBusy] = useState(false);
   useEffect(() => { if (authOpen) { setMode(authOpen === "register" ? "register" : "login"); setErr(""); } }, [authOpen]);
+  useEffect(() => { if (!authOpen) return; const k = (e: KeyboardEvent) => e.key === "Escape" && setAuthOpen(false); window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k); }, [authOpen]);
   if (!authOpen) return null;
   async function submit(e: React.FormEvent) {
     e.preventDefault(); setErr(""); setBusy(true);
@@ -313,10 +314,10 @@ function AuthModal() {
   }
   return (
     <div className="fixed inset-0 z-[60] grid place-items-center bg-black/70 p-4 backdrop-blur-sm" onMouseDown={(e) => e.target === e.currentTarget && setAuthOpen(false)}>
-      <div className="animate-slip-reveal w-full max-w-[410px] rounded-2xl border border-line bg-panel p-6 shadow-[0_30px_80px_rgba(0,0,0,.6)]">
+      <div role="dialog" aria-modal="true" aria-label={mode === "login" ? "Giriş yap" : "Kayıt ol"} className="animate-slip-reveal w-full max-w-[410px] rounded-2xl border border-line bg-panel p-6 shadow-[0_30px_80px_rgba(0,0,0,.6)]">
         <div className="mb-5 flex items-center justify-between">
           <Logo className="h-8" />
-          <button onClick={() => setAuthOpen(false)} className="grid size-9 place-items-center rounded-lg text-muted hover:bg-card hover:text-fg"><I n="x" className="size-5" /></button>
+          <button onClick={() => setAuthOpen(false)} aria-label="Kapat" className="grid size-9 place-items-center rounded-lg text-muted hover:bg-card hover:text-fg"><I n="x" className="size-5" /></button>
         </div>
         <div className="mb-5 grid grid-cols-2 rounded-lg bg-field p-1">
           {(["login", "register"] as const).map((m) => (
@@ -324,12 +325,12 @@ function AuthModal() {
           ))}
         </div>
         <form onSubmit={submit} className="space-y-3">
-          <Field label="Kullanıcı adı"><input className={inp} value={f.username} onChange={(e) => setF({ ...f, username: e.target.value })} autoFocus /></Field>
+          <Field label="Kullanıcı adı"><input className={inp} autoComplete="username" value={f.username} onChange={(e) => setF({ ...f, username: e.target.value })} autoFocus /></Field>
           {mode === "register" && <>
-            <Field label="E-posta (isteğe bağlı)"><input className={inp} type="email" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} /></Field>
+            <Field label="E-posta (isteğe bağlı)"><input className={inp} type="email" autoComplete="email" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} /></Field>
             <Field label="Telefon (isteğe bağlı)"><input className={inp} value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} /></Field>
           </>}
-          <Field label="Şifre"><input className={inp} type="password" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} /></Field>
+          <Field label="Şifre"><input className={inp} type="password" autoComplete={mode === "login" ? "current-password" : "new-password"} value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} /></Field>
           <ErrBox e={err} />
           <Btn className="w-full" disabled={busy || !f.username || f.password.length < 6}>{mode === "login" ? "Giriş Yap" : "Hesap oluştur"}</Btn>
           {mode === "register" && <p className="text-center text-xs text-dim">Kayıt olarak 18 yaşından büyük olduğunu ve kullanıcı sözleşmesini kabul ettiğini onaylarsın.</p>}
@@ -347,9 +348,10 @@ export default function Layout() {
   const bare = false;
   return (
     <div className={`min-h-dvh lg:pl-[var(--sidebar-w)] ${chatOpen ? "xl:pr-[340px]" : ""}`}>
+      <a href="#icerik" className="sr-only z-[80] rounded-lg bg-primary px-4 py-2 font-bold text-primary-fg focus:not-sr-only focus:fixed focus:left-3 focus:top-3">İçeriğe geç</a>
       <Sidebar />
       <Header />
-      <main className={bare ? "" : `mx-auto px-3 pt-4 pb-24 sm:px-4 lg:pb-10 ${loc.pathname.startsWith("/spor") ? "max-w-[1480px]" : "max-w-[1286px] pt-[22px]"}`}>
+      <main id="icerik" tabIndex={-1} className={bare ? "" : `mx-auto px-3 pt-4 pb-24 sm:px-4 lg:pb-10 ${loc.pathname.startsWith("/spor") ? "max-w-[1480px]" : "max-w-[1286px] pt-[22px]"}`}>
         <Outlet />
       </main>
       {!loc.pathname.startsWith("/spor") && <Footer />}

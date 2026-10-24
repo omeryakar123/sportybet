@@ -199,7 +199,7 @@ function OddBtn({ ev, m, s, label, row, props }: { ev: DEv; m: DMarket; s: DSel;
   const on = props.isPicked(s.id); const c = props.changed[s.id];
   if (s.suspended) return <div className="flex h-12 w-full items-center justify-between rounded-lg bg-card/60 px-3 text-[14px] text-dim"><span className="truncate">{label}</span><I n="lock" className="size-4" /></div>;
   return (
-    <button onClick={() => props.onPick(ev, m, s)}
+    <button onClick={() => props.onPick(ev, m, s)} aria-label={`${m.name}: ${label}, oran ${s.odds.toFixed(2)}${on ? ", kuponda" : ""}`}
       aria-pressed={on} className={`odd h-12 w-full text-[14px] font-semibold ${on ? "odd-on" : "text-muted hover:text-fg"}`}>
       <span className="truncate text-left">{label}</span>
       <span className={`num flex items-center gap-1 text-[17px] font-bold ${on ? "" : c === "up" ? "text-win" : c === "down" ? "text-loss" : "text-fg"}`}>{!on && c === "up" ? "▲" : !on && c === "down" ? "▼" : ""}{s.odds.toFixed(2)}</span>

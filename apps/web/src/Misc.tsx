@@ -30,7 +30,7 @@ export function Promotions() {
           <input className="w-full bg-transparent text-sm font-medium outline-none placeholder:text-subtle" placeholder="Promosyon ara" value={q} onChange={(e) => setQ(e.target.value)} />
         </label>
         <div className="flex gap-2">
-          <input className={inp + " w-48 uppercase sm:w-56"} placeholder="Promosyon kodunu gir" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} />
+          <input aria-label="Promosyon kodu" className={inp + " w-48 uppercase sm:w-56"} placeholder="Promosyon kodunu gir" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} />
           <Btn className="!h-[46px] shrink-0" disabled={code.length < 3} onClick={redeem}>Kodu al</Btn>
         </div>
       </div>

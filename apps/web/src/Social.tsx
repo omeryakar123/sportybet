@@ -95,7 +95,7 @@ export function ChatPanel({ onClose }: { onClose: () => void }) {
         <button onClick={onClose} className="grid size-8 place-items-center rounded-full bg-card text-subtle hover:text-fg" aria-label="Sohbeti kapat"><I n="x" className="size-4" /></button>
       </div>
       {st?.rain && <div className="pt-2"><RainCard rain={st.rain} onJoin={join} busy={busy} /></div>}
-      <div ref={box} onScroll={(e) => { const el = e.currentTarget; stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60; }} className="sb-scroll min-h-0 flex-1 space-y-1 overflow-y-auto px-2 py-2">
+      <div ref={box} onScroll={(e) => { const el = e.currentTarget; stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60; }} className="sb-scroll min-h-0 flex-1 space-y-1 overflow-y-auto px-2 py-2" role="log" aria-label="Sohbet mesajları" aria-live="polite">
         {msgs.length === 0 && <div className="px-4 py-10 text-center text-[13px] text-subtle">Henüz mesaj yok. İlk yazan sen ol!</div>}
         {msgs.map((m) => m.kind === "SYSTEM" ? (
           <div key={m.id} className="mx-2 rounded-lg bg-card/60 px-3 py-2 text-center text-[12px] font-semibold text-soft">{m.text}</div>
@@ -123,14 +123,14 @@ export function ChatPanel({ onClose }: { onClose: () => void }) {
           <div className="space-y-2">
             <div className="text-[12px] font-semibold text-subtle">Yağmur: tutar {st?.limits?.rainMin ? `(min ${money(st.limits.rainMin)})` : ""} 60 sn içinde katılanlara eşit dağıtılır.</div>
             <div className="flex gap-2">
-              <label className="flex h-11 flex-1 items-center gap-2 rounded-lg border border-line-strong bg-field px-2"><span className="grid size-6 place-items-center rounded bg-primary text-[13px] font-extrabold text-primary-fg">₺</span><input value={rainAmt} onChange={(e) => setRainAmt(e.target.value.replace(/[^0-9.,]/g, ""))} inputMode="decimal" className="w-full bg-transparent font-bold outline-none" /></label>
+              <label className="flex h-11 flex-1 items-center gap-2 rounded-lg border border-line-strong bg-field px-2"><span className="grid size-6 place-items-center rounded bg-primary text-[13px] font-extrabold text-primary-fg">₺</span><input aria-label="Yağmur tutarı" value={rainAmt} onChange={(e) => setRainAmt(e.target.value.replace(/[^0-9.,]/g, ""))} inputMode="decimal" className="w-full bg-transparent font-bold outline-none" /></label>
               <button disabled={busy} onClick={makeRain} className="btn btn-primary px-4">Başlat</button>
               <button onClick={() => setRainOpen(false)} className="h-11 rounded-lg bg-card px-3 text-subtle hover:text-fg"><I n="x" className="size-4" /></button>
             </div>
           </div>
         ) : (
           <div className="flex gap-2">
-            <input value={text} maxLength={st?.limits?.maxLen ?? 200} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && sendMsg()} onFocus={() => !me && setAuthOpen(true)}
+            <input aria-label="Sohbet mesajı" value={text} maxLength={st?.limits?.maxLen ?? 200} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && sendMsg()} onFocus={() => !me && setAuthOpen(true)}
               placeholder={me ? "Bir şeyler yaz…" : "Yazmak için giriş yap"} className="input min-w-0 flex-1 text-sm" />
             {st?.limits?.rainEnabled && <button onClick={() => (me ? setRainOpen(true) : setAuthOpen(true))} title="Yağmur başlat" aria-label="Yağmur başlat" className="grid size-11 shrink-0 place-items-center rounded-lg bg-card text-accent hover:bg-surface-hover"><I n="rain" className="size-5" /></button>}
             <button disabled={busy || !text.trim()} onClick={sendMsg} className="grid size-11 shrink-0 place-items-center rounded-lg bg-card text-primary hover:bg-surface-hover disabled:opacity-40" aria-label="Gönder"><I n="send" className="size-5" /></button>
@@ -148,15 +148,16 @@ export function ChatPanel({ onClose }: { onClose: () => void }) {
 export function ProfileModal() {
   const { profileId, openProfile, me, setWalletOpen, setTipTo } = useStore();
   const [p, setP] = useState<any>(null); const [err, setErr] = useState("");
+  useEffect(() => { if (!profileId) return; const k = (e: KeyboardEvent) => e.key === "Escape" && openProfile(null); window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k); }, [profileId]);
   useEffect(() => { if (!profileId) return; setP(null); setErr(""); api(`/api/profile/${profileId}`).then(setP).catch((e) => setErr(e.message)); }, [profileId]);
   if (!profileId) return null;
   const net = p?.stats?.net ?? 0;
   return (
     <div className="fixed inset-0 z-[70] grid place-items-center bg-black/70 p-4 backdrop-blur-sm" onMouseDown={(e) => e.target === e.currentTarget && openProfile(null)}>
-      <div className="animate-slip-reveal w-full max-w-[560px] overflow-hidden rounded-2xl border border-line bg-panel shadow-[0_30px_80px_rgba(0,0,0,.6)]">
+      <div role="dialog" aria-modal="true" aria-label="Oyuncu profili" className="animate-slip-reveal w-full max-w-[560px] overflow-hidden rounded-2xl border border-line bg-panel shadow-[0_30px_80px_rgba(0,0,0,.6)]">
         <div className="relative bg-[radial-gradient(120%_140%_at_50%_-20%,rgba(31,232,138,.35),transparent_60%)] px-5 pt-4 pb-5">
           <div className="mb-3 text-center text-[15px] font-extrabold">Profil</div>
-          <button onClick={() => openProfile(null)} className="absolute right-4 top-4 grid size-8 place-items-center rounded-full bg-black/30 text-muted hover:text-fg"><I n="x" className="size-4" /></button>
+          <button onClick={() => openProfile(null)} aria-label="Kapat" className="absolute right-4 top-4 grid size-8 place-items-center rounded-full bg-black/30 text-muted hover:text-fg"><I n="x" className="size-4" /></button>
           {!p ? <div className="py-8 text-center text-sm text-subtle">{err ? "Profil bulunamadı" : "Yükleniyor…"}</div> : (
             <div className="flex items-center gap-4 rounded-xl bg-black/25 p-4">
               <Avatar src={p.avatar} name={p.name} className="size-16 ring-2 ring-primary/50" />
@@ -194,10 +195,11 @@ export function WalletModal() {
   const [code, setCode] = useState(""); const [amt, setAmt] = useState(""); const [user, setUser] = useState("");
   const [err, setErr] = useState(""); const [ok, setOk] = useState(""); const [busy, setBusy] = useState(false);
   useEffect(() => { setErr(""); setOk(""); if (walletOpen === "tip") setUser(tipTo); }, [walletOpen]);
+  useEffect(() => { if (!walletOpen) return; const k = (e: KeyboardEvent) => { if (e.key === "Escape") { setWalletOpen(false); setTipTo(""); } }; window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k); }, [walletOpen]);
   if (!walletOpen || !me) return null;
   const close = () => { setWalletOpen(false); setTipTo(""); };
   const go = (to: string) => { close(); nav(to); };
-  const back = <button onClick={() => setWalletOpen("menu")} className="grid size-8 place-items-center rounded-full text-subtle hover:text-fg"><I n="left" className="size-4" /></button>;
+  const back = <button onClick={() => setWalletOpen("menu")} aria-label="Geri" className="grid size-8 place-items-center rounded-full text-subtle hover:text-fg"><I n="left" className="size-4" /></button>;
   async function redeem() {
     setBusy(true); setErr(""); setOk("");
     try { const r: any = await api("/api/promo/redeem", { method: "POST", json: { code: code.trim() } }); setOk(`Kod kullanıldı! ${money(r.amount)} bonus hesabına yüklendi.`); setCode(""); refreshMe(); } catch (e: any) { setErr(e.message); }
@@ -218,11 +220,11 @@ export function WalletModal() {
   );
   return (
     <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/70 backdrop-blur-sm sm:items-center sm:p-4" onMouseDown={(e) => e.target === e.currentTarget && close()}>
-      <div className="animate-slip-reveal flex max-h-[92dvh] w-full max-w-[440px] flex-col overflow-hidden rounded-t-2xl border border-line bg-panel-deep shadow-[0_30px_80px_rgba(0,0,0,.6)] sm:rounded-2xl">
+      <div role="dialog" aria-modal="true" aria-label="Cüzdan" className="animate-slip-reveal flex max-h-[92dvh] w-full max-w-[440px] flex-col overflow-hidden rounded-t-2xl border border-line bg-panel-deep shadow-[0_30px_80px_rgba(0,0,0,.6)] sm:rounded-2xl">
         <div className="flex h-14 shrink-0 items-center gap-2 px-3">
           {walletOpen !== "menu" ? back : <span className="size-8" />}
           <span className="flex-1 text-center text-[16px] font-extrabold">{walletOpen === "menu" ? "Cüzdan" : walletOpen === "promo" ? "Promo Kodu" : "Bahşiş Gönder"}</span>
-          <button onClick={close} className="grid size-8 place-items-center rounded-full bg-card text-subtle hover:text-fg"><I n="x" className="size-4" /></button>
+          <button onClick={close} aria-label="Kapat" className="grid size-8 place-items-center rounded-full bg-card text-subtle hover:text-fg"><I n="x" className="size-4" /></button>
         </div>
         <div className="sb-scroll overflow-y-auto px-3 pb-4">
           {walletOpen === "menu" && (
@@ -251,7 +253,7 @@ export function WalletModal() {
           {walletOpen === "tip" && (
             <div className="space-y-3 pt-1">
               <label className="block"><span className="mb-1.5 block text-[13px] font-semibold text-soft">Tutar</span>
-                <span className="flex h-12 items-center gap-2 rounded-lg border border-line-strong bg-field px-3 focus-within:border-primary"><span className="grid size-6 place-items-center rounded bg-primary text-[13px] font-extrabold text-primary-fg">₺</span><input value={amt} onChange={(e) => setAmt(e.target.value.replace(/[^0-9.,]/g, ""))} inputMode="decimal" placeholder="0,00" className="w-full bg-transparent font-bold outline-none" /></span></label>
+                <span className="flex h-12 items-center gap-2 rounded-lg border border-line-strong bg-field px-3 focus-within:border-primary"><span className="grid size-6 place-items-center rounded bg-primary text-[13px] font-extrabold text-primary-fg">₺</span><input aria-label="Bahşiş tutarı" value={amt} onChange={(e) => setAmt(e.target.value.replace(/[^0-9.,]/g, ""))} inputMode="decimal" placeholder="0,00" className="w-full bg-transparent font-bold outline-none" /></span></label>
               <label className="block"><span className="mb-1.5 block text-[13px] font-semibold text-primary">Kullanıcı adı</span>
                 <input value={user} onChange={(e) => setUser(e.target.value)} placeholder="Kullanıcı adını gir" className="input input-lg" /></label>
               <div className="flex items-center gap-2 rounded-lg bg-caution/10 px-3 py-2.5 text-[13px] font-semibold text-caution"><I n="shield" className="size-4 shrink-0" />Bahşişler iade edilmez. Ana Para bakiyenden düşülür.</div>

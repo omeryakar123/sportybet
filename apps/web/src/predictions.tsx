@@ -302,7 +302,7 @@ export function PredictionDetail() {
                     <span className="shrink-0 text-sm font-extrabold text-primary">{Math.round(out.probability)}%</span>
                   </div>
                 </div>
-                <input className={inp} inputMode="decimal" placeholder={`Tutar (${money0(cur.minStake)} – ${money0(cur.maxStake)})`} value={amount}
+                <input aria-label="Tahmin tutarı" className={inp} inputMode="decimal" placeholder={`Tutar (${money0(cur.minStake)} – ${money0(cur.maxStake)})`} value={amount}
                   onChange={(e) => setAmount(e.target.value.replace(/[^0-9.,]/g, "").replace(",", "."))} />
                 <div className="mt-2 grid grid-cols-4 gap-2">
                   {[50, 100, 500, 1000].map((v) => (

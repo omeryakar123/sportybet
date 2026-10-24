@@ -20,7 +20,7 @@ body { @apply bg-page font-sans text-fg antialiased; font-feature-settings: "cv1
 .odd:active { transform: translateY(1px); }
 .odd-on { background: #1fe88a !important; color: #062314; box-shadow: inset 0 1px 0 rgba(255,255,255,.35), 0 6px 18px -6px rgba(31,232,138,.65); }
 .odd .o { font-family: "Barlow Semi Condensed", Manrope, sans-serif; font-variant-numeric: tabular-nums; font-weight: 700; font-size: 15px; }
-.odd .l { font-size: 12px; font-weight: 600; color: #7f8ea0; }
+.odd .l { font-size: 12px; font-weight: 600; color: #93a2b4; }
 .odd-on .l { color: rgba(6,35,20,.65); }
 .no-scrollbar { scrollbar-width: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }

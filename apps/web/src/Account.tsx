@@ -298,7 +298,7 @@ export function MyBonuses() {
       <div className="mb-5 rounded-lg border border-line bg-card p-4">
         <div className="mb-2 text-sm font-extrabold">Promosyon kodun mu var?</div>
         <div className="flex gap-2">
-          <input className={inp + " uppercase"} placeholder="Kodu gir" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} />
+          <input aria-label="Promosyon kodu" className={inp + " uppercase"} placeholder="Kodu gir" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} />
           <Btn className="!h-[46px]" disabled={code.length < 3} onClick={redeem}>Kodu kullan</Btn>
         </div>
       </div>
