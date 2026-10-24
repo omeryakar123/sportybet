@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { api, setToken } from "./api";
+import { api, asset, setToken } from "./api";
 import { Avatar, Btn, ErrBox, Field, I, inp, money, pct, useStore, scrollMain } from "./lib";
 import { ChatPanel, ProfileModal, WalletModal } from "./Social";
 import { BannerImage } from "./CmsSlot";
 
-function Logo({ className = "h-9" }: { className?: string }) {
+function Logo({ className = "h-9", mobile }: { className?: string; mobile?: boolean }) {
   const { settings } = useStore();
+  const src = asset((mobile && settings.logoMobileUrl) || settings.logoUrl);
   // Şimdilik logo kullanılmıyor — yalnızca CMS'ten bir logo yüklenirse gösterilir.
-  if (settings.logoUrl) return <img src={settings.logoUrl} alt={settings.siteName ?? ""} className={`${className} w-auto max-w-[220px] object-contain object-left`} draggable={false} />;
+  if (src) return <img src={src} alt={settings.siteName ?? ""} className={`${className} w-auto max-w-[220px] object-contain object-left`} draggable={false} />;
   return null;
 }
 
@@ -207,7 +208,7 @@ function Header() {
     <header className="relative z-30 h-[var(--header-h)] shrink-0 border-b border-white/[.04] bg-[rgba(8,13,19,.75)] backdrop-blur-[12px] transition-[background-color] duration-200">
       <div className="mx-auto flex h-full max-w-[1286px] items-center gap-2 px-4">
         <button onClick={() => setSidebarOpen(true)} aria-label="Menüyü aç" className="mr-1 hidden size-9 place-items-center rounded-lg text-muted hover:text-fg"><I n="menu" className="size-6" /></button>
-        <Link to="/" className="mr-2 shrink-0 lg:hidden"><Logo className="h-7" /></Link>
+        <Link to="/" className="mr-2 shrink-0 lg:hidden"><Logo className="h-9" mobile /></Link>
         <nav className="hidden items-center gap-2 min-[480px]:flex">
           <NavPill to="/spor" icon="ball" label="Spor" />
           <NavPill to="/tahminler" icon="vote" label="Tahminler" />

@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import { api, getToken, setToken } from "./api";
+import { api, getToken, setToken, asset } from "./api";
 
 // ---------- biçimleme ----------
 export const money = (v: any) => "₺" + Number(v ?? 0).toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -119,14 +119,21 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const refreshMe = async () => { if (!getToken()) return setMe(null); try { setMe(await api("/api/me")); } catch (e: any) { if (e?.message === "UNAUTHORIZED" || !getToken()) setMe(null); else setTimeout(() => { if (getToken()) api("/api/me").then(setMe).catch(() => {}); }, 4000); } };
   useEffect(() => {
     refreshMe();
-    api("/api/cms/settings/site_general").then((v) => setSettings(v ?? {})).catch(() => {});
+    api("/api/cms/settings/site_general").then((v) => {
+      setSettings(v ?? {});
+      if (v?.faviconUrl) { let l = document.querySelector("link[rel~='icon']") as HTMLLinkElement | null; if (!l) { l = document.createElement("link"); l.rel = "icon"; document.head.appendChild(l); } l.href = asset(v.faviconUrl); }
+    }).catch(() => {});
     api("/api/cms/settings/menus").then((v) => setMenus(v ?? {})).catch(() => {});
     api("/api/prediction-categories").then((r) => setPredCats(r.data ?? [])).catch(() => {});
     // CMS özel CSS
     const key = window.innerWidth < 768 ? "mobile_css" : "web_css";
     api(`/api/cms/settings/${key}`).then((v) => { if (v?.css) { const el = document.createElement("style"); el.textContent = v.css; document.head.appendChild(el); } }).catch(() => {});
     // SEO
-    api("/api/cms/settings/seo").then((v) => { if (v?.title) document.title = v.title; }).catch(() => {});
+    api("/api/cms/settings/seo").then((v) => {
+      if (v?.title) document.title = v.title;
+      const meta = (n: string, c?: string, prop = false) => { if (!c) return; let m = document.querySelector(`meta[${prop ? "property" : "name"}="${n}"]`) as HTMLMetaElement | null; if (!m) { m = document.createElement("meta"); m.setAttribute(prop ? "property" : "name", n); document.head.appendChild(m); } m.content = c; };
+      meta("description", v?.description); meta("keywords", v?.keywords); meta("og:image", v?.ogImage ? asset(v.ogImage) : undefined, true);
+    }).catch(() => {});
   }, []);
   useEffect(() => { const t = setInterval(() => { if (getToken()) refreshMe(); }, 30_000); return () => clearInterval(t); }, []);
   const balance = (t: "MAIN" | "BONUS") => Number(me?.wallets?.find((w: any) => w.type === t)?.balance ?? 0);
